@@ -19,33 +19,6 @@ MATE_IN_1_FEN = "6k1/5ppp/8/8/8/8/8/4R2K w - - 0 1"  # Re1-e8#
 COMPLEX_FEN = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4"
 
 
-def pytest_configure(config: pytest.Config) -> None:
-    """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "integration: mark test as integration test (requires Stockfish binary)"
-    )
-
-
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Skip integration tests unless --integration flag is passed."""
-    run_integration = config.getoption("--integration", default=False)
-    if not run_integration:
-        skip_integration = pytest.mark.skip(reason="need --integration option to run")
-        for item in items:
-            if "integration" in item.keywords:
-                item.add_marker(skip_integration)
-
-
-def pytest_addoption(parser: pytest.Parser) -> None:
-    """Add custom command line options."""
-    parser.addoption(
-        "--integration",
-        action="store_true",
-        default=False,
-        help="run integration tests (requires Stockfish binary)",
-    )
-
-
 @pytest.fixture
 def stockfish_available() -> bool:
     """Check if Stockfish binary is available."""
