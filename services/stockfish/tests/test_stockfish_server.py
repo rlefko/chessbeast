@@ -249,9 +249,7 @@ class TestCreateServer:
         assert pool is not None
         assert not pool.is_started
 
-    def test_create_server_with_custom_config(
-        self, mock_simple_engine: MagicMock
-    ) -> None:
+    def test_create_server_with_custom_config(self, mock_simple_engine: MagicMock) -> None:
         """Server can be created with custom config."""
         server_config = ServerConfig(port=50052, max_workers=5)
         pool_config = PoolConfig(size=2)

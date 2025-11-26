@@ -187,9 +187,7 @@ class EnginePool:
         try:
             engine = self._available.get(timeout=timeout)
         except queue.Empty as e:
-            raise PoolExhaustedError(
-                f"No engine available within {timeout}s timeout"
-            ) from e
+            raise PoolExhaustedError(f"No engine available within {timeout}s timeout") from e
 
         # Verify engine is healthy, restart if needed
         if not engine.is_alive():
