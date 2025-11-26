@@ -1,0 +1,171 @@
+# ========================================
+# Secrets & Credentials
+# ========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets/
+*.secret
+*_secret.*
+api_keys.json
+.secrets/
+
+# ========================================
+# Python
+# ========================================
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+pytestdebug.log
+.ruff_cache/
+
+# ========================================
+# Node.js
+# ========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+.pnpm-debug.log*
+
+# TypeScript
+dist/
+*.tsbuildinfo
+*.js.map
+.turbo/
+
+# ========================================
+# Data Files (Large)
+# ========================================
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+services/maia/models/
+*.pb
+*.onnx
+*.h5
+*.pt
+*.pth
+*.safetensors
+*.bin
+
+# Lichess database downloads
+*.pgn.zst
+*.pgn.bz2
+
+# ========================================
+# Build Artifacts
+# ========================================
+coverage/
+.nyc_output/
+*.lcov
+.cache/
+
+# gRPC generated files (can be regenerated)
+# packages/grpc-client/src/generated/
+# services/*/src/generated/
+
+# ========================================
+# IDE & Editor
+# ========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# ========================================
+# OS Files
+# ========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ========================================
+# Logs
+# ========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ========================================
+# Testing
+# ========================================
+.pytest_cache/
+__pycache__/
+*.pyc
+.coverage
+htmlcov/
+.tox/
+coverage/
+*.cover
+*.py,cover
+.hypothesis/
+
+# ========================================
+# Docker
+# ========================================
+*.log
+docker-compose.override.yml
+
+# ========================================
+# Misc
+# ========================================
+*.bak
+*.tmp
+*.temp
+.cache/
+*.pid
+*.seed
+*.pid.lock

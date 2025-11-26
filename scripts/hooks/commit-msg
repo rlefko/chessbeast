@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Commit message validation hook
+# Format: <emoji> <single sentence, no ending punctuation>
+
+commit_msg_file=$1
+commit_msg=$(cat "$commit_msg_file")
+
+# Valid emoji prefixes (common ones)
+emoji_pattern="^(✨|🐛|♻️|📝|🧪|🔧|⬆️|🎉|🔥|💄|🚀|✅|🔒|⚡|🏗️|➕|➖|🔀|⏪|🚚|📦|👷|💚|📈|🩹|🗑️|🙈|📸|⚗️|🏷️|🌱|🚩|💡|🍻|💬|🗃️|🔊|🔇|👥|🚸|🏁|♿|🤖|🌐)"
+
+# Check if message starts with an emoji
+if ! echo "$commit_msg" | grep -qE "$emoji_pattern"; then
+    echo "ERROR: Commit message must start with an emoji prefix."
+    echo ""
+    echo "Valid prefixes include:"
+    echo "  ✨ New feature"
+    echo "  🐛 Bug fix"
+    echo "  ♻️ Refactor"
+    echo "  📝 Documentation"
+    echo "  🧪 Tests"
+    echo "  🔧 Configuration"
+    echo "  ⬆️ Dependencies"
+    echo "  🎉 Initial commit"
+    echo ""
+    echo "Your message: $commit_msg"
+    exit 1
+fi
+
+# Check that message is a single line (no newlines in the subject)
+line_count=$(echo "$commit_msg" | head -1 | wc -l)
+first_line=$(echo "$commit_msg" | head -1)
+
+# Check for ending punctuation (. ! ?)
+if echo "$first_line" | grep -qE '[.!?]$'; then
+    echo "ERROR: Commit message should not end with punctuation."
+    echo ""
+    echo "Your message: $first_line"
+    exit 1
+fi
+
+# Check message length (reasonable limit)
+msg_length=${#first_line}
+if [ "$msg_length" -gt 100 ]; then
+    echo "ERROR: Commit message is too long ($msg_length chars). Keep it under 100 characters."
+    echo ""
+    echo "Your message: $first_line"
+    exit 1
+fi
+
+# Check that there's actual content after the emoji
+content_after_emoji=$(echo "$first_line" | sed -E "s/$emoji_pattern\s*//" | xargs)
+if [ -z "$content_after_emoji" ]; then
+    echo "ERROR: Commit message must have content after the emoji."
+    echo ""
+    echo "Your message: $first_line"
+    exit 1
+fi
+
+exit 0
