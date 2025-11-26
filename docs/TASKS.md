@@ -165,42 +165,42 @@
 
 ---
 
-## Milestone 3: Maia Service (Python + gRPC)
+## Milestone 3: Maia Service (Python + gRPC) - Using Maia2
 
-### 3.1 Model Loading
-- [ ] Download Maia model weights (1100-1900 rating bands)
-- [ ] Implement model loading/caching
-- [ ] Support loading specific rating band model
-- [ ] Support loading multiple models for ensemble
+### 3.1 Model Loading (Maia2)
+- [ ] Install Maia2 package (`pip install maia2`)
+- [ ] Implement Maia2Model wrapper class
+- [ ] Support model types: "rapid" and "blitz"
+- [ ] Support device selection: CPU or CUDA
 
 ### 3.2 Move Prediction API
-- [ ] Implement `predictMoves(fen, ratingBand)` method
+- [ ] Implement `predictMoves(fen, playerElo)` method using Maia2
+- [ ] Support continuous ELO ratings (any value, not just fixed bands)
 - [ ] Return top moves with probabilities
 - [ ] Handle all legal positions
-- [ ] Optimize batch prediction if needed
 
 ### 3.3 Rating Estimation
 - [ ] Implement `estimateRating(moves[])` method
-- [ ] Compare played moves against predictions across rating bands
-- [ ] Return estimated rating range
+- [ ] Use Maia2's inference across multiple ELO values to find best fit
+- [ ] Return estimated rating with confidence bounds
 - [ ] Handle short games gracefully
 
 ### 3.4 Human-Likeness Scoring
-- [ ] For a position + played move, return P(human plays this)
-- [ ] Implement for each rating band
+- [ ] For a position + played move, return P(human plays this) at given ELO
+- [ ] Support any ELO rating as continuous parameter
 - [ ] Define "natural but flawed" vs "engine-like" classification
 
 ### 3.5 gRPC Service
 - [ ] Implement `MaiaService` gRPC server
-- [ ] Define request/response messages
-- [ ] Add health check endpoint
-- [ ] Handle model loading on startup
+- [ ] Implement PredictMoves, EstimateRating, HealthCheck RPCs
+- [ ] Add proper error handling with gRPC status codes
+- [ ] Load Maia2 model on startup
 
 ### 3.6 Testing
+- [ ] Unit tests with mocked Maia2 module
 - [ ] Test predictions against known positions
 - [ ] Test rating estimation accuracy
-- [ ] Test service under load
-- [ ] Validate probability distributions
+- [ ] Test gRPC error handling
 
 ---
 
@@ -231,9 +231,9 @@
 - [ ] Select meaningful alternatives (different plans, not just move order)
 - [ ] Tag sidelines with purpose (tactical, strategic, simplifying)
 
-### 4.5 Integration with Maia
-- [ ] Fetch human-likeness for all moves
-- [ ] Use Maia for rating estimation if metadata missing
+### 4.5 Integration with Maia2
+- [ ] Fetch human-likeness for all moves using Maia2
+- [ ] Use Maia2 for rating estimation if metadata missing
 - [ ] Adjust classification thresholds based on estimated rating
 - [ ] Identify "natural mistakes" vs "uncharacteristic errors"
 
@@ -472,7 +472,7 @@
 - Node.js 18+
 
 ### External Data
-- Maia model weights (~100MB per rating band)
+- Maia2 model (auto-downloaded via `pip install maia2`)
 - ECO opening database
 - Lichess Elite database (download from Lichess)
 
@@ -485,7 +485,7 @@
 
 | Risk | Mitigation |
 |------|------------|
-| Maia model complexity | Start with single rating band, add others incrementally |
+| Maia2 model size | Maia2 auto-downloads models; single unified model simplifies deployment |
 | LLM hallucinations | Strict prompts, provide only verified data, validate output |
 | Database size | Use efficient indexing, consider caching common positions |
 | gRPC complexity | Start with simple REST, migrate to gRPC if needed |

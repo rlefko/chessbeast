@@ -6,6 +6,8 @@ requires-python = ">=3.12"
 dependencies = [
     "grpcio>=1.60",
     "protobuf>=4.25",
+    "chess>=1.10",
+    "maia2>=0.1.0",
 ]
 
 [build-system]

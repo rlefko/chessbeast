@@ -6,7 +6,7 @@ Product name (working): ExplainChess
 
 ExplainChess is a chess analysis tool that takes a PGN as input and returns a fully annotated PGN as output. It combines:
 	•	Stockfish (optimal play, precise evaluation)
-	•	Maia Chess (human-like move prediction by rating)
+	•	Maia2 (unified human-like move prediction at any rating level)
 	•	LLMs (natural language and pedagogical explanations)
 	•	Game databases (opening theory, master & amateur reference games)
 
@@ -22,7 +22,7 @@ The following technology choices have been made for v1:
 |-----------|------------|-----------|
 | Architecture | Hybrid (TypeScript + Python) | Best of both worlds: TypeScript for CLI/API, Python for ML |
 | CLI & Orchestration | TypeScript / Node.js | Modern async, good DX, familiar ecosystem |
-| ML Services | Python + gRPC | Native Maia/Stockfish support, efficient binary protocol |
+| ML Services | Python + gRPC | Native Maia2/Stockfish support, efficient binary protocol |
 | LLM Provider | OpenAI GPT-4o (upgradeable to GPT-5) | Strong performance, good API |
 | Database | SQLite | Simple local storage, no external dependencies |
 | Deployment Target | Local CLI | Simplicity for v1; cloud deployment deferred |
@@ -45,8 +45,8 @@ The following technology choices have been made for v1:
 	•	Reference notable master games and typical amateur patterns.
 	5.	Produce standard‑compliant annotated PGN
 	•	Legal PGN with comments, NAGs, and sidelines that can be loaded into common GUIs.
-	6.	Integrate Maia for human-likeness analysis (Core Requirement)
-	•	Use Maia models to predict human-like moves at various rating levels.
+	6.	Integrate Maia2 for human-likeness analysis (Core Requirement)
+	•	Use Maia2's unified model to predict human-like moves at any rating level.
 	•	Estimate player ratings from move patterns when not provided.
 	•	Distinguish "natural mistakes" from "uncharacteristic errors".
 
@@ -102,7 +102,7 @@ The following technology choices have been made for v1:
 	•	Per-move positions (FEN).
 	•	Game metadata (event, players, ratings).
 	•	FR5: Estimate player strength if ratings not provided:
-	•	Use Maia / model-based estimation from behavior over the game.
+	•	Use Maia2's rating estimation from behavior over the game.
 	•	FR6: Run engine analysis:
 	•	Quick pass for all moves (low depth) to get evaluation + best move.
 	•	Deeper analysis only for selected key positions.
@@ -113,9 +113,9 @@ The following technology choices have been made for v1:
 	•	Large evaluation swings.
 	•	Missed tactics (win to draw, draw to loss, etc.).
 	•	Transition points (opening–middlegame, middlegame–endgame).
-	•	FR9: Integrate Maia/human-likeness:
-	•	For key positions, compute how “human” a move is at the player’s level.
-	•	Identify “natural but flawed” vs. “non-obvious engine move”.
+	•	FR9: Integrate Maia2/human-likeness:
+	•	For key positions, compute how "human" a move is at the player's level using Maia2.
+	•	Identify "natural but flawed" vs. "non-obvious engine move".
 	•	FR10: Opening theory and database:
 	•	Identify opening name and ECO code.
 	•	Show where the game left main theory.
@@ -180,7 +180,7 @@ The following technology choices have been made for v1:
 	•	Risk: High compute cost (deep engine + LLM for many positions).
 	•	Mitigation: Two-pass analysis (shallow for all, deep for few), configurable depth, caching.
 	•	Risk: Poor relevance (wall of engine lines nobody can use).
-	•	Mitigation: Strong heuristics for critical positions; human-likeness signal from Maia; user feedback loop.
+	•	Mitigation: Strong heuristics for critical positions; human-likeness signal from Maia2; user feedback loop.
 
 ⸻
 

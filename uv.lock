@@ -20,13 +20,17 @@ name = "chessbeast-maia"
 version = "0.1.0"
 source = { editable = "services/maia" }
 dependencies = [
+    { name = "chess" },
     { name = "grpcio" },
+    { name = "maia2" },
     { name = "protobuf" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "chess", specifier = ">=1.10" },
     { name = "grpcio", specifier = ">=1.60" },
+    { name = "maia2", specifier = ">=0.1.0" },
     { name = "protobuf", specifier = ">=4.25" },
 ]
 
@@ -266,6 +270,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730", size = 20503, upload-time = "2025-10-18T21:55:43.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
+]
+
+[[package]]
+name = "maia2"
+version = "0.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/1f/91479176a039bca955927d7845654f202c61fdc879c485a74d5f199c9426/maia2-0.9.tar.gz", hash = "sha256:862539ff1811d09a6f0f3ab5344686f1589d4992fa157727d31156dba2251cd1", size = 19153, upload-time = "2024-11-22T02:25:41.941Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/90/4f/fa264ac847e4b669b82eb850687336b69600706c914b21b007b75ccf42b0/maia2-0.9-py2.py3-none-any.whl", hash = "sha256:f32b81a1720f5064a9f975692cd608405a349908610eb735e922ba57c60aeb2b", size = 18020, upload-time = "2024-11-22T02:25:38.749Z" },
 ]
 
 [[package]]
