@@ -197,9 +197,7 @@ class Maia2Model:
         if not (0 <= elo_self <= 4000):
             raise InvalidRatingError(f"Invalid ELO rating: {elo_self}. Must be 0-4000.")
         if not (0 <= elo_opponent <= 4000):
-            raise InvalidRatingError(
-                f"Invalid opponent ELO: {elo_opponent}. Must be 0-4000."
-            )
+            raise InvalidRatingError(f"Invalid opponent ELO: {elo_opponent}. Must be 0-4000.")
 
         # Check for legal moves
         legal_moves = list(board.legal_moves)
@@ -292,11 +290,7 @@ class Maia2Model:
 
             # Confidence bounds: ELOs within threshold of best
             threshold = 0.5  # Log probability difference threshold
-            nearby_elos = [
-                elo
-                for elo, lp in log_probs.items()
-                if best_log_prob - lp < threshold
-            ]
+            nearby_elos = [elo for elo, lp in log_probs.items() if best_log_prob - lp < threshold]
 
             confidence_low = min(nearby_elos)
             confidence_high = max(nearby_elos)

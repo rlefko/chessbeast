@@ -12,9 +12,7 @@ from dataclasses import dataclass, field
 class ModelConfig:
     """Configuration for the Maia2 model."""
 
-    model_type: str = field(
-        default_factory=lambda: os.environ.get("MAIA_MODEL_TYPE", "rapid")
-    )
+    model_type: str = field(default_factory=lambda: os.environ.get("MAIA_MODEL_TYPE", "rapid"))
     device: str = field(default_factory=lambda: os.environ.get("MAIA_DEVICE", "cpu"))
 
 
