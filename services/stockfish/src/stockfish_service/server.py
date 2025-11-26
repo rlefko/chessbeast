@@ -165,7 +165,7 @@ def create_server(
 
     # Add service
     servicer = StockfishServiceImpl(pool)
-    add_StockfishServiceServicer_to_server(servicer, server)
+    add_StockfishServiceServicer_to_server(servicer, server)  # type: ignore[no-untyped-call]
 
     server.add_insecure_port(f"[::]:{server_config.port}")
 

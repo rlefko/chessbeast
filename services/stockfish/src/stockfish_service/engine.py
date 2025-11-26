@@ -234,7 +234,9 @@ class StockfishEngine:
                 raise EngineTimeoutError(f"Evaluation timed out: {e}") from e
             raise EngineError(f"Evaluation failed: {e}") from e
 
-    def _parse_info(self, info: dict, turn: chess.Color) -> EvaluationResult | None:
+    def _parse_info(
+        self, info: chess.engine.InfoDict, turn: chess.Color
+    ) -> EvaluationResult | None:
         """Parse a python-chess info dict into an EvaluationResult.
 
         Args:

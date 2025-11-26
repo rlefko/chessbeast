@@ -13,10 +13,20 @@ import queue
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from .config import EngineConfig, PoolConfig
 from .engine import EngineError, StockfishEngine
+
+
+class HealthStatus(TypedDict):
+    """Health check result type."""
+
+    total: int
+    available: int
+    healthy: int
+    version: str
+
 
 if TYPE_CHECKING:
     pass
@@ -276,7 +286,7 @@ class EnginePool:
 
         return new_engine
 
-    def health_check(self) -> dict:
+    def health_check(self) -> HealthStatus:
         """Check the health of all engines in the pool.
 
         Returns:
