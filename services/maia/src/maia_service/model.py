@@ -124,7 +124,7 @@ class Maia2Model:
 
         try:
             # Import maia2 here to allow mocking in tests
-            from maia2 import inference, model  # type: ignore[import-not-found]
+            from maia2 import inference, model
 
             logger.info(
                 f"Loading Maia2 model (type={self._config.model_type}, device={self._config.device})"
