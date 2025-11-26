@@ -8,7 +8,6 @@
 export const STUB_VERSION = '0.1.0';
 
 // Placeholder types - will be replaced by generated code
-
 export interface Position {
   fen: string;
 }
@@ -32,18 +31,4 @@ export interface EvaluateResponse {
   depth: number;
   bestLine: string[];
   alternatives: EvaluateResponse[];
-}
-
-export interface PredictRequest {
-  fen: string;
-  ratingBand?: number;
-}
-
-export interface MovePrediction {
-  move: string;
-  probability: number;
-}
-
-export interface PredictResponse {
-  predictions: MovePrediction[];
 }
