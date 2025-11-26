@@ -15,32 +15,32 @@
 
 ---
 
-## Pre-Milestone: Update PRD & TDD with Technology Decisions
+## Pre-Milestone: Update PRD & TDD with Technology Decisions ✅
 
 ### Update PRD.md
-- [ ] Add "Technology Decisions" section specifying:
+- [x] Add "Technology Decisions" section specifying:
   - Hybrid architecture (TypeScript + Python)
   - OpenAI GPT-4o/GPT-5 for LLM
   - gRPC for inter-service communication
   - Local CLI deployment target
-- [ ] Update non-goals to clarify cloud deployment is out of scope for v1
-- [ ] Add Maia as explicit core requirement in Goals section
+- [x] Update non-goals to clarify cloud deployment is out of scope for v1
+- [x] Add Maia as explicit core requirement in Goals section
 
 ### Update TDD.md
-- [ ] Add "Technology Stack" section:
+- [x] Add "Technology Stack" section:
   - TypeScript/Node.js for CLI, orchestration, PGN handling
   - Python for ML services (Stockfish, Maia)
   - gRPC with protobuf for service communication
   - SQLite for local database (ECO + Lichess Elite)
   - OpenAI API for LLM integration
-- [ ] Update component design to reflect hybrid architecture
-- [ ] Add gRPC service definitions (proto schemas)
-- [ ] Add directory structure for monorepo
-- [ ] Update API design to show TypeScript interfaces
-- [ ] Add database schema section for:
+- [x] Update component design to reflect hybrid architecture
+- [x] Add gRPC service definitions (proto schemas)
+- [x] Add directory structure for monorepo
+- [x] Update API design to show TypeScript interfaces
+- [x] Add database schema section for:
   - ECO opening lookup table
   - Lichess Elite games with FEN indexing
-- [ ] Add "External Dependencies" section listing:
+- [x] Add "External Dependencies" section listing:
   - Stockfish binary requirements
   - Maia model weights
   - Lichess database download
@@ -48,19 +48,19 @@
 
 ---
 
-## Milestone 0: Project Setup & Infrastructure
+## Milestone 0: Project Setup & Infrastructure ✅
 
 ### 0.1 Repository Setup
-- [ ] Initialize git repository
-- [ ] Create monorepo structure with workspaces
-- [ ] Set up `.gitignore` for Node, Python, and data files
+- [x] Initialize git repository
+- [x] Create monorepo structure with workspaces (pnpm + Turborepo)
+- [x] Set up `.gitignore` for Node, Python, and data files
 
 ### 0.2 TypeScript Project Setup
-- [ ] Initialize Node.js project with TypeScript
-- [ ] Configure `tsconfig.json` with strict settings
-- [ ] Set up ESLint + Prettier
-- [ ] Configure Jest for testing
-- [ ] Create initial directory structure:
+- [x] Initialize Node.js project with TypeScript
+- [x] Configure `tsconfig.json` with strict settings
+- [x] Set up ESLint + Prettier
+- [x] Configure Vitest for testing (chosen over Jest for better ESM support)
+- [x] Create initial directory structure:
   ```
   packages/
     cli/           # CLI entry point
@@ -70,10 +70,10 @@
   ```
 
 ### 0.3 Python Project Setup
-- [ ] Initialize Python project with Poetry or uv
-- [ ] Configure pyproject.toml
-- [ ] Set up pytest + mypy
-- [ ] Create initial directory structure:
+- [x] Initialize Python project with uv
+- [x] Configure pyproject.toml
+- [x] Set up pytest + mypy
+- [x] Create initial directory structure:
   ```
   services/
     stockfish/     # Stockfish gRPC service
@@ -82,7 +82,7 @@
   ```
 
 ### 0.4 gRPC Infrastructure
-- [ ] Define protobuf schemas for:
+- [x] Define protobuf schemas for:
   - `stockfish.proto` - position evaluation
   - `maia.proto` - human-likeness prediction
   - `common.proto` - shared types (Position, Move, etc.)
@@ -91,9 +91,9 @@
 - [ ] Create basic connectivity test
 
 ### 0.5 Development Environment
-- [ ] Create `docker-compose.yml` for local services (optional)
-- [ ] Document local setup requirements (Stockfish binary, Maia models)
-- [ ] Create scripts for running services locally
+- [x] Create `docker-compose.yml` for local services
+- [x] Document local setup requirements (Stockfish binary, Maia models)
+- [x] Create scripts for running services locally (Makefile)
 
 ---
 
