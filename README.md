@@ -1,11 +1,11 @@
 # ChessBeast
 
-An AI-powered chess game annotator that produces human-friendly analysis. ChessBeast combines Stockfish engine analysis, Maia human-likeness prediction, and LLM-generated commentary to explain chess games like a coach would.
+An AI-powered chess game annotator that produces human-friendly analysis. ChessBeast combines Stockfish engine analysis, Maia2 human-likeness prediction (NeurIPS 2024), and LLM-generated commentary to explain chess games like a coach would.
 
 ## Features
 
 - **Human-Friendly Annotations**: Not just engine evaluations, but explanations of plans, ideas, and why moves are good or bad
-- **Rating-Aware Analysis**: Adapts criticism and suggestions to player skill level (1100-1900+ Elo)
+- **Rating-Aware Analysis**: Adapts criticism and suggestions to any player skill level using Maia2's continuous ELO support
 - **Critical Moment Detection**: Identifies key turning points, blunders, and missed opportunities
 - **Opening Recognition**: ECO classification and reference to master games
 - **Standards-Compliant Output**: Produces valid annotated PGN loadable in any chess GUI
@@ -93,12 +93,16 @@ See [docs/](docs/) for detailed documentation.
 ChessBeast uses a hybrid TypeScript + Python architecture:
 
 - **TypeScript**: CLI, orchestration, PGN parsing/rendering
-- **Python**: ML services (Stockfish wrapper, Maia model serving)
+- **Python**: ML services (Stockfish wrapper, Maia2 model serving)
 - **gRPC**: Inter-service communication
 
 ```
-PGN Input → Parser → Engine + Maia → Critical Moments → LLM → Annotated PGN
+PGN Input → Parser → Engine + Maia2 → Critical Moments → LLM → Annotated PGN
 ```
+
+### Maia2 Integration
+
+ChessBeast uses [Maia2](https://github.com/CSSLab/maia2) (NeurIPS 2024), a unified neural network model for predicting human-like chess moves at any rating level. Unlike the original Maia which required 9 separate models for different rating bands (1100-1900), Maia2 uses a single model with continuous ELO support.
 
 ## Contributing
 

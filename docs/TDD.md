@@ -28,7 +28,7 @@ PGN → Parser → Positions → Engine + Maia + DB → Critical Moments → Ann
 | CLI & Orchestration | TypeScript / Node.js 18+ | Main entry point, coordinates pipeline |
 | PGN Parsing/Rendering | TypeScript | Using chess.js or similar |
 | Stockfish Service | Python 3.10+ + gRPC | UCI wrapper with connection pooling |
-| Maia Service | Python 3.10+ + gRPC | TensorFlow/PyTorch model serving |
+| Maia Service | Python 3.10+ + gRPC | Maia2 PyTorch model serving (`pip install maia2`) |
 | Inter-service Comm | gRPC + Protobuf | Efficient binary protocol |
 | Database | SQLite | ECO openings + Lichess Elite games |
 | LLM | OpenAI API (GPT-4o) | Upgradeable to GPT-5 |
@@ -152,6 +152,7 @@ message HealthCheckResponse {
 syntax = "proto3";
 package chessbeast.maia;
 
+// Uses Maia2 (NeurIPS 2024) - a unified model for human-like chess predictions
 service MaiaService {
   rpc PredictMoves(PredictRequest) returns (PredictResponse);
   rpc EstimateRating(EstimateRatingRequest) returns (EstimateRatingResponse);
@@ -160,7 +161,7 @@ service MaiaService {
 
 message PredictRequest {
   string fen = 1;
-  int32 rating_band = 2;     // Target rating band (1100-1900)
+  int32 rating_band = 2;     // Player ELO rating (any value, e.g., 800-2800)
 }
 
 message MovePrediction {
@@ -190,7 +191,7 @@ message EstimateRatingResponse {
 message HealthCheckRequest {}
 message HealthCheckResponse {
   bool healthy = 1;
-  repeated int32 loaded_models = 2;  // Rating bands loaded
+  repeated int32 loaded_models = 2;  // Model types loaded (Maia2 uses single unified model)
 }
 ```
 
@@ -307,14 +308,17 @@ evaluatePosition(fen: string, config: {
 	•	Global budget per game (max total engine time / nodes).
 	•	Cancellation / timeouts.
 
-3.3 Maia Service
-	•	Wrap Maia models (per rating band) behind an API:
+3.3 Maia Service (Maia2)
+	•	Wrap the Maia2 unified model behind an API:
 
-predictHumanMoves(fen: string, isWhiteToMove: boolean): Promise<MaiaEval>;
-estimateRatingFromGame(game: MoveInfo[]): Promise<number>; // optional
+predictHumanMoves(fen: string, playerElo: number): Promise<MaiaEval>;
+estimateRatingFromGame(game: MoveInfo[]): Promise<number>;
 
 	•	Implementation detail:
-	•	Load appropriate Maia model based on approximate rating (or run multiple).
+	•	Uses Maia2 (NeurIPS 2024) - a single unified model that handles all rating levels
+	•	Install via `pip install maia2`
+	•	Supports continuous ELO (any rating value, not just fixed bands)
+	•	Returns both move probabilities and win probability
 
 3.4 Game Database Service
 	•	Abstract source of opening and game data:
@@ -459,7 +463,7 @@ Thresholds depend on estimated Elo R. Example (rough):
 
 These can be linear interpolations between bands. Additional rules:
 	•	“Only move”: if only one move keeps result (win/draw/loss) and played that, label as forced $1.
-	•	“Brilliant”: if played move is low-probability from Maia but engine-best and tactically striking (e.g., sacrifice, big eval increase).
+	•	"Brilliant": if played move is low-probability from Maia2 but engine-best and tactically striking (e.g., sacrifice, big eval increase).
 
 4.2 Depth Control
 	•	Pass 1 (shallow):
@@ -521,7 +525,7 @@ explainchess analyze --input game.pgn --output annotated.pgn \
 	•	If still failing, degrade gracefully:
 	•	Use whatever evals are available.
 	•	Possibly skip deep analysis for some positions.
-	•	Maia unavailable:
+	•	Maia2 unavailable:
 	•	Skip human-likeness and rating estimation; fall back to metadata ratings or generic thresholds.
 	•	LLM failure:
 	•	Retry once.
@@ -639,23 +643,29 @@ CREATE INDEX idx_positions_game ON positions(game_id);
 | Stockfish | 16+ | Chess engine | https://stockfishchess.org |
 | protoc | 3.x | Protobuf compiler | Package manager |
 
-10.2 Maia Models
+10.2 Maia2 Model
 
-Maia models must be downloaded separately (~100MB per rating band):
+Maia2 is installed as a Python package and handles model downloads automatically:
 
-| Model | Rating Band | File |
-|-------|-------------|------|
-| maia-1100 | 1100 | maia-1100.pb |
-| maia-1200 | 1200 | maia-1200.pb |
-| maia-1300 | 1300 | maia-1300.pb |
-| maia-1400 | 1400 | maia-1400.pb |
-| maia-1500 | 1500 | maia-1500.pb |
-| maia-1600 | 1600 | maia-1600.pb |
-| maia-1700 | 1700 | maia-1700.pb |
-| maia-1800 | 1800 | maia-1800.pb |
-| maia-1900 | 1900 | maia-1900.pb |
+```bash
+pip install maia2
+```
 
-Source: https://github.com/CSSLab/maia-chess
+| Component | Description |
+|-----------|-------------|
+| Package | `maia2` (PyPI) |
+| Model Type | Unified model for all rating levels |
+| Rating Support | Continuous ELO (any rating, e.g., 800-2800) |
+| Game Types | "rapid" or "blitz" |
+| Device Support | CPU or CUDA (GPU) |
+
+**Key advantages over original Maia:**
+- Single unified model instead of 9 separate rating-band models
+- Supports any ELO rating as a continuous parameter
+- Automatic model download and caching
+- Returns both move probabilities and win probability
+
+Source: https://github.com/CSSLab/maia2 (NeurIPS 2024 paper)
 
 10.3 Database Files
 
