@@ -34,6 +34,7 @@ ignore_errors = true
 target-version = "py312"
 line-length = 100
 src = ["services"]
+exclude = ["**/generated/*"]
 
 [tool.ruff.lint]
 select = [
@@ -52,7 +53,12 @@ select = [
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["stockfish_service", "maia_service"]
+known-first-party = ["stockfish_service", "maia_service", "conftest"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG"]  # Allow unused arguments in test fixtures
+"**/tests/*" = ["ARG", "F841"]  # Also for services tests
+"**/server.py" = ["N802", "ARG"]  # gRPC methods must be PascalCase, args are protocol
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

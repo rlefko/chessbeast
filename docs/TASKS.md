@@ -87,7 +87,7 @@
   - `maia.proto` - human-likeness prediction
   - `common.proto` - shared types (Position, Move, etc.)
 - [ ] Generate TypeScript client stubs
-- [ ] Generate Python server stubs
+- [x] Generate Python server stubs
 - [ ] Create basic connectivity test
 
 ### 0.5 Development Environment
@@ -128,40 +128,40 @@
 
 ---
 
-## Milestone 2: Stockfish Service (Python + gRPC)
+## Milestone 2: Stockfish Service (Python + gRPC) ✅
 
 ### 2.1 UCI Engine Wrapper
-- [ ] Implement Stockfish process management
-- [ ] Implement UCI protocol communication
-- [ ] Handle `position` and `go` commands
-- [ ] Parse engine output (info, bestmove)
-- [ ] Implement proper shutdown/cleanup
+- [x] Implement Stockfish process management (using python-chess)
+- [x] Implement UCI protocol communication
+- [x] Handle `position` and `go` commands
+- [x] Parse engine output (info, bestmove)
+- [x] Implement proper shutdown/cleanup
 
 ### 2.2 Evaluation API
-- [ ] Implement `evaluatePosition(fen, config)` method
-- [ ] Support depth-limited search
-- [ ] Support time-limited search
-- [ ] Support node-limited search
-- [ ] Implement MultiPV support (top N lines)
+- [x] Implement `evaluatePosition(fen, config)` method
+- [x] Support depth-limited search
+- [x] Support time-limited search
+- [x] Support node-limited search
+- [x] Implement MultiPV support (top N lines)
 
 ### 2.3 Connection Pooling
-- [ ] Implement engine instance pool
-- [ ] Handle concurrent evaluation requests
-- [ ] Implement per-game budget tracking (total nodes/time)
-- [ ] Graceful degradation under load
+- [x] Implement engine instance pool
+- [x] Handle concurrent evaluation requests
+- [ ] Implement per-game budget tracking (total nodes/time) - deferred to orchestrator
+- [x] Graceful degradation under load
 
 ### 2.4 gRPC Service
-- [ ] Implement `StockfishService` gRPC server
-- [ ] Define request/response messages
-- [ ] Add health check endpoint
-- [ ] Implement timeout handling
-- [ ] Add basic logging/metrics
+- [x] Implement `StockfishService` gRPC server
+- [x] Define request/response messages
+- [x] Add health check endpoint
+- [x] Implement timeout handling
+- [x] Add basic logging/metrics
 
 ### 2.5 Testing
-- [ ] Unit tests for UCI parsing
-- [ ] Integration tests with real Stockfish
-- [ ] Test concurrent evaluations
-- [ ] Test budget enforcement
+- [x] Unit tests for UCI parsing (55 tests)
+- [x] Integration tests with real Stockfish
+- [x] Test concurrent evaluations
+- [ ] Test budget enforcement - deferred with budget tracking
 
 ---
 
