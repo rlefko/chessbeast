@@ -46,18 +46,15 @@ export interface ParsedGame {
   moves: MoveInfo[];
 }
 
-/**
- * Placeholder for the PGN parser
- */
-export function parsePgn(_pgn: string): ParsedGame[] {
-  console.log('PGN parser not yet implemented');
-  return [];
-}
+// Re-export parsing functions
+export { parsePgnString as parsePgn } from './parser/pgn-parser.js';
 
-/**
- * Placeholder for the PGN renderer
- */
-export function renderPgn(_game: ParsedGame): string {
-  console.log('PGN renderer not yet implemented');
-  return '';
-}
+// Re-export rendering functions
+export { renderPgnString as renderPgn } from './renderer/pgn-renderer.js';
+
+// Re-export chess position utilities
+export { ChessPosition, STARTING_FEN } from './chess/position.js';
+export type { MoveResult } from './chess/position.js';
+
+// Re-export error types
+export { PgnParseError, InvalidFenError, IllegalMoveError } from './errors.js';
