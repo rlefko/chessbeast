@@ -13,6 +13,7 @@ dev = [
     "grpcio>=1.60",
     "grpcio-tools>=1.60",
     "types-protobuf>=4.24",
+    "grpc-stubs>=1.53",
 ]
 
 [tool.uv.workspace]
@@ -23,6 +24,7 @@ python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+exclude = ["tests/"]
 
 [[tool.mypy.overrides]]
 module = "*.generated.*"
