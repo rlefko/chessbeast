@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package chessbeast;
+
+// A chess position represented as a FEN string
+message Position {
+  string fen = 1;
+}
+
+// A chess move
+message Move {
+  string san = 1;  // Standard Algebraic Notation (e.g., "Nf3")
+  string uci = 2;  // UCI format (e.g., "g1f3")
+}

@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package chessbeast.maia;
+
+// Maia human-likeness prediction service
+service MaiaService {
+  // Predict the most likely human moves for a position
+  rpc PredictMoves(PredictRequest) returns (PredictResponse);
+
+  // Estimate player rating from a sequence of moves
+  rpc EstimateRating(EstimateRatingRequest) returns (EstimateRatingResponse);
+
+  // Health check endpoint
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Request for move prediction
+message PredictRequest {
+  string fen = 1;         // Position in FEN notation
+  int32 rating_band = 2;  // Target rating band (1100-1900)
+}
+
+// A predicted move with probability
+message MovePrediction {
+  string move = 1;       // Move in UCI format
+  float probability = 2; // Probability (0.0 - 1.0)
+}
+
+// Move prediction response
+message PredictResponse {
+  repeated MovePrediction predictions = 1;
+}
+
+// A move played in a game (for rating estimation)
+message GameMove {
+  string fen = 1;          // Position before the move
+  string played_move = 2;  // Move played in UCI format
+}
+
+// Request for rating estimation
+message EstimateRatingRequest {
+  repeated GameMove moves = 1;
+}
+
+// Rating estimation response
+message EstimateRatingResponse {
+  int32 estimated_rating = 1;  // Point estimate
+  int32 confidence_low = 2;    // Lower bound of estimate
+  int32 confidence_high = 3;   // Upper bound of estimate
+}
+
+// Health check request
+message HealthCheckRequest {}
+
+// Health check response
+message HealthCheckResponse {
+  bool healthy = 1;
+  repeated int32 loaded_models = 2;  // Rating bands with loaded models
+}

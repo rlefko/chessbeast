@@ -1,0 +1,60 @@
+[project]
+name = "chessbeast-services"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "mypy>=1.8",
+    "ruff>=0.8",
+    "grpcio>=1.60",
+    "grpcio-tools>=1.60",
+    "types-protobuf>=4.24",
+    "grpc-stubs>=1.53",
+]
+
+[tool.uv.workspace]
+members = ["services/stockfish", "services/maia"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+exclude = ["tests/"]
+
+[[tool.mypy.overrides]]
+module = "*.generated.*"
+ignore_errors = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["services"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "W",   # pycodestyle warnings
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
+]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["stockfish_service", "maia_service"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["services"]
+addopts = "-v --tb=short"

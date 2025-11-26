@@ -65,12 +65,17 @@ yarn-error.log*
 .npm
 .yarn-integrity
 .pnpm-debug.log*
+.pnpm-store/
 
 # TypeScript
 dist/
 *.tsbuildinfo
 *.js.map
 .turbo/
+
+# Vitest
+coverage/
+.vitest/
 
 # ========================================
 # Data Files (Large)
