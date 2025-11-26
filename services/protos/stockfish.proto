@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package chessbeast.stockfish;
+
+import "common.proto";
+
+// Stockfish chess engine evaluation service
+service StockfishService {
+  // Evaluate a chess position
+  rpc Evaluate(EvaluateRequest) returns (EvaluateResponse);
+
+  // Health check endpoint
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Request for position evaluation
+message EvaluateRequest {
+  string fen = 1;           // Position in FEN notation
+  int32 depth = 2;          // Search depth (0 = use time limit)
+  int32 time_limit_ms = 3;  // Time limit in milliseconds
+  int32 multipv = 4;        // Number of principal variations (default 1)
+  int64 nodes = 5;          // Node limit (0 = no limit)
+}
+
+// Evaluation result
+message EvaluateResponse {
+  int32 cp = 1;                           // Centipawns (from side to move)
+  int32 mate = 2;                         // Mate in N (0 if not mate)
+  int32 depth = 3;                        // Actual depth searched
+  repeated string best_line = 4;          // Best line in UCI notation
+  repeated EvaluateResponse alternatives = 5;  // MultiPV results
+}
+
+// Health check request
+message HealthCheckRequest {}
+
+// Health check response
+message HealthCheckResponse {
+  bool healthy = 1;
+  string version = 2;  // Stockfish version string
+}

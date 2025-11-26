@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  stockfish:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.stockfish
+    ports:
+      - "50051:50051"
+    environment:
+      - STOCKFISH_THREADS=4
+      - STOCKFISH_HASH=256
+      - GRPC_PORT=50051
+    healthcheck:
+      test: ["CMD", "python", "-c", "import grpc; ch = grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+
+  maia:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.maia
+    ports:
+      - "50052:50052"
+    volumes:
+      - maia-models:/app/models
+    environment:
+      - MAIA_MODELS_PATH=/app/models
+      - GRPC_PORT=50052
+    healthcheck:
+      test: ["CMD", "python", "-c", "import grpc; ch = grpc.insecure_channel('localhost:50052'); grpc.channel_ready_future(ch).result(timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+volumes:
+  maia-models:
+    driver: local
