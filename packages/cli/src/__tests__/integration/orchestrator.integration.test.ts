@@ -106,7 +106,7 @@ describe('Orchestrator Integration', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle Scholar\'s Mate (4-move game)', async () => {
+    it("should handle Scholar's Mate (4-move game)", async () => {
       const pgn = await loadPgn('edge-cases/scholars-mate.pgn');
       const services = createMockServices();
       const reporter = createNullReporter();

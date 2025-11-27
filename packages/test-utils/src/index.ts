@@ -49,10 +49,7 @@ export {
 } from './mocks/mock-services.js';
 
 // Builders
-export {
-  GameAnalysisBuilder,
-  gameAnalysis,
-} from './builders/game-analysis-builder.js';
+export { GameAnalysisBuilder, gameAnalysis } from './builders/game-analysis-builder.js';
 
 export {
   MoveAnalysisBuilder,
@@ -60,11 +57,7 @@ export {
   createMoveSequence,
 } from './builders/move-analysis-builder.js';
 
-export {
-  ConfigBuilder,
-  config,
-  configPresets,
-} from './builders/config-builder.js';
+export { ConfigBuilder, config, configPresets } from './builders/config-builder.js';
 
 // Semantic matching
 export {

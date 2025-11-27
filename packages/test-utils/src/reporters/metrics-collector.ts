@@ -78,10 +78,8 @@ export class MetricsCollector {
     falseNegatives: number;
   } = { truePositives: 0, falsePositives: 0, falseNegatives: 0 };
 
-  private classificationData: Map<
-    MoveClassification,
-    { correct: number; total: number }
-  > = new Map();
+  private classificationData: Map<MoveClassification, { correct: number; total: number }> =
+    new Map();
 
   private openingData = {
     correctEco: 0,

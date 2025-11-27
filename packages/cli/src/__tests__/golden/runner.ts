@@ -4,25 +4,14 @@
  */
 
 import type { GameAnalysis } from '@chessbeast/core';
-import {
-  calculateThemeMatchRatio,
-  getThemeMatches,
-} from '@chessbeast/test-utils';
+import { calculateThemeMatchRatio, getThemeMatches } from '@chessbeast/test-utils';
 
-import type {
-  GoldenCriteria,
-  GoldenResult,
-  StructuralResult,
-  SemanticResult,
-} from './criteria.js';
+import type { GoldenCriteria, GoldenResult, StructuralResult, SemanticResult } from './criteria.js';
 
 /**
  * Run structural validation
  */
-function validateStructural(
-  analysis: GameAnalysis,
-  criteria: GoldenCriteria,
-): StructuralResult {
+function validateStructural(analysis: GameAnalysis, criteria: GoldenCriteria): StructuralResult {
   const details: StructuralResult['details'] = {
     missingCriticalMoments: [],
     extraCriticalMoments: [],
@@ -98,10 +87,7 @@ function validateStructural(
 /**
  * Run semantic validation
  */
-function validateSemantic(
-  analysis: GameAnalysis,
-  criteria: GoldenCriteria,
-): SemanticResult {
+function validateSemantic(analysis: GameAnalysis, criteria: GoldenCriteria): SemanticResult {
   const details: SemanticResult['details'] = {
     summaryThemeMatch: 0,
     missingSummaryThemes: [],
@@ -111,10 +97,7 @@ function validateSemantic(
 
   // Check summary themes
   if (analysis.summary && criteria.semantic.summaryThemes.length > 0) {
-    const { matched, missed } = getThemeMatches(
-      analysis.summary,
-      criteria.semantic.summaryThemes,
-    );
+    const { matched, missed } = getThemeMatches(analysis.summary, criteria.semantic.summaryThemes);
     details.summaryThemeMatch = matched.length / criteria.semantic.summaryThemes.length;
     details.missingSummaryThemes = missed;
   } else if (criteria.semantic.summaryThemes.length === 0) {
@@ -163,10 +146,7 @@ function validateSemantic(
 /**
  * Run a complete golden test
  */
-export function runGoldenTest(
-  analysis: GameAnalysis,
-  criteria: GoldenCriteria,
-): GoldenResult {
+export function runGoldenTest(analysis: GameAnalysis, criteria: GoldenCriteria): GoldenResult {
   const structural = validateStructural(analysis, criteria);
   const semantic = validateSemantic(analysis, criteria);
 
@@ -209,10 +189,7 @@ export function runGoldenTest(
 /**
  * Generate a human-readable report from golden test result
  */
-export function generateGoldenReport(
-  caseName: string,
-  result: GoldenResult,
-): string {
+export function generateGoldenReport(caseName: string, result: GoldenResult): string {
   const lines: string[] = [
     `=== Golden Test: ${caseName} ===`,
     `Overall: ${result.passed ? 'PASSED' : 'FAILED'}`,
@@ -237,7 +214,9 @@ export function generateGoldenReport(
 
   if (result.structural.details.classificationMismatches.length > 0) {
     for (const m of result.structural.details.classificationMismatches) {
-      lines.push(`  Classification mismatch at ply ${m.ply}: expected ${m.expected}, got ${m.actual}`);
+      lines.push(
+        `  Classification mismatch at ply ${m.ply}: expected ${m.expected}, got ${m.actual}`,
+      );
     }
   }
 
@@ -249,13 +228,19 @@ export function generateGoldenReport(
   lines.push('');
   lines.push('--- Semantic Validation ---');
   lines.push(`  Passed: ${result.semantic.passed}`);
-  lines.push(`  Summary theme match: ${(result.semantic.details.summaryThemeMatch * 100).toFixed(1)}%`);
+  lines.push(
+    `  Summary theme match: ${(result.semantic.details.summaryThemeMatch * 100).toFixed(1)}%`,
+  );
 
   if (result.semantic.details.missingSummaryThemes.length > 0) {
-    lines.push(`  Missing summary themes: ${result.semantic.details.missingSummaryThemes.join(', ')}`);
+    lines.push(
+      `  Missing summary themes: ${result.semantic.details.missingSummaryThemes.join(', ')}`,
+    );
   }
 
-  lines.push(`  Overall theme match: ${(result.semantic.details.overallThemeMatch * 100).toFixed(1)}%`);
+  lines.push(
+    `  Overall theme match: ${(result.semantic.details.overallThemeMatch * 100).toFixed(1)}%`,
+  );
 
   // Opening and result
   if (result.openingMatch !== undefined) {

@@ -46,14 +46,14 @@ export function createMockEcoClient() {
     if (fen.includes('e4')) {
       return {
         eco: 'B00',
-        name: 'King\'s Pawn Opening',
+        name: "King's Pawn Opening",
         variation: null,
       };
     }
     if (fen.includes('d4')) {
       return {
         eco: 'A40',
-        name: 'Queen\'s Pawn Opening',
+        name: "Queen's Pawn Opening",
         variation: null,
       };
     }
@@ -64,7 +64,7 @@ export function createMockEcoClient() {
     if (moves.length === 0) return null;
     if (moves[0] === 'e4') {
       if (moves[1] === 'e5') {
-        return { eco: 'C20', name: 'King\'s Pawn Game', variation: null };
+        return { eco: 'C20', name: "King's Pawn Game", variation: null };
       }
       if (moves[1] === 'c5') {
         return { eco: 'B20', name: 'Sicilian Defense', variation: null };
@@ -72,7 +72,7 @@ export function createMockEcoClient() {
     }
     if (moves[0] === 'd4') {
       if (moves[1] === 'd5') {
-        return { eco: 'D00', name: 'Queen\'s Pawn Game', variation: null };
+        return { eco: 'D00', name: "Queen's Pawn Game", variation: null };
       }
       if (moves[1] === 'Nf6') {
         return { eco: 'A45', name: 'Indian Defense', variation: null };
@@ -93,7 +93,7 @@ export function createMockEcoClient() {
     return {
       opening: {
         eco: 'B00',
-        name: 'King\'s Pawn Opening',
+        name: "King's Pawn Opening",
         mainLine: ['e4'],
         movesUci: 'e2e4',
         epd: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -',
@@ -173,9 +173,11 @@ export function createTrackingReporter(): any {
   const calls: Array<{ method: string; args: unknown[] }> = [];
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-  const track = (method: string) => (...args: unknown[]) => {
-    calls.push({ method, args });
-  };
+  const track =
+    (method: string) =>
+    (...args: unknown[]) => {
+      calls.push({ method, args });
+    };
 
   return {
     startPhase: vi.fn(track('startPhase')),

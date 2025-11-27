@@ -267,7 +267,9 @@ export class BenchmarkRunner {
     for (const profile of ['quick', 'standard', 'deep'] as const) {
       const summary = report.summary[profile];
       if (summary) {
-        lines.push(`${profile}: ${summary.averageTimeMs.toFixed(2)}ms avg, ${summary.averageTimePerPly.toFixed(2)}ms/ply`);
+        lines.push(
+          `${profile}: ${summary.averageTimeMs.toFixed(2)}ms avg, ${summary.averageTimePerPly.toFixed(2)}ms/ply`,
+        );
       }
     }
 

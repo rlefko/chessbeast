@@ -96,9 +96,7 @@ export function createMockMaia(config: MockMaiaConfig = {}) {
   });
 
   const estimateRating = vi.fn(
-    async (
-      _moves: Array<{ fen: string; playedMove: string }>,
-    ): Promise<EstimateRatingResponse> => {
+    async (_moves: Array<{ fen: string; playedMove: string }>): Promise<EstimateRatingResponse> => {
       // Return a mock rating estimate
       return {
         estimatedRating: 1500,

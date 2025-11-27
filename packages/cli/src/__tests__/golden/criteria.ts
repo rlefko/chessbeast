@@ -63,10 +63,12 @@ export interface GoldenCriteria {
   /** Tolerance settings */
   tolerance: ToleranceSettings;
   /** Expected opening identification */
-  opening: {
-    eco?: string;
-    name?: string;
-  } | undefined;
+  opening:
+    | {
+        eco?: string;
+        name?: string;
+      }
+    | undefined;
   /** Expected game result */
   result: string | undefined;
 }

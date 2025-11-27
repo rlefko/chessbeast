@@ -84,10 +84,10 @@ const goldenCases: Array<{
     },
   },
   {
-    name: 'Scholar\'s Mate',
+    name: "Scholar's Mate",
     fixture: 'edge-cases/scholars-mate.pgn',
     criteria: {
-      name: 'Scholar\'s Mate',
+      name: "Scholar's Mate",
       description: 'Quick checkmate pattern',
       structural: {
         requiredCriticalMoments: [],
