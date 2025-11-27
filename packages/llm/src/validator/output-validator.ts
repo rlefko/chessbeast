@@ -26,10 +26,12 @@ export interface GeneratedSummary {
   /** Narrative of the game */
   gameNarrative: string;
   /** Key moments in the game */
-  keyMoments: Array<{
-    moveNumber: number;
-    description: string;
-  }> | undefined;
+  keyMoments:
+    | Array<{
+        moveNumber: number;
+        description: string;
+      }>
+    | undefined;
   /** Lessons learned from the game */
   lessonsLearned: string[];
 }
@@ -233,10 +235,5 @@ export function validateSummary(raw: unknown): ValidationResult<GeneratedSummary
  * PGN comments use { } delimiters, so these must be escaped
  */
 export function sanitizePgnComment(text: string): string {
-  return text
-    .replace(/\{/g, '(')
-    .replace(/\}/g, ')')
-    .replace(/\\/g, '')
-    .replace(/\n/g, ' ')
-    .trim();
+  return text.replace(/\{/g, '(').replace(/\}/g, ')').replace(/\\/g, '').replace(/\n/g, ' ').trim();
 }

@@ -100,13 +100,30 @@ interface MockGameAnalysis {
     evalAfter: { cp: number; depth: number; pv: string[] };
     bestMove: string;
     cpLoss: number;
-    classification: 'book' | 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder' | 'brilliant' | 'forced';
+    classification:
+      | 'book'
+      | 'excellent'
+      | 'good'
+      | 'inaccuracy'
+      | 'mistake'
+      | 'blunder'
+      | 'brilliant'
+      | 'forced';
     humanProbability?: number;
     isCriticalMoment: boolean;
   }>;
   criticalMoments: Array<{
     plyIndex: number;
-    type: 'eval_swing' | 'result_change' | 'missed_win' | 'missed_draw' | 'phase_transition' | 'tactical_moment' | 'turning_point' | 'time_pressure' | 'blunder_recovery';
+    type:
+      | 'eval_swing'
+      | 'result_change'
+      | 'missed_win'
+      | 'missed_draw'
+      | 'phase_transition'
+      | 'tactical_moment'
+      | 'turning_point'
+      | 'time_pressure'
+      | 'blunder_recovery';
     score: number;
     reason: string;
   }>;

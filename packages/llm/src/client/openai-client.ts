@@ -5,13 +5,7 @@
 import OpenAILib from 'openai';
 
 import type { LLMConfig } from '../config/llm-config.js';
-import {
-  LLMError,
-  LLMErrorCode,
-  RateLimitError,
-  TimeoutError,
-  APIError,
-} from '../errors.js';
+import { LLMError, LLMErrorCode, RateLimitError, TimeoutError, APIError } from '../errors.js';
 
 import { CircuitBreaker } from './circuit-breaker.js';
 import type { LLMRequest, LLMResponse, TokenUsage, HealthStatus, CircuitState } from './types.js';
@@ -150,20 +144,21 @@ export class OpenAIClient {
         content: m.content,
       }));
 
-      const response = request.responseFormat === 'json'
-        ? await this.client.chat.completions.create({
-            model: this.config.model,
-            messages,
-            temperature: request.temperature ?? this.config.temperature,
-            max_tokens: request.maxTokens ?? null,
-            response_format: { type: 'json_object' },
-          })
-        : await this.client.chat.completions.create({
-            model: this.config.model,
-            messages,
-            temperature: request.temperature ?? this.config.temperature,
-            max_tokens: request.maxTokens ?? null,
-          });
+      const response =
+        request.responseFormat === 'json'
+          ? await this.client.chat.completions.create({
+              model: this.config.model,
+              messages,
+              temperature: request.temperature ?? this.config.temperature,
+              max_tokens: request.maxTokens ?? null,
+              response_format: { type: 'json_object' },
+            })
+          : await this.client.chat.completions.create({
+              model: this.config.model,
+              messages,
+              temperature: request.temperature ?? this.config.temperature,
+              max_tokens: request.maxTokens ?? null,
+            });
 
       const choice = response.choices[0];
       if (!choice) {

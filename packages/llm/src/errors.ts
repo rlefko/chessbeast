@@ -49,12 +49,7 @@ export class RateLimitError extends LLMError {
     public readonly retryAfterMs: number,
     cause?: Error,
   ) {
-    super(
-      `Rate limited, retry after ${retryAfterMs}ms`,
-      LLMErrorCode.RATE_LIMITED,
-      true,
-      cause,
-    );
+    super(`Rate limited, retry after ${retryAfterMs}ms`, LLMErrorCode.RATE_LIMITED, true, cause);
     this.name = 'RateLimitError';
   }
 }

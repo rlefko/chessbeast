@@ -7,7 +7,8 @@
  * Matches moves like: e4, Nf3, Bxc6, O-O, O-O-O, exd5, Qh7+, Rxa1#, e8=Q
  * Uses lookahead instead of \b at the end to properly capture +/# symbols
  */
-const SAN_PATTERN = /\b([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O)(?![a-zA-Z0-9])/g;
+const SAN_PATTERN =
+  /\b([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O)(?![a-zA-Z0-9])/g;
 
 /**
  * Long algebraic notation pattern (e.g., e2-e4, Ng1-f3)
@@ -58,10 +59,7 @@ export interface MoveValidationResult {
 /**
  * Validate all move references in a piece of text
  */
-export function validateMoveReferences(
-  text: string,
-  legalMoves: string[],
-): MoveValidationResult {
+export function validateMoveReferences(text: string, legalMoves: string[]): MoveValidationResult {
   const foundMoves = extractMoveReferences(text);
   const validMoves: string[] = [];
   const hallucinations: string[] = [];
@@ -86,10 +84,7 @@ export function validateMoveReferences(
  * Remove hallucinated move references from text
  * This is a soft fix - replaces specific moves with generic terms
  */
-export function sanitizeMoveReferences(
-  text: string,
-  hallucinations: string[],
-): string {
+export function sanitizeMoveReferences(text: string, hallucinations: string[]): string {
   let result = text;
 
   for (const move of hallucinations) {

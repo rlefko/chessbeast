@@ -126,10 +126,7 @@ Only add a comment if noteworthy. Keep it under 20 words.`;
 /**
  * Build prompt for game summary
  */
-export function buildSummaryPrompt(
-  analysis: GameAnalysis,
-  targetRating: number,
-): string {
+export function buildSummaryPrompt(analysis: GameAnalysis, targetRating: number): string {
   const { metadata, criticalMoments, stats } = analysis;
 
   const keyMoments = criticalMoments
@@ -137,7 +134,9 @@ export function buildSummaryPrompt(
     .slice(0, 5)
     .map((m) => {
       const move = analysis.moves[m.plyIndex];
-      const moveNum = move ? `${move.moveNumber}${move.isWhiteMove ? '.' : '...'} ${move.san}` : `Ply ${m.plyIndex}`;
+      const moveNum = move
+        ? `${move.moveNumber}${move.isWhiteMove ? '.' : '...'} ${move.san}`
+        : `Ply ${m.plyIndex}`;
       return `- ${moveNum}: ${m.reason} (${m.type})`;
     })
     .join('\n');

@@ -45,10 +45,7 @@ export class CircuitBreaker {
     this.checkReset();
 
     if (this.state === 'open') {
-      throw new CircuitOpenError(
-        this.openedAt ?? new Date(),
-        this.getRemainingResetTime(),
-      );
+      throw new CircuitOpenError(this.openedAt ?? new Date(), this.getRemainingResetTime());
     }
 
     try {

@@ -94,9 +94,7 @@ describe('CircuitBreaker', () => {
     });
 
     it('should reject operations immediately', async () => {
-      await expect(breaker.execute(async () => 'success')).rejects.toThrow(
-        CircuitOpenError,
-      );
+      await expect(breaker.execute(async () => 'success')).rejects.toThrow(CircuitOpenError);
     });
 
     it('should transition to half-open after timeout', async () => {

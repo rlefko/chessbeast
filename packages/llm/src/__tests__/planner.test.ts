@@ -100,9 +100,7 @@ describe('Annotation Planner', () => {
       const plan = createAnnotationPlan(analysis, DEFAULT_TOKEN_BUDGET);
 
       for (let i = 1; i < plan.positions.length; i++) {
-        expect(plan.positions[i]!.plyIndex).toBeGreaterThanOrEqual(
-          plan.positions[i - 1]!.plyIndex,
-        );
+        expect(plan.positions[i]!.plyIndex).toBeGreaterThanOrEqual(plan.positions[i - 1]!.plyIndex);
       }
     });
 

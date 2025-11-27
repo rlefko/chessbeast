@@ -170,10 +170,7 @@ export function generatePositionCacheKey(
 /**
  * Generate a cache key for an opening annotation
  */
-export function generateOpeningCacheKey(
-  openingName: string,
-  targetRating: number,
-): string {
+export function generateOpeningCacheKey(openingName: string, targetRating: number): string {
   // Normalize opening name
   const normalized = openingName.toLowerCase().replace(/\s+/g, '-');
   const ratingBand = Math.floor(targetRating / 200) * 200;

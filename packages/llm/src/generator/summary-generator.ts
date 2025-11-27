@@ -25,10 +25,7 @@ export class SummaryGenerator {
   /**
    * Generate a summary for the analyzed game
    */
-  async generateSummary(
-    analysis: GameAnalysis,
-    targetRating: number,
-  ): Promise<GeneratedSummary> {
+  async generateSummary(analysis: GameAnalysis, targetRating: number): Promise<GeneratedSummary> {
     // Check if we can afford the summary
     if (!this.client.canAfford(this.config.budget.maxTokensPerSummary)) {
       console.warn('Not enough token budget for summary, using fallback');

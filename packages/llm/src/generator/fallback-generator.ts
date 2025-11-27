@@ -2,7 +2,13 @@
  * Template-based fallback generator for when LLM is unavailable
  */
 
-import type { GameAnalysis, MoveAnalysis, CriticalMoment, CriticalMomentType, MoveClassification } from '@chessbeast/core';
+import type {
+  GameAnalysis,
+  MoveAnalysis,
+  CriticalMoment,
+  CriticalMomentType,
+  MoveClassification,
+} from '@chessbeast/core';
 
 import { formatEval } from '../prompts/templates.js';
 import { classificationToNag } from '../validator/nag-validator.js';
@@ -159,13 +165,17 @@ function generateNarrative(analysis: GameAnalysis): string {
   // Describe the flow
   if (metadata.result === '1-0') {
     if (stats.black.blunders > 0) {
-      parts.push(`${metadata.white} won after ${metadata.black}'s ${stats.black.blunders > 1 ? 'blunders' : 'blunder'}.`);
+      parts.push(
+        `${metadata.white} won after ${metadata.black}'s ${stats.black.blunders > 1 ? 'blunders' : 'blunder'}.`,
+      );
     } else {
       parts.push(`${metadata.white} played accurately and converted the advantage.`);
     }
   } else if (metadata.result === '0-1') {
     if (stats.white.blunders > 0) {
-      parts.push(`${metadata.black} won after ${metadata.white}'s ${stats.white.blunders > 1 ? 'blunders' : 'blunder'}.`);
+      parts.push(
+        `${metadata.black} won after ${metadata.white}'s ${stats.white.blunders > 1 ? 'blunders' : 'blunder'}.`,
+      );
     } else {
       parts.push(`${metadata.black} played accurately and converted the advantage.`);
     }

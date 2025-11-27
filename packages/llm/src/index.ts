@@ -19,7 +19,11 @@ import type { LLMConfig } from './config/llm-config.js';
 import { createLLMConfig, loadConfigFromEnv } from './config/llm-config.js';
 import { CommentGenerator, DegradationLevel } from './generator/comment-generator.js';
 import { SummaryGenerator, formatSummaryAsString } from './generator/summary-generator.js';
-import { createAnnotationPlan, buildCommentContext, type PlanOptions } from './planner/annotation-planner.js';
+import {
+  createAnnotationPlan,
+  buildCommentContext,
+  type PlanOptions,
+} from './planner/annotation-planner.js';
 
 /**
  * Options for annotation
@@ -116,12 +120,7 @@ export class Annotator {
       const legalMoves = this.getLegalMoves(planned.move.fenBefore);
 
       // Build context
-      const context = buildCommentContext(
-        planned,
-        plan.targetRating,
-        legalMoves,
-        plan.openingName,
-      );
+      const context = buildCommentContext(planned, plan.targetRating, legalMoves, plan.openingName);
 
       // Generate comment
       const comment = await this.commentGenerator.generateComment(context, planned);
@@ -195,19 +194,38 @@ export type { VerbosityLevel, CommentContext } from './prompts/templates.js';
 export { buildCriticalMomentPrompt, buildSummaryPrompt } from './prompts/templates.js';
 export { CHESS_ANNOTATOR_SYSTEM, GAME_SUMMARY_SYSTEM } from './prompts/system-prompts.js';
 
-export type { AnnotationPlan, PlannedAnnotation, PlanOptions } from './planner/annotation-planner.js';
+export type {
+  AnnotationPlan,
+  PlannedAnnotation,
+  PlanOptions,
+} from './planner/annotation-planner.js';
 export { createAnnotationPlan, buildCommentContext } from './planner/annotation-planner.js';
 export { calculateVerbosity, shouldAnnotate } from './planner/verbosity.js';
 
 export { CommentGenerator, DegradationLevel } from './generator/comment-generator.js';
 export { SummaryGenerator, formatSummaryAsString } from './generator/summary-generator.js';
-export { generateFallbackComment, generateFallbackSummary } from './generator/fallback-generator.js';
+export {
+  generateFallbackComment,
+  generateFallbackSummary,
+} from './generator/fallback-generator.js';
 
-export type { GeneratedComment, GeneratedSummary, ValidationResult } from './validator/output-validator.js';
-export { validateComment, validateSummary, parseJsonResponse } from './validator/output-validator.js';
+export type {
+  GeneratedComment,
+  GeneratedSummary,
+  ValidationResult,
+} from './validator/output-validator.js';
+export {
+  validateComment,
+  validateSummary,
+  parseJsonResponse,
+} from './validator/output-validator.js';
 export { isValidNag, classificationToNag, filterValidNags } from './validator/nag-validator.js';
 export { validateMoveReferences, extractMoveReferences } from './validator/move-validator.js';
 
-export { ResponseCache, generatePositionCacheKey, generateOpeningCacheKey } from './cache/response-cache.js';
+export {
+  ResponseCache,
+  generatePositionCacheKey,
+  generateOpeningCacheKey,
+} from './cache/response-cache.js';
 
 export * from './errors.js';

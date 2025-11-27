@@ -92,21 +92,21 @@ export function filterValidNags(nags: string[]): string[] {
 export function getNagDescription(nag: string): string {
   const normalized = normalizeNag(nag);
   const descriptions: Record<string, string> = {
-    '$1': 'Good move',
-    '$2': 'Mistake',
-    '$3': 'Brilliant move',
-    '$4': 'Blunder',
-    '$5': 'Interesting move',
-    '$6': 'Dubious move',
-    '$7': 'Only move',
-    '$10': 'Drawish position',
-    '$13': 'Unclear position',
-    '$14': 'White is slightly better',
-    '$15': 'Black is slightly better',
-    '$16': 'White is better',
-    '$17': 'Black is better',
-    '$18': 'White is winning',
-    '$19': 'Black is winning',
+    $1: 'Good move',
+    $2: 'Mistake',
+    $3: 'Brilliant move',
+    $4: 'Blunder',
+    $5: 'Interesting move',
+    $6: 'Dubious move',
+    $7: 'Only move',
+    $10: 'Drawish position',
+    $13: 'Unclear position',
+    $14: 'White is slightly better',
+    $15: 'Black is slightly better',
+    $16: 'White is better',
+    $17: 'Black is better',
+    $18: 'White is winning',
+    $19: 'Black is winning',
   };
   return descriptions[normalized] ?? 'Unknown';
 }
