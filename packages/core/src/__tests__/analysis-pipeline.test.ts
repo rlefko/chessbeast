@@ -180,7 +180,9 @@ describe('Analysis Pipeline', () => {
     it('should use Maia service when provided', async () => {
       const engine = createMockEngine();
       const maia = createMockMaia();
-      const pipeline = new AnalysisPipeline(engine, maia, { skipMaia: false });
+      const pipeline = new AnalysisPipeline(engine, maia, undefined, undefined, {
+        skipMaia: false,
+      });
 
       await pipeline.analyze(simpleGame);
 
@@ -191,7 +193,7 @@ describe('Analysis Pipeline', () => {
     it('should skip Maia when skipMaia is true', async () => {
       const engine = createMockEngine();
       const maia = createMockMaia();
-      const pipeline = new AnalysisPipeline(engine, maia, { skipMaia: true });
+      const pipeline = new AnalysisPipeline(engine, maia, undefined, undefined, { skipMaia: true });
 
       await pipeline.analyze(simpleGame);
 
@@ -201,7 +203,14 @@ describe('Analysis Pipeline', () => {
     it('should report progress when callback provided', async () => {
       const engine = createMockEngine();
       const progressCallback = vi.fn();
-      const pipeline = new AnalysisPipeline(engine, undefined, {}, progressCallback);
+      const pipeline = new AnalysisPipeline(
+        engine,
+        undefined,
+        undefined,
+        undefined,
+        {},
+        progressCallback,
+      );
 
       await pipeline.analyze(simpleGame);
 
@@ -214,7 +223,7 @@ describe('Analysis Pipeline', () => {
 
     it('should use custom rating config', async () => {
       const engine = createMockEngine();
-      const pipeline = new AnalysisPipeline(engine, undefined, {
+      const pipeline = new AnalysisPipeline(engine, undefined, undefined, undefined, {
         whiteRating: 2000,
         blackRating: 1800,
       });
@@ -237,7 +246,14 @@ describe('Analysis Pipeline', () => {
       const engine = createMockEngine();
       const maia = createMockMaia();
       const progress = vi.fn();
-      const pipeline = createAnalysisPipeline(engine, maia, { shallowDepth: 10 }, progress);
+      const pipeline = createAnalysisPipeline(
+        engine,
+        maia,
+        undefined,
+        undefined,
+        { shallowDepth: 10 },
+        progress,
+      );
 
       await pipeline.analyze(simpleGame);
 

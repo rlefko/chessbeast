@@ -1,4 +1,4 @@
-.PHONY: all setup install build test lint clean run help
+.PHONY: all setup install build test lint clean run help setup-db download-eco download-lichess-elite build-db
 
 # Default target
 all: help
@@ -7,7 +7,7 @@ all: help
 # Setup & Installation
 # ===========================================
 
-setup: install build-protos install-hooks  ## Full setup (install deps, build protos)
+setup: install build-protos install-hooks setup-db  ## Full setup (install deps, build protos, setup DB)
 	@echo "Setup complete!"
 
 install: install-ts install-py  ## Install all dependencies (npm + uv)
@@ -21,6 +21,25 @@ install-py:
 
 install-hooks:
 	bash scripts/install-hooks.sh
+
+# ===========================================
+# Database Setup
+# ===========================================
+
+setup-db: download-eco download-lichess-elite build-db  ## Setup databases (download data, build SQLite)
+
+download-eco:  ## Download ECO opening data
+	bash scripts/download-eco.sh
+
+download-lichess-elite:  ## Download Lichess Elite games
+	bash scripts/download-lichess-elite.sh
+
+build-db: build-ts  ## Build database files from downloaded data
+	@echo "Building ECO database..."
+	pnpm exec node packages/database/dist/loaders/eco-loader.js
+	@echo "Building Lichess Elite database (this may take a while)..."
+	pnpm exec node packages/database/dist/loaders/lichess-loader.js 100000
+	@echo "Databases built successfully"
 
 # ===========================================
 # Build
