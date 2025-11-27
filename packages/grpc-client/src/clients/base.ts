@@ -76,8 +76,9 @@ export abstract class BaseGrpcClient {
    * Get the proto root directory
    */
   protected getProtoRoot(): string {
-    // Navigate from packages/grpc-client/src/clients/ to services/protos/
-    return path.resolve(__dirname, '../../../../../services/protos');
+    // Navigate from packages/grpc-client/dist/clients/ to services/protos/
+    // dist/clients -> dist -> grpc-client -> packages -> chessbeast -> services/protos
+    return path.resolve(__dirname, '../../../../services/protos');
   }
 
   /**
