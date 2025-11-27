@@ -125,7 +125,9 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
   }
 
   // Legal moves for hallucination prevention
-  parts.push(`LEGAL MOVES: ${legalMoves.slice(0, 15).join(', ')}${legalMoves.length > 15 ? '...' : ''}`);
+  parts.push(
+    `LEGAL MOVES: ${legalMoves.slice(0, 15).join(', ')}${legalMoves.length > 15 ? '...' : ''}`,
+  );
 
   // Target rating context
   parts.push(`TARGET RATING: ${targetRating}`);
@@ -167,7 +169,9 @@ export function buildBriefMovePrompt(context: CommentContext): string {
   parts.push(`POSITION: ${move.fenBefore}`);
 
   // Legal moves for hallucination prevention
-  parts.push(`LEGAL MOVES: ${legalMoves.slice(0, 10).join(', ')}${legalMoves.length > 10 ? '...' : ''}`);
+  parts.push(
+    `LEGAL MOVES: ${legalMoves.slice(0, 10).join(', ')}${legalMoves.length > 10 ? '...' : ''}`,
+  );
 
   parts.push(`TARGET RATING: ${targetRating}`);
 

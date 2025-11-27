@@ -180,7 +180,9 @@ export class CommentGenerator {
       this.recordFailure();
       // Log the error with more context
       if (error instanceof Error) {
-        console.warn(`[LLM] Comment generation failed: ${error.constructor.name}: ${error.message}`);
+        console.warn(
+          `[LLM] Comment generation failed: ${error.constructor.name}: ${error.message}`,
+        );
       } else {
         console.warn(`[LLM] Comment generation failed with unknown error`);
       }

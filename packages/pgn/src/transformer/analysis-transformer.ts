@@ -229,11 +229,7 @@ function transformMove(move: MoveAnalysisInput, opts: Required<TransformOptions>
 
   // Add position assessment NAG (⩲, ±, +-, etc.) after move quality NAG
   if (opts.includePositionNags) {
-    const posNag = evalToPositionNag(
-      move.evalAfter.cp,
-      move.evalAfter.mate,
-      opts.targetRating,
-    );
+    const posNag = evalToPositionNag(move.evalAfter.cp, move.evalAfter.mate, opts.targetRating);
     if (posNag) {
       moveInfo.nags = moveInfo.nags ?? [];
       moveInfo.nags.push(posNag);

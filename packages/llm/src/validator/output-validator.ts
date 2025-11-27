@@ -257,8 +257,7 @@ export function extractMentionedMoves(comment: string, legalMoves: string[]): st
   // - Piece moves: Nf3, Bxe5, Qh7+, Rxd8#
   // - Pawn moves: e4, exd5, e8=Q
   // - Castling: O-O, O-O-O
-  const sanPattern =
-    /\b([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?)\b/g;
+  const sanPattern = /\b([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?)\b/g;
 
   const matches = comment.match(sanPattern) ?? [];
 
