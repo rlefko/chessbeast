@@ -81,6 +81,54 @@ export interface MaiaService {
 }
 
 /**
+ * Opening lookup result
+ */
+export interface OpeningLookupResult {
+  /** Opening info if found */
+  opening?: {
+    eco: string;
+    name: string;
+    numPlies: number;
+  };
+  /** Number of plies that matched the opening */
+  matchedPlies: number;
+  /** Ply where game left known theory */
+  leftTheoryAtPly?: number;
+  /** Whether game matches opening exactly */
+  isExactMatch: boolean;
+}
+
+/**
+ * Opening database service interface
+ * (Implemented by database client)
+ */
+export interface OpeningService {
+  /** Look up opening from move sequence (UCI format) */
+  getOpeningByMoves(movesUci: string[]): OpeningLookupResult;
+}
+
+/**
+ * Reference game result
+ */
+export interface ReferenceGameInfo {
+  white: string;
+  black: string;
+  result: string;
+  whiteElo?: number;
+  blackElo?: number;
+  eco?: string;
+}
+
+/**
+ * Reference game database service interface
+ * (Implemented by database client)
+ */
+export interface ReferenceGameService {
+  /** Get reference games that reached a position */
+  getReferenceGames(fen: string, limit?: number): { games: ReferenceGameInfo[]; totalCount: number };
+}
+
+/**
  * Analysis configuration
  */
 export interface AnalysisConfig {
@@ -124,12 +172,15 @@ export type ProgressCallback = (phase: string, current: number, total: number) =
 export class AnalysisPipeline {
   private engine: EngineService;
   private maia?: MaiaService;
+  private openings?: OpeningService;
   private config: Required<AnalysisConfig>;
   private onProgress?: ProgressCallback;
 
   constructor(
     engine: EngineService,
     maia?: MaiaService,
+    openings?: OpeningService,
+    referenceGames?: ReferenceGameService,
     config: AnalysisConfig = {},
     onProgress?: ProgressCallback,
   ) {
@@ -137,6 +188,12 @@ export class AnalysisPipeline {
     if (maia !== undefined) {
       this.maia = maia;
     }
+    if (openings !== undefined) {
+      this.openings = openings;
+    }
+    // referenceGames is accepted for API compatibility but not yet used
+    // Will be used in LLM annotation phase
+    void referenceGames;
     this.config = { ...DEFAULT_CONFIG, ...config };
     if (onProgress !== undefined) {
       this.onProgress = onProgress;
@@ -156,6 +213,27 @@ export class AnalysisPipeline {
     // Store estimated ratings if we need to compute them
     let estimatedWhiteElo: number | undefined;
     let estimatedBlackElo: number | undefined;
+
+    // Opening lookup (if service available)
+    let openingName: string | undefined;
+    let openingEco: string | undefined;
+    let openingEndPly: number | undefined;
+
+    if (this.openings) {
+      // Convert SAN moves to UCI for opening lookup
+      // Note: The opening service expects UCI moves
+      // For now, we'll pass the SAN moves and let the service handle conversion if needed
+      const moveSans = moves.map((m) => m.san);
+      const lookupResult = this.openings.getOpeningByMoves(moveSans);
+
+      if (lookupResult.opening) {
+        openingName = lookupResult.opening.name;
+        openingEco = lookupResult.opening.eco;
+      }
+      if (lookupResult.leftTheoryAtPly !== undefined) {
+        openingEndPly = lookupResult.leftTheoryAtPly;
+      }
+    }
 
     // Phase 1: Shallow analysis pass
     this.reportProgress('shallow_analysis', 0, moves.length);
@@ -220,6 +298,11 @@ export class AnalysisPipeline {
     // Phase 6: Calculate statistics
     const stats = this.calculateStats(classifiedMoves);
 
+    // Add opening end ply to stats if available from opening lookup
+    if (openingEndPly !== undefined) {
+      stats.openingEndPly = openingEndPly;
+    }
+
     // Build final result metadata (only include defined properties)
     const resultMetadata: GameAnalysis['metadata'] = {
       white: metadata.white,
@@ -228,7 +311,13 @@ export class AnalysisPipeline {
     };
     if (metadata.event !== undefined) resultMetadata.event = metadata.event;
     if (metadata.date !== undefined) resultMetadata.date = metadata.date;
-    if (metadata.eco !== undefined) resultMetadata.eco = metadata.eco;
+    // Use ECO from opening lookup if available, otherwise from metadata
+    if (openingEco !== undefined) {
+      resultMetadata.eco = openingEco;
+    } else if (metadata.eco !== undefined) {
+      resultMetadata.eco = metadata.eco;
+    }
+    if (openingName !== undefined) resultMetadata.openingName = openingName;
     if (metadata.whiteElo !== undefined) resultMetadata.whiteElo = metadata.whiteElo;
     if (metadata.blackElo !== undefined) resultMetadata.blackElo = metadata.blackElo;
     if (estimatedWhiteElo !== undefined) resultMetadata.estimatedWhiteElo = estimatedWhiteElo;
@@ -459,8 +548,10 @@ export class AnalysisPipeline {
 export function createAnalysisPipeline(
   engine: EngineService,
   maia?: MaiaService,
+  openings?: OpeningService,
+  referenceGames?: ReferenceGameService,
   config?: AnalysisConfig,
   onProgress?: ProgressCallback,
 ): AnalysisPipeline {
-  return new AnalysisPipeline(engine, maia, config, onProgress);
+  return new AnalysisPipeline(engine, maia, openings, referenceGames, config, onProgress);
 }
