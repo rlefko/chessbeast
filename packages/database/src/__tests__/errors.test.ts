@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import {
-  DatabaseError,
-  DatabaseNotFoundError,
-  QueryError,
-  ConnectionError,
-} from '../errors.js';
+import { DatabaseError, DatabaseNotFoundError, QueryError, ConnectionError } from '../errors.js';
 
 describe('Error Classes', () => {
   describe('DatabaseError', () => {

@@ -180,7 +180,9 @@ describe('Analysis Pipeline', () => {
     it('should use Maia service when provided', async () => {
       const engine = createMockEngine();
       const maia = createMockMaia();
-      const pipeline = new AnalysisPipeline(engine, maia, undefined, undefined, { skipMaia: false });
+      const pipeline = new AnalysisPipeline(engine, maia, undefined, undefined, {
+        skipMaia: false,
+      });
 
       await pipeline.analyze(simpleGame);
 

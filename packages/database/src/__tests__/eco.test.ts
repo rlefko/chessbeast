@@ -82,7 +82,9 @@ describe('EcoClient', () => {
   describe('getByPosition', () => {
     it('should throw DatabaseNotFoundError if database does not exist', () => {
       const client = new EcoClient({ dbPath: 'nonexistent.db' });
-      expect(() => client.getByPosition('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -')).toThrow(DatabaseNotFoundError);
+      expect(() =>
+        client.getByPosition('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -'),
+      ).toThrow(DatabaseNotFoundError);
       client.close();
     });
   });

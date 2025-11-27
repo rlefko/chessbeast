@@ -409,19 +409,17 @@ export async function loadLichessDatabase(
     `);
 
     // Begin transaction for better performance
-    const insertBatch = db.transaction(
-      (games: Array<{ game: ParsedGame; gameId: number }>) => {
-        for (const { game, gameId } of games) {
-          // Insert positions (just starting position for now)
-          for (let ply = 0; ply < game.fens.length; ply++) {
-            const fen = game.fens[ply];
-            if (fen) {
-              insertPosition.run(gameId, ply, hashFen(fen));
-            }
+    const insertBatch = db.transaction((games: Array<{ game: ParsedGame; gameId: number }>) => {
+      for (const { game, gameId } of games) {
+        // Insert positions (just starting position for now)
+        for (let ply = 0; ply < game.fens.length; ply++) {
+          const fen = game.fens[ply];
+          if (fen) {
+            insertPosition.run(gameId, ply, hashFen(fen));
           }
         }
-      },
-    );
+      }
+    });
 
     let gameCount = 0;
     let batchGames: Array<{ game: ParsedGame; gameId: number }> = [];

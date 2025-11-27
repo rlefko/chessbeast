@@ -57,7 +57,9 @@ describe('LichessEliteClient', () => {
   describe('getReferenceGames', () => {
     it('should throw DatabaseNotFoundError if database does not exist', () => {
       const client = new LichessEliteClient({ dbPath: 'nonexistent.db' });
-      expect(() => client.getReferenceGames('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')).toThrow(DatabaseNotFoundError);
+      expect(() =>
+        client.getReferenceGames('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'),
+      ).toThrow(DatabaseNotFoundError);
       client.close();
     });
   });

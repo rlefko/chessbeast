@@ -47,10 +47,7 @@ export class QueryError extends DatabaseError {
  */
 export class ConnectionError extends DatabaseError {
   constructor(dbPath: string, cause?: Error) {
-    super(
-      `Failed to connect to database at ${dbPath}${cause ? `: ${cause.message}` : ''}`,
-      dbPath,
-    );
+    super(`Failed to connect to database at ${dbPath}${cause ? `: ${cause.message}` : ''}`, dbPath);
     this.name = 'ConnectionError';
   }
 }

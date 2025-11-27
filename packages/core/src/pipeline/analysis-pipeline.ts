@@ -125,7 +125,10 @@ export interface ReferenceGameInfo {
  */
 export interface ReferenceGameService {
   /** Get reference games that reached a position */
-  getReferenceGames(fen: string, limit?: number): { games: ReferenceGameInfo[]; totalCount: number };
+  getReferenceGames(
+    fen: string,
+    limit?: number,
+  ): { games: ReferenceGameInfo[]; totalCount: number };
 }
 
 /**

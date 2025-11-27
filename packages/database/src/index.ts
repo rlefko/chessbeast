@@ -32,9 +32,4 @@ export type {
 export { hashFen, normalizeFen, unhashFen } from './utils/index.js';
 
 // Re-export errors
-export {
-  DatabaseError,
-  DatabaseNotFoundError,
-  QueryError,
-  ConnectionError,
-} from './errors.js';
+export { DatabaseError, DatabaseNotFoundError, QueryError, ConnectionError } from './errors.js';
