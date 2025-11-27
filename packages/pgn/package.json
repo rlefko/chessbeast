@@ -20,8 +20,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "chess.js": "^1.0.0",
-    "@mliebelt/pgn-parser": "^1.4.0"
+    "@mliebelt/pgn-parser": "^1.4.0",
+    "chess.js": "^1.0.0"
   },
   "devDependencies": {
     "vitest": "^2.1.0"

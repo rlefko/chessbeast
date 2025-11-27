@@ -1,12 +1,29 @@
 import type { GameMetadata, MoveInfo, ParsedGame } from '../index.js';
 
 /**
+ * Default maximum line length for PGN output
+ */
+export const DEFAULT_MAX_LINE_LENGTH = 80;
+
+/**
+ * Options for PGN rendering
+ */
+export interface RenderOptions {
+  /**
+   * Maximum line length for move text (default: 80)
+   * Set to 0 or undefined to disable line wrapping
+   */
+  maxLineLength?: number;
+}
+
+/**
  * Render a ParsedGame back to PGN string format
  *
  * @param game - The parsed game to render
+ * @param options - Optional rendering options
  * @returns Valid PGN string
  */
-export function renderPgnString(game: ParsedGame): string {
+export function renderPgnString(game: ParsedGame, options?: RenderOptions): string {
   const parts: string[] = [];
 
   // Render tags (Seven Tag Roster first, then optional tags)
@@ -20,7 +37,15 @@ export function renderPgnString(game: ParsedGame): string {
   }
 
   // Render moves with result
-  parts.push(renderMoves(game.moves, game.metadata.result));
+  const moveText = renderMoves(game.moves, game.metadata.result);
+
+  // Apply line wrapping if enabled
+  const maxLineLength = options?.maxLineLength ?? DEFAULT_MAX_LINE_LENGTH;
+  if (maxLineLength > 0) {
+    parts.push(wrapMoveText(moveText, maxLineLength));
+  } else {
+    parts.push(moveText);
+  }
 
   return parts.join('\n');
 }
@@ -172,4 +197,125 @@ function renderVariation(moves: MoveInfo[]): string {
 function escapeComment(comment: string): string {
   // Escape closing braces in comments
   return comment.replace(/\}/g, '\\}');
+}
+
+/**
+ * Wrap move text to respect maximum line length
+ *
+ * This preserves the PGN structure by:
+ * - Breaking at word boundaries (spaces)
+ * - Never breaking inside comments (braces) or variations (parentheses)
+ * - Maintaining proper spacing
+ *
+ * @param text - The move text to wrap
+ * @param maxLength - Maximum line length
+ * @returns Wrapped text with newlines
+ */
+export function wrapMoveText(text: string, maxLength: number): string {
+  if (!text || maxLength <= 0) {
+    return text;
+  }
+
+  // Tokenize the move text while preserving structure
+  const tokens = tokenizeMoveText(text);
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (const token of tokens) {
+    // Check if adding this token would exceed the line length
+    const wouldExceed =
+      currentLine.length > 0 && currentLine.length + 1 + token.length > maxLength;
+
+    if (wouldExceed && currentLine.length > 0) {
+      // Start a new line
+      lines.push(currentLine);
+      currentLine = token;
+    } else {
+      // Add to current line
+      if (currentLine.length > 0) {
+        currentLine += ' ' + token;
+      } else {
+        currentLine = token;
+      }
+    }
+  }
+
+  // Add the final line
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Tokenize move text while preserving comments and variations as single tokens
+ */
+function tokenizeMoveText(text: string): string[] {
+  const tokens: string[] = [];
+  let i = 0;
+
+  while (i < text.length) {
+    // Skip leading whitespace
+    while (i < text.length && text[i] === ' ') {
+      i++;
+    }
+
+    if (i >= text.length) break;
+
+    const char = text[i]!;
+
+    if (char === '{') {
+      // Comment: find matching closing brace
+      const end = findMatchingBrace(text, i, '{', '}');
+      tokens.push(text.slice(i, end + 1));
+      i = end + 1;
+    } else if (char === '(') {
+      // Variation: find matching closing parenthesis
+      const end = findMatchingBrace(text, i, '(', ')');
+      tokens.push(text.slice(i, end + 1));
+      i = end + 1;
+    } else {
+      // Regular token: collect until whitespace, brace, or parenthesis
+      let j = i;
+      while (j < text.length && text[j] !== ' ' && text[j] !== '{' && text[j] !== '(') {
+        j++;
+      }
+      if (j > i) {
+        tokens.push(text.slice(i, j));
+      }
+      i = j;
+    }
+  }
+
+  return tokens;
+}
+
+/**
+ * Find the index of the matching closing brace/parenthesis
+ */
+function findMatchingBrace(text: string, start: number, open: string, close: string): number {
+  let depth = 0;
+
+  for (let i = start; i < text.length; i++) {
+    const char = text[i]!;
+
+    // Handle escape sequences (for comments with \})
+    if (char === '\\' && i + 1 < text.length) {
+      i++; // Skip the escaped character
+      continue;
+    }
+
+    if (char === open) {
+      depth++;
+    } else if (char === close) {
+      depth--;
+      if (depth === 0) {
+        return i;
+      }
+    }
+  }
+
+  // If no match found, return end of string
+  return text.length - 1;
 }

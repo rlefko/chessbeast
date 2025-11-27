@@ -60,7 +60,8 @@ export interface ParsedGame {
 export { parsePgnString as parsePgn } from './parser/pgn-parser.js';
 
 // Re-export rendering functions
-export { renderPgnString as renderPgn } from './renderer/pgn-renderer.js';
+export { renderPgnString as renderPgn, wrapMoveText, DEFAULT_MAX_LINE_LENGTH } from './renderer/pgn-renderer.js';
+export type { RenderOptions } from './renderer/pgn-renderer.js';
 
 // Re-export chess position utilities
 export { ChessPosition, STARTING_FEN } from './chess/position.js';
@@ -68,3 +69,34 @@ export type { MoveResult } from './chess/position.js';
 
 // Re-export error types
 export { PgnParseError, InvalidFenError, IllegalMoveError } from './errors.js';
+
+// Re-export NAG utilities
+export type { MoveClassification } from './nag/index.js';
+
+export {
+  VALID_NAGS,
+  MOVE_QUALITY_NAGS,
+  isValidNag,
+  normalizeNag,
+  classificationToNag,
+  filterValidNags,
+  getNagDescription,
+  getNagSymbol,
+} from './nag/index.js';
+
+// Re-export transformer utilities
+export type {
+  TransformOptions,
+  GameAnalysisInput,
+  GameAnalysisMetadata,
+  MoveAnalysisInput,
+  AlternativeMove,
+  EngineEvaluation,
+  AnalysisMetadata,
+} from './transformer/index.js';
+
+export {
+  transformAnalysisToGame,
+  hasAnnotations,
+  countAnnotations,
+} from './transformer/index.js';
