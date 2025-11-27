@@ -1,4 +1,4 @@
-.PHONY: all setup install build test lint clean run help setup-db download-eco download-lichess-elite build-db
+.PHONY: all setup install build test lint clean run help setup-db download-eco download-lichess-elite build-db download-stockfish
 
 # Default target
 all: help
@@ -7,8 +7,11 @@ all: help
 # Setup & Installation
 # ===========================================
 
-setup: install build-protos install-hooks setup-db  ## Full setup (install deps, build protos, setup DB)
+setup: install build-protos install-hooks setup-db download-stockfish  ## Full setup (install deps, build protos, setup DB, Stockfish)
 	@echo "Setup complete!"
+
+download-stockfish:  ## Download Stockfish binary for current platform
+	bash scripts/download-stockfish.sh
 
 install: install-ts install-py  ## Install all dependencies (npm + uv)
 	@echo "All dependencies installed"

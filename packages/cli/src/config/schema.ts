@@ -142,4 +142,8 @@ export interface CliOptions {
   skipLlm?: boolean;
   /** Print resolved config and exit */
   showConfig?: boolean;
+  /** Disable colored output */
+  noColor?: boolean;
+  /** Validate setup without running analysis */
+  dryRun?: boolean;
 }
