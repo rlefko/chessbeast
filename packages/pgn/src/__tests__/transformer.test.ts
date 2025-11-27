@@ -168,13 +168,23 @@ describe('Analysis Transformer', () => {
       expect(game.moves[0]!.nags).toContain('$3');
     });
 
-    it('should add NAG for excellent moves', () => {
+    it('should add NAG for excellent moves at critical moments', () => {
       const analysis = createMockAnalysis({
-        moves: [createMockMove({ classification: 'excellent' })],
+        moves: [createMockMove({ classification: 'excellent', isCriticalMoment: true })],
       });
       const game = transformAnalysisToGame(analysis, { includeNags: true });
 
       expect(game.moves[0]!.nags).toContain('$1');
+    });
+
+    it('should skip excellent move NAG for non-critical positions', () => {
+      const analysis = createMockAnalysis({
+        moves: [createMockMove({ classification: 'excellent', isCriticalMoment: false })],
+      });
+      const game = transformAnalysisToGame(analysis, { includeNags: true });
+
+      // $1 NAG is skipped for non-critical positions to reduce NAG overuse
+      expect(game.moves[0]!.nags).toBeUndefined();
     });
 
     it('should add NAG for blunders', () => {
@@ -505,6 +515,7 @@ describe('Analysis Transformer', () => {
             isWhiteMove: true,
             san: 'e4',
             classification: 'excellent',
+            isCriticalMoment: true, // Required for $1 NAG to be added
             comment: 'Great move!',
           }),
         ],

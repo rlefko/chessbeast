@@ -22,6 +22,18 @@ export type VerbosityLevel = 'brief' | 'normal' | 'detailed';
 export type AnnotationPerspective = 'white' | 'black' | 'neutral';
 
 /**
+ * A planned variation that will be shown in the PGN
+ */
+export interface PlannedVariation {
+  /** SAN moves in the variation */
+  moves: string[];
+  /** Purpose of the variation */
+  purpose: 'best' | 'human_alternative' | 'refutation' | 'trap' | 'thematic';
+  /** Source of the variation (engine, maia, or llm-suggested) */
+  source: 'engine' | 'maia' | 'llm';
+}
+
+/**
  * Context for generating a move comment
  */
 export interface CommentContext {
@@ -43,6 +55,8 @@ export interface CommentContext {
   perspective: AnnotationPerspective;
   /** Whether a NAG glyph will be shown (to avoid redundant classification language) */
   hasNag: boolean;
+  /** Planned variations that will be shown in the PGN (for coherent commentary) */
+  plannedVariations?: PlannedVariation[];
 }
 
 /**
@@ -108,14 +122,26 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
   if (move.bestMove && move.bestMove !== move.san) {
     parts.push(`BEST MOVE: ${move.bestMove}`);
 
-    // Include the key continuation line if available
+    // Include the key continuation line if available (expanded from 4 to 10 moves)
     if (move.alternatives && move.alternatives.length > 0) {
       const bestAlt = move.alternatives[0];
       if (bestAlt && bestAlt.eval.pv && bestAlt.eval.pv.length > 1) {
-        const continuation = bestAlt.eval.pv.slice(0, 4).join(' ');
+        const continuation = bestAlt.eval.pv.slice(0, 10).join(' ');
         parts.push(`KEY LINE: ${continuation}`);
       }
     }
+  }
+
+  // Include planned variations that will be shown in the PGN
+  // This ensures the LLM commentary references lines that actually appear in output
+  if (context.plannedVariations && context.plannedVariations.length > 0) {
+    parts.push('');
+    parts.push('VARIATIONS THAT WILL BE SHOWN IN PGN:');
+    for (const v of context.plannedVariations) {
+      const purposeLabel = v.purpose === 'human_alternative' ? 'human likely' : v.purpose;
+      parts.push(`  ${v.moves.slice(0, 15).join(' ')} [${purposeLabel}]`);
+    }
+    parts.push('Your comment should reference these specific lines when relevant.');
   }
 
   // Opening context if relevant
