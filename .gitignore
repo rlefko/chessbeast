@@ -105,8 +105,8 @@ coverage/
 .cache/
 
 # gRPC generated files (can be regenerated)
-# packages/grpc-client/src/generated/
-# services/*/src/generated/
+packages/grpc-client/src/generated/
+services/*/src/generated/
 
 # ========================================
 # IDE & Editor
