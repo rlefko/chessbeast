@@ -88,6 +88,10 @@ export class CommentGenerator {
 
     // Check if we can afford this request
     if (!this.client.canAfford(planned.estimatedTokens)) {
+      const usage = this.client.getTokenUsage();
+      console.warn(
+        `[LLM] Token budget exhausted: need ~${planned.estimatedTokens}, have ${usage.remaining} remaining (${usage.used} used)`,
+      );
       this.increaseDegradation();
       return generateFallbackComment(planned.move, planned.criticalMoment);
     }
@@ -166,8 +170,9 @@ export class CommentGenerator {
     // it means retries were exhausted
     if (error instanceof RateLimitError) {
       console.warn(
-        `LLM rate limited after all retries. This is NOT a token budget issue. ` +
-          `Consider reducing request frequency or upgrading API tier.`,
+        `[LLM] Rate limit error after exhausting all retries. ` +
+          `Consider reducing request frequency or upgrading API tier. ` +
+          `Note: This is NOT a token budget issue - the API is throttling requests.`,
       );
       // Only record failure once for rate limits (don't trigger immediate degradation)
       this.consecutiveFailures++;
@@ -175,7 +180,11 @@ export class CommentGenerator {
       this.recordFailure();
       // Log the error with more context
       if (error instanceof Error) {
-        console.warn(`LLM comment generation failed: ${error.message}`);
+        console.warn(
+          `[LLM] Comment generation failed: ${error.constructor.name}: ${error.message}`,
+        );
+      } else {
+        console.warn(`[LLM] Comment generation failed with unknown error`);
       }
     }
 

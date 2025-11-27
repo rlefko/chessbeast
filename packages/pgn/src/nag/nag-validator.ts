@@ -151,3 +151,85 @@ export function getNagSymbol(nag: string): string {
   };
   return symbols[normalized] ?? normalized;
 }
+
+/**
+ * Position assessment NAG codes
+ */
+export const POSITION_NAGS = {
+  equal: '$10', // =
+  slightWhite: '$14', // ⩲
+  slightBlack: '$15', // ⩱
+  clearWhite: '$16', // ±
+  clearBlack: '$17', // ∓
+  winningWhite: '$18', // +-
+  winningBlack: '$19', // -+
+} as const;
+
+/**
+ * Thresholds for position assessment (in centipawns)
+ */
+interface PositionThresholds {
+  /** Below this: equal */
+  equal: number;
+  /** Below this: slight advantage */
+  slight: number;
+  /** Below this: clear advantage, above: winning */
+  clear: number;
+}
+
+/**
+ * Get position assessment thresholds based on target rating
+ *
+ * Higher rated players notice smaller advantages, so thresholds are stricter.
+ */
+function getPositionThresholds(rating: number): PositionThresholds {
+  if (rating >= 2200) {
+    // Advanced/Expert: stricter thresholds
+    return { equal: 15, slight: 50, clear: 150 };
+  }
+  if (rating >= 1800) {
+    // Intermediate-advanced
+    return { equal: 25, slight: 75, clear: 200 };
+  }
+  if (rating >= 1400) {
+    // Intermediate
+    return { equal: 40, slight: 100, clear: 250 };
+  }
+  // Beginner: more lenient thresholds
+  return { equal: 50, slight: 150, clear: 300 };
+}
+
+/**
+ * Convert engine evaluation to position assessment NAG
+ *
+ * @param cp - Centipawn evaluation (positive = White better)
+ * @param mate - Mate-in-X (positive = White mating, negative = Black mating)
+ * @param targetRating - Target audience rating (affects thresholds)
+ * @returns Position NAG code, or undefined if position is equal
+ */
+export function evalToPositionNag(
+  cp: number | undefined,
+  mate: number | undefined,
+  targetRating: number,
+): string | undefined {
+  // Mate always means winning
+  if (mate !== undefined) {
+    return mate > 0 ? POSITION_NAGS.winningWhite : POSITION_NAGS.winningBlack;
+  }
+
+  if (cp === undefined) return undefined;
+
+  const thresholds = getPositionThresholds(targetRating);
+  const absCp = Math.abs(cp);
+
+  if (absCp < thresholds.equal) {
+    return POSITION_NAGS.equal;
+  }
+  if (absCp < thresholds.slight) {
+    return cp > 0 ? POSITION_NAGS.slightWhite : POSITION_NAGS.slightBlack;
+  }
+  if (absCp < thresholds.clear) {
+    return cp > 0 ? POSITION_NAGS.clearWhite : POSITION_NAGS.clearBlack;
+  }
+  return cp > 0 ? POSITION_NAGS.winningWhite : POSITION_NAGS.winningBlack;
+}

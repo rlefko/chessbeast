@@ -213,14 +213,17 @@ describe('Analysis Transformer', () => {
       expect(game.moves[0]!.nags).toContain('$7');
     });
 
-    it('should not add NAG for good or book moves', () => {
+    it('should not add move quality NAG for good or book moves', () => {
       const analysis = createMockAnalysis({
         moves: [
           createMockMove({ classification: 'good' }),
           createMockMove({ classification: 'book', isWhiteMove: false }),
         ],
       });
-      const game = transformAnalysisToGame(analysis, { includeNags: true });
+      const game = transformAnalysisToGame(analysis, {
+        includeNags: true,
+        includePositionNags: false, // Disable to test only move quality NAGs
+      });
 
       expect(game.moves[0]!.nags).toBeUndefined();
       expect(game.moves[1]!.nags).toBeUndefined();
@@ -230,7 +233,10 @@ describe('Analysis Transformer', () => {
       const analysis = createMockAnalysis({
         moves: [createMockMove({ classification: 'blunder' })],
       });
-      const game = transformAnalysisToGame(analysis, { includeNags: false });
+      const game = transformAnalysisToGame(analysis, {
+        includeNags: false,
+        includePositionNags: false, // Also disable position NAGs
+      });
 
       expect(game.moves[0]!.nags).toBeUndefined();
     });
@@ -258,10 +264,11 @@ describe('Analysis Transformer', () => {
   });
 
   describe('variation insertion', () => {
-    it('should include alternatives as variations', () => {
+    it('should include alternatives as variations for critical moments', () => {
       const analysis = createMockAnalysis({
         moves: [
           createMockMove({
+            isCriticalMoment: true, // Required for variations
             alternatives: [
               { san: 'd4', eval: { cp: 25, depth: 20, pv: ['d4', 'd5', 'c4'] } },
               { san: 'c4', eval: { cp: 20, depth: 20, pv: ['c4', 'e5'] } },
@@ -271,35 +278,40 @@ describe('Analysis Transformer', () => {
       });
       const game = transformAnalysisToGame(analysis, { includeVariations: true });
 
+      // Max 2 variations for critical moments
       expect(game.moves[0]!.variations).toHaveLength(2);
       expect(game.moves[0]!.variations![0]![0]!.san).toBe('d4');
       expect(game.moves[0]!.variations![1]![0]!.san).toBe('c4');
     });
 
-    it('should include evaluation in variation comments', () => {
+    it('should NOT include evaluation in variation comments (removed feature)', () => {
       const analysis = createMockAnalysis({
         moves: [
           createMockMove({
+            isCriticalMoment: true, // Required for variations
             alternatives: [{ san: 'd4', eval: { cp: 50, depth: 20, pv: ['d4'] } }],
           }),
         ],
       });
       const game = transformAnalysisToGame(analysis, { includeVariations: true });
 
-      expect(game.moves[0]!.variations![0]![0]!.commentAfter).toBe('+0.50');
+      // Evaluation numbers are now removed from variations
+      expect(game.moves[0]!.variations![0]![0]!.commentAfter).toBeUndefined();
     });
 
-    it('should format mate scores in variations', () => {
+    it('should NOT format mate scores in variations (removed feature)', () => {
       const analysis = createMockAnalysis({
         moves: [
           createMockMove({
+            isCriticalMoment: true, // Required for variations
             alternatives: [{ san: 'Qh5', eval: { mate: 3, depth: 20, pv: ['Qh5'] } }],
           }),
         ],
       });
       const game = transformAnalysisToGame(analysis, { includeVariations: true });
 
-      expect(game.moves[0]!.variations![0]![0]!.commentAfter).toBe('M+3');
+      // Mate scores are now removed from variations (position NAGs indicate advantage instead)
+      expect(game.moves[0]!.variations![0]![0]!.commentAfter).toBeUndefined();
     });
 
     it('should exclude variations when disabled', () => {
@@ -319,6 +331,7 @@ describe('Analysis Transformer', () => {
       const analysis = createMockAnalysis({
         moves: [
           createMockMove({
+            isCriticalMoment: true, // Required for variations
             alternatives: [{ san: 'd4', eval: { cp: 25, depth: 20, pv: ['d4', 'd5', 'c4'] } }],
           }),
         ],
@@ -330,6 +343,22 @@ describe('Analysis Transformer', () => {
       expect(variation[0]!.san).toBe('d4');
       expect(variation[1]!.san).toBe('d5');
       expect(variation[2]!.san).toBe('c4');
+    });
+
+    it('should NOT include variations for non-critical moments', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: false, // Non-critical moment
+            alternatives: [{ san: 'd4', eval: { cp: 25, depth: 20, pv: ['d4'] } }],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      // Non-critical moments should have no variations (empty array or undefined)
+      const variations = game.moves[0]!.variations;
+      expect(!variations || variations.length === 0).toBe(true);
     });
   });
 
@@ -365,6 +394,7 @@ describe('Analysis Transformer', () => {
         createMockAnalysis({
           moves: [
             createMockMove({
+              isCriticalMoment: true, // Required for variations
               alternatives: [{ san: 'd4', eval: { cp: 25, depth: 20, pv: ['d4'] } }],
             }),
           ],
@@ -378,6 +408,7 @@ describe('Analysis Transformer', () => {
       const game = transformAnalysisToGame(createMockAnalysis(), {
         includeSummary: false,
         includeNags: false,
+        includePositionNags: false, // Also disable position NAGs
         includeVariations: false,
       });
       expect(hasAnnotations(game)).toBe(false);
@@ -392,6 +423,7 @@ describe('Analysis Transformer', () => {
           createMockMove({
             classification: 'blunder',
             comment: 'Bad move',
+            isCriticalMoment: true, // Required for variations
             alternatives: [{ san: 'd4', eval: { cp: 25, depth: 20, pv: ['d4'] } }],
           }),
         ],
@@ -399,13 +431,35 @@ describe('Analysis Transformer', () => {
       const game = transformAnalysisToGame(analysis, {
         includeSummary: true,
         includeNags: true,
+        includePositionNags: false, // Disable for predictable count
         includeVariations: true,
       });
       const counts = countAnnotations(game);
 
       expect(counts.comments).toBe(2); // Summary + move comment
-      expect(counts.nags).toBe(1); // Blunder NAG
+      expect(counts.nags).toBe(1); // Blunder NAG (position NAGs disabled)
       expect(counts.variations).toBe(1); // One alternative
+    });
+
+    it('should count position NAGs when enabled', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            classification: 'blunder',
+            evalAfter: { cp: 300, depth: 20, pv: ['d4'] }, // White winning
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, {
+        includeSummary: false,
+        includeNags: true,
+        includePositionNags: true,
+        includeVariations: false,
+      });
+      const counts = countAnnotations(game);
+
+      // Blunder NAG + position NAG (White winning: $18)
+      expect(counts.nags).toBe(2);
     });
   });
 

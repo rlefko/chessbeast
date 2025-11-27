@@ -229,6 +229,7 @@ export {
   validateComment,
   validateSummary,
   parseJsonResponse,
+  extractMentionedMoves,
 } from './validator/output-validator.js';
 export { isValidNag, classificationToNag, filterValidNags } from './validator/nag-validator.js';
 export { validateMoveReferences, extractMoveReferences } from './validator/move-validator.js';
