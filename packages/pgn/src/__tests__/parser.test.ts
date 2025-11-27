@@ -288,22 +288,26 @@ describe('PGN Parser', () => {
       expect(games.length).toBe(0);
     });
 
-    it('handles games with comments (comments are ignored)', () => {
+    it('handles games with comments', () => {
       const pgn = `[Result "*"]
 
 1. e4 {Best by test} e5 {Solid reply} *`;
 
       const games = parsePgn(pgn);
       expect(games[0]!.moves.length).toBe(2);
+      expect(games[0]!.moves[0]!.commentAfter).toBe('Best by test');
+      expect(games[0]!.moves[1]!.commentAfter).toBe('Solid reply');
     });
 
-    it('handles games with NAG symbols (NAGs are ignored)', () => {
+    it('handles games with NAG symbols', () => {
       const pgn = `[Result "*"]
 
 1. e4 $1 e5 $2 *`;
 
       const games = parsePgn(pgn);
       expect(games[0]!.moves.length).toBe(2);
+      expect(games[0]!.moves[0]!.nags).toContain('$1');
+      expect(games[0]!.moves[1]!.nags).toContain('$2');
     });
 
     it('handles various result formats', () => {
@@ -332,6 +336,155 @@ describe('PGN Parser', () => {
 1. e4 e4 *`; // Black can't play e4
 
       expect(() => parsePgn(pgn)).toThrow();
+    });
+  });
+
+  describe('annotation parsing', () => {
+    describe('comments', () => {
+      it('parses comments after moves', () => {
+        const pgn = `[Result "*"]
+
+1. e4 {Best move} e5 {Solid} *`;
+
+        const games = parsePgn(pgn);
+        expect(games[0]!.moves[0]!.commentAfter).toBe('Best move');
+        expect(games[0]!.moves[1]!.commentAfter).toBe('Solid');
+      });
+
+      it('parses game comment before first move', () => {
+        const pgn = `[Result "*"]
+
+{This is a game comment} 1. e4 *`;
+
+        const games = parsePgn(pgn);
+        expect(games[0]!.gameComment).toBe('This is a game comment');
+      });
+
+      it('handles moves without comments', () => {
+        const pgn = `[Result "*"]
+
+1. e4 e5 *`;
+
+        const games = parsePgn(pgn);
+        expect(games[0]!.moves[0]!.commentAfter).toBeUndefined();
+        expect(games[0]!.moves[1]!.commentAfter).toBeUndefined();
+      });
+    });
+
+    describe('NAG symbols', () => {
+      it('parses NAG symbols after moves', () => {
+        const pgn = `[Result "*"]
+
+1. e4 $1 e5 $2 *`;
+
+        const games = parsePgn(pgn);
+        expect(games[0]!.moves[0]!.nags).toEqual(['$1']);
+        expect(games[0]!.moves[1]!.nags).toEqual(['$2']);
+      });
+
+      it('parses multiple NAGs per move', () => {
+        const pgn = `[Result "*"]
+
+1. e4 $1 $18 *`;
+
+        const games = parsePgn(pgn);
+        expect(games[0]!.moves[0]!.nags).toEqual(['$1', '$18']);
+      });
+
+      it('handles moves without NAGs', () => {
+        const pgn = `[Result "*"]
+
+1. e4 e5 *`;
+
+        const games = parsePgn(pgn);
+        expect(games[0]!.moves[0]!.nags).toBeUndefined();
+      });
+    });
+
+    describe('variations', () => {
+      it('parses simple variations', () => {
+        const pgn = `[Result "*"]
+
+1. e4 (1. d4) e5 *`;
+
+        const games = parsePgn(pgn);
+        const e4 = games[0]!.moves[0]!;
+
+        expect(e4.variations).toHaveLength(1);
+        expect(e4.variations![0]![0]!.san).toBe('d4');
+      });
+
+      it('parses variations with multiple moves', () => {
+        const pgn = `[Result "*"]
+
+1. e4 e5 2. Nf3 (2. Bc4 Nc6) Nc6 *`;
+
+        const games = parsePgn(pgn);
+        const nf3 = games[0]!.moves[2]!;
+
+        expect(nf3.variations).toHaveLength(1);
+        expect(nf3.variations![0]).toHaveLength(2);
+        expect(nf3.variations![0]![0]!.san).toBe('Bc4');
+        expect(nf3.variations![0]![1]!.san).toBe('Nc6');
+      });
+
+      it('parses multiple variations on same move', () => {
+        const pgn = `[Result "*"]
+
+1. e4 (1. d4) (1. c4) e5 *`;
+
+        const games = parsePgn(pgn);
+        const e4 = games[0]!.moves[0]!;
+
+        expect(e4.variations).toHaveLength(2);
+        expect(e4.variations![0]![0]!.san).toBe('d4');
+        expect(e4.variations![1]![0]!.san).toBe('c4');
+      });
+
+      it('generates correct FEN for variation moves', () => {
+        const pgn = `[Result "*"]
+
+1. e4 e5 2. Nf3 (2. Bc4) *`;
+
+        const games = parsePgn(pgn);
+        const nf3 = games[0]!.moves[2]!;
+        const bc4 = nf3.variations![0]![0]!;
+
+        // Bc4 should start from same position as Nf3 (after e5)
+        expect(bc4.fenBefore).toBe(nf3.fenBefore);
+        // Bc4 should end in different position than Nf3
+        expect(bc4.fenAfter).not.toBe(nf3.fenAfter);
+      });
+
+      it('handles variations for black moves', () => {
+        const pgn = `[Result "*"]
+
+1. e4 e5 (1... c5) *`;
+
+        const games = parsePgn(pgn);
+        const e5 = games[0]!.moves[1]!;
+
+        expect(e5.variations).toHaveLength(1);
+        expect(e5.variations![0]![0]!.san).toBe('c5');
+        expect(e5.variations![0]![0]!.isWhiteMove).toBe(false);
+      });
+    });
+
+    describe('combined annotations', () => {
+      it('parses moves with comments, NAGs, and variations', () => {
+        const pgn = `[Result "*"]
+
+1. e4 $1 {Best move} (1. d4 {Also good}) e5 *`;
+
+        const games = parsePgn(pgn);
+        const e4 = games[0]!.moves[0]!;
+
+        expect(e4.nags).toContain('$1');
+        expect(e4.commentAfter).toBe('Best move');
+        expect(e4.variations).toHaveLength(1);
+        expect(e4.variations![0]![0]!.san).toBe('d4');
+        expect(e4.variations![0]![0]!.commentAfter).toBe('Also good');
+      });
     });
   });
 });

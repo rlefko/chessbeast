@@ -86,9 +86,9 @@
   - `stockfish.proto` - position evaluation
   - `maia.proto` - human-likeness prediction
   - `common.proto` - shared types (Position, Move, etc.)
-- [ ] Generate TypeScript client stubs
+- [x] Generate TypeScript client stubs (StockfishClient, MaiaClient with dynamic proto loading)
 - [x] Generate Python server stubs
-- [ ] Create basic connectivity test
+- [x] Create basic connectivity test (unit tests for gRPC clients)
 
 ### 0.5 Development Environment
 - [x] Create `docker-compose.yml` for local services
@@ -97,33 +97,33 @@
 
 ---
 
-## Milestone 1: PGN Parser & Chess Core (TypeScript)
+## Milestone 1: PGN Parser & Chess Core (TypeScript) ✅
 
 ### 1.1 PGN Parser
-- [ ] Implement PGN tag parser (Event, White, Black, Result, etc.)
-- [ ] Implement move text parser (SAN notation)
-- [ ] Handle existing comments and variations in input PGN
-- [ ] Parse NAG symbols ($1, $2, etc.)
-- [ ] Implement robust error handling with position info
+- [x] Implement PGN tag parser (Event, White, Black, Result, etc.)
+- [x] Implement move text parser (SAN notation)
+- [x] Handle existing comments and variations in input PGN
+- [x] Parse NAG symbols ($1, $2, etc.)
+- [x] Implement robust error handling with position info
 
 ### 1.2 Chess Position Model
-- [ ] Implement `Position` class (board state, castling rights, en passant)
-- [ ] Implement FEN serialization/deserialization
-- [ ] Implement move application (SAN → position update)
-- [ ] Validate move legality
-- [ ] Generate FEN for each position in game
+- [x] Implement `Position` class (board state, castling rights, en passant)
+- [x] Implement FEN serialization/deserialization
+- [x] Implement move application (SAN → position update)
+- [x] Validate move legality
+- [x] Generate FEN for each position in game
 
 ### 1.3 Game Model
-- [ ] Define `GameMetadata` type
-- [ ] Define `MoveInfo` type with fenBefore/fenAfter
-- [ ] Define `ParsedGame` combining metadata + moves
-- [ ] Implement multi-game PGN parsing
+- [x] Define `GameMetadata` type
+- [x] Define `MoveInfo` type with fenBefore/fenAfter
+- [x] Define `ParsedGame` combining metadata + moves
+- [x] Implement multi-game PGN parsing
 
 ### 1.4 Unit Tests
-- [ ] Test PGN parsing with various formats
-- [ ] Test illegal move detection
-- [ ] Test FEN generation accuracy
-- [ ] Test edge cases (promotions, castling, en passant)
+- [x] Test PGN parsing with various formats
+- [x] Test illegal move detection
+- [x] Test FEN generation accuracy
+- [x] Test edge cases (promotions, castling, en passant)
 - [ ] Add corpus of real PGNs for integration testing
 
 ---
@@ -165,82 +165,82 @@
 
 ---
 
-## Milestone 3: Maia Service (Python + gRPC) - Using Maia2
+## Milestone 3: Maia Service (Python + gRPC) - Using Maia2 ✅
 
 ### 3.1 Model Loading (Maia2)
-- [ ] Install Maia2 package (`pip install maia2`)
-- [ ] Implement Maia2Model wrapper class
-- [ ] Support model types: "rapid" and "blitz"
-- [ ] Support device selection: CPU or CUDA
+- [x] Install Maia2 package (`pip install maia2`)
+- [x] Implement Maia2Model wrapper class
+- [x] Support model types: "rapid" and "blitz"
+- [x] Support device selection: CPU or CUDA
 
 ### 3.2 Move Prediction API
-- [ ] Implement `predictMoves(fen, playerElo)` method using Maia2
-- [ ] Support continuous ELO ratings (any value, not just fixed bands)
-- [ ] Return top moves with probabilities
-- [ ] Handle all legal positions
+- [x] Implement `predictMoves(fen, playerElo)` method using Maia2
+- [x] Support continuous ELO ratings (any value, not just fixed bands)
+- [x] Return top moves with probabilities
+- [x] Handle all legal positions
 
 ### 3.3 Rating Estimation
-- [ ] Implement `estimateRating(moves[])` method
-- [ ] Use Maia2's inference across multiple ELO values to find best fit
-- [ ] Return estimated rating with confidence bounds
-- [ ] Handle short games gracefully
+- [x] Implement `estimateRating(moves[])` method
+- [x] Use Maia2's inference across multiple ELO values to find best fit
+- [x] Return estimated rating with confidence bounds
+- [x] Handle short games gracefully
 
 ### 3.4 Human-Likeness Scoring
-- [ ] For a position + played move, return P(human plays this) at given ELO
-- [ ] Support any ELO rating as continuous parameter
-- [ ] Define "natural but flawed" vs "engine-like" classification
+- [x] For a position + played move, return P(human plays this) at given ELO
+- [x] Support any ELO rating as continuous parameter
+- [x] Define "natural but flawed" vs "engine-like" classification
 
 ### 3.5 gRPC Service
-- [ ] Implement `MaiaService` gRPC server
-- [ ] Implement PredictMoves, EstimateRating, HealthCheck RPCs
-- [ ] Add proper error handling with gRPC status codes
-- [ ] Load Maia2 model on startup
+- [x] Implement `MaiaService` gRPC server
+- [x] Implement PredictMoves, EstimateRating, HealthCheck RPCs
+- [x] Add proper error handling with gRPC status codes
+- [x] Load Maia2 model on startup
 
 ### 3.6 Testing
-- [ ] Unit tests with mocked Maia2 module
-- [ ] Test predictions against known positions
-- [ ] Test rating estimation accuracy
-- [ ] Test gRPC error handling
+- [x] Unit tests with mocked Maia2 module
+- [x] Test predictions against known positions
+- [x] Test rating estimation accuracy
+- [x] Test gRPC error handling
 
 ---
 
-## Milestone 4: Basic Analysis Pipeline (TypeScript)
+## Milestone 4: Basic Analysis Pipeline (TypeScript) ✅
 
 ### 4.1 Two-Pass Engine Analysis
-- [ ] Implement shallow pass (depth 12-16) for all positions
-- [ ] Track evaluation for each position
-- [ ] Calculate centipawn loss per move
-- [ ] Store results in `MoveAnalysis` structure
+- [x] Implement shallow pass (depth 12-16) for all positions
+- [x] Track evaluation for each position
+- [x] Calculate centipawn loss per move
+- [x] Store results in `MoveAnalysis` structure
 
 ### 4.2 Move Classification
-- [ ] Implement rating-dependent thresholds
-- [ ] Classify moves: book, excellent, good, inaccuracy, mistake, blunder
-- [ ] Detect "forced" moves (only one reasonable option)
-- [ ] Detect "brilliant" moves (low Maia prob, high engine eval, sacrifice)
+- [x] Implement rating-dependent thresholds
+- [x] Classify moves: book, excellent, good, inaccuracy, mistake, blunder
+- [x] Detect "forced" moves (only one reasonable option)
+- [x] Detect "brilliant" moves (low Maia prob, high engine eval, sacrifice)
 
 ### 4.3 Critical Moment Detection
-- [ ] Detect large evaluation swings
-- [ ] Detect game-result transitions (win→draw, etc.)
-- [ ] Detect phase transitions (opening→middlegame→endgame)
-- [ ] Score moments by "interestingness"
-- [ ] Cap critical moments at ~25% of moves
+- [x] Detect large evaluation swings
+- [x] Detect game-result transitions (win→draw, etc.)
+- [x] Detect phase transitions (opening→middlegame→endgame)
+- [x] Score moments by "interestingness"
+- [x] Cap critical moments at ~25% of moves
 
 ### 4.4 Deep Analysis
-- [ ] For critical moments, run depth 20-24 analysis
-- [ ] Run MultiPV=3 for alternative lines
+- [x] For critical moments, run depth 20-24 analysis
+- [x] Run MultiPV=3 for alternative lines
 - [ ] Select meaningful alternatives (different plans, not just move order)
 - [ ] Tag sidelines with purpose (tactical, strategic, simplifying)
 
 ### 4.5 Integration with Maia2
-- [ ] Fetch human-likeness for all moves using Maia2
-- [ ] Use Maia2 for rating estimation if metadata missing
-- [ ] Adjust classification thresholds based on estimated rating
+- [x] Fetch human-likeness for all moves using Maia2
+- [x] Use Maia2 for rating estimation if metadata missing
+- [x] Adjust classification thresholds based on estimated rating
 - [ ] Identify "natural mistakes" vs "uncharacteristic errors"
 
 ### 4.6 Testing
-- [ ] Test classification on games with known blunders
-- [ ] Test critical moment detection
-- [ ] Verify rating-dependent thresholds work correctly
+- [x] Test classification on games with known blunders
+- [x] Test critical moment detection
+- [x] Verify rating-dependent thresholds work correctly
 - [ ] Test with GM games and amateur games
 
 ---

@@ -267,4 +267,216 @@ describe('PGN Renderer', () => {
       expect(reparsed[0]!.moves[6]!.san).toBe('Qxf7#');
     });
   });
+
+  describe('annotation rendering', () => {
+    describe('comments', () => {
+      it('renders comments after moves', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '', commentAfter: 'Best move' },
+          ],
+        };
+
+        const pgn = renderPgn(game);
+        expect(pgn).toContain('e4 {Best move}');
+      });
+
+      it('renders game comment before moves', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '' },
+          ],
+          gameComment: 'An interesting game',
+        };
+
+        const pgn = renderPgn(game);
+        expect(pgn).toContain('{An interesting game}');
+        // Game comment should be before moves
+        const gameCommentIndex = pgn.indexOf('{An interesting game}');
+        const moveIndex = pgn.indexOf('1. e4');
+        expect(gameCommentIndex).toBeLessThan(moveIndex);
+      });
+
+      it('escapes braces in comments', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '', commentAfter: 'A } brace' },
+          ],
+        };
+
+        const pgn = renderPgn(game);
+        expect(pgn).toContain('{A \\} brace}');
+      });
+    });
+
+    describe('NAG symbols', () => {
+      it('renders NAG symbols after moves', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '', nags: ['$1'] },
+          ],
+        };
+
+        const pgn = renderPgn(game);
+        expect(pgn).toContain('e4 $1');
+      });
+
+      it('renders multiple NAGs', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '', nags: ['$1', '$18'] },
+          ],
+        };
+
+        const pgn = renderPgn(game);
+        expect(pgn).toContain('e4 $1 $18');
+      });
+    });
+
+    describe('variations', () => {
+      it('renders variations in parentheses', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            {
+              moveNumber: 1,
+              san: 'e4',
+              isWhiteMove: true,
+              fenBefore: '',
+              fenAfter: '',
+              variations: [[
+                { moveNumber: 1, san: 'd4', isWhiteMove: true, fenBefore: '', fenAfter: '' },
+              ]],
+            },
+          ],
+        };
+
+        const pgn = renderPgn(game);
+        expect(pgn).toContain('( 1. d4 )');
+      });
+
+      it('renders black move variations with ellipsis', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '' },
+            {
+              moveNumber: 1,
+              san: 'e5',
+              isWhiteMove: false,
+              fenBefore: '',
+              fenAfter: '',
+              variations: [[
+                { moveNumber: 1, san: 'c5', isWhiteMove: false, fenBefore: '', fenAfter: '' },
+              ]],
+            },
+          ],
+        };
+
+        const pgn = renderPgn(game);
+        expect(pgn).toContain('( 1... c5 )');
+      });
+
+      it('renders multiple variations', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            {
+              moveNumber: 1,
+              san: 'e4',
+              isWhiteMove: true,
+              fenBefore: '',
+              fenAfter: '',
+              variations: [
+                [{ moveNumber: 1, san: 'd4', isWhiteMove: true, fenBefore: '', fenAfter: '' }],
+                [{ moveNumber: 1, san: 'c4', isWhiteMove: true, fenBefore: '', fenAfter: '' }],
+              ],
+            },
+          ],
+        };
+
+        const pgn = renderPgn(game);
+        expect(pgn).toContain('( 1. d4 )');
+        expect(pgn).toContain('( 1. c4 )');
+      });
+    });
+
+    describe('combined annotations', () => {
+      it('renders NAGs, comments, and variations in correct order', () => {
+        const game: ParsedGame = {
+          metadata: { white: 'A', black: 'B', result: '*' },
+          moves: [
+            {
+              moveNumber: 1,
+              san: 'e4',
+              isWhiteMove: true,
+              fenBefore: '',
+              fenAfter: '',
+              nags: ['$1'],
+              commentAfter: 'Best',
+              variations: [[
+                { moveNumber: 1, san: 'd4', isWhiteMove: true, fenBefore: '', fenAfter: '' },
+              ]],
+            },
+          ],
+        };
+
+        const pgn = renderPgn(game);
+        // Order should be: move, NAG, comment, variations
+        expect(pgn).toMatch(/e4 \$1 \{Best\} \( 1\. d4 \)/);
+      });
+    });
+  });
+
+  describe('annotation round-trip tests', () => {
+    it('preserves comments through parse-render cycle', () => {
+      const originalPgn = `[White "A"]
+[Black "B"]
+[Result "*"]
+
+1. e4 {Best move} e5 {Solid} *`;
+
+      const games = parsePgn(originalPgn);
+      const rendered = renderPgn(games[0]!);
+      const reparsed = parsePgn(rendered);
+
+      expect(reparsed[0]!.moves[0]!.commentAfter).toBe('Best move');
+      expect(reparsed[0]!.moves[1]!.commentAfter).toBe('Solid');
+    });
+
+    it('preserves NAGs through parse-render cycle', () => {
+      const originalPgn = `[White "A"]
+[Black "B"]
+[Result "*"]
+
+1. e4 $1 e5 $2 *`;
+
+      const games = parsePgn(originalPgn);
+      const rendered = renderPgn(games[0]!);
+      const reparsed = parsePgn(rendered);
+
+      expect(reparsed[0]!.moves[0]!.nags).toContain('$1');
+      expect(reparsed[0]!.moves[1]!.nags).toContain('$2');
+    });
+
+    it('preserves simple variations through parse-render cycle', () => {
+      const originalPgn = `[White "A"]
+[Black "B"]
+[Result "*"]
+
+1. e4 (1. d4) e5 *`;
+
+      const games = parsePgn(originalPgn);
+      const rendered = renderPgn(games[0]!);
+      const reparsed = parsePgn(rendered);
+
+      expect(reparsed[0]!.moves[0]!.variations).toHaveLength(1);
+      expect(reparsed[0]!.moves[0]!.variations![0]![0]!.san).toBe('d4');
+    });
+  });
 });
