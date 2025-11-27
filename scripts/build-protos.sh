@@ -32,8 +32,15 @@ fi
 # Generate Python stubs
 echo "Generating Python stubs..."
 
+# Use uv run if available, otherwise fall back to python
+if command -v uv &> /dev/null; then
+    PYTHON_CMD="uv run python"
+else
+    PYTHON_CMD="python"
+fi
+
 # For Stockfish service
-python -m grpc_tools.protoc \
+$PYTHON_CMD -m grpc_tools.protoc \
     -I"$PROTO_DIR" \
     --python_out="$PY_STOCKFISH_OUT" \
     --pyi_out="$PY_STOCKFISH_OUT" \
@@ -42,7 +49,7 @@ python -m grpc_tools.protoc \
     "$PROTO_DIR/stockfish.proto"
 
 # For Maia service
-python -m grpc_tools.protoc \
+$PYTHON_CMD -m grpc_tools.protoc \
     -I"$PROTO_DIR" \
     --python_out="$PY_MAIA_OUT" \
     --pyi_out="$PY_MAIA_OUT" \
@@ -50,9 +57,32 @@ python -m grpc_tools.protoc \
     "$PROTO_DIR/common.proto" \
     "$PROTO_DIR/maia.proto"
 
+# Fix imports to be relative (grpc_tools generates absolute imports)
+echo "Fixing Python imports to be relative..."
+for dir in "$PY_STOCKFISH_OUT" "$PY_MAIA_OUT"; do
+    for file in "$dir"/*_pb2*.py; do
+        if [[ -f "$file" ]]; then
+            # Replace 'import xxx_pb2' with 'from . import xxx_pb2'
+            sed -i.bak 's/^import \([a-z_]*_pb2\)/from . import \1/' "$file"
+            rm -f "${file}.bak"
+        fi
+    done
+done
+
 # Create __init__.py files for generated packages
-touch "$PY_STOCKFISH_OUT/__init__.py"
-touch "$PY_MAIA_OUT/__init__.py"
+cat > "$PY_STOCKFISH_OUT/__init__.py" << 'EOF'
+"""Generated gRPC stubs for Stockfish service."""
+from .common_pb2 import *
+from .stockfish_pb2 import *
+from .stockfish_pb2_grpc import *
+EOF
+
+cat > "$PY_MAIA_OUT/__init__.py" << 'EOF'
+"""Generated gRPC stubs for Maia service."""
+from .common_pb2 import *
+from .maia_pb2 import *
+from .maia_pb2_grpc import *
+EOF
 
 echo "Python stubs generated successfully"
 
