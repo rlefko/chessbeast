@@ -172,10 +172,9 @@ export function createNullReporter(): any {
 export function createTrackingReporter(): any {
   const calls: Array<{ method: string; args: unknown[] }> = [];
 
-  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   const track =
-    (method: string) =>
-    (...args: unknown[]) => {
+    (method: string): ((...args: unknown[]) => void) =>
+    (...args: unknown[]): void => {
       calls.push({ method, args });
     };
 
