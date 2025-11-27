@@ -39,33 +39,70 @@ chessbeast analyze --input game.pgn --output annotated.pgn
 ## Usage
 
 ```bash
-# Basic analysis
-chessbeast analyze --input game.pgn
+# Basic analysis (reads from stdin, writes to stdout)
+chessbeast analyze < game.pgn > annotated.pgn
 
-# With options
+# With input/output files
+chessbeast analyze --input game.pgn --output annotated.pgn
+
+# Quick analysis for faster results
+chessbeast analyze --input game.pgn --profile quick
+
+# Deep analysis with rich commentary for a 1600-rated player
 chessbeast analyze \
   --input game.pgn \
   --output annotated.pgn \
-  --profile standard \
+  --profile deep \
   --verbosity rich \
   --target-elo 1600
+
+# Skip external services for offline analysis
+chessbeast analyze --input game.pgn --skip-maia --skip-llm
+
+# Validate setup before running
+chessbeast analyze --dry-run
+
+# Show resolved configuration
+chessbeast analyze --show-config
 ```
+
+### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `-i, --input <file>` | Input PGN file (default: stdin) |
+| `-o, --output <file>` | Output file (default: stdout) |
+| `-c, --config <file>` | Path to configuration file |
+| `-p, --profile <profile>` | Analysis profile: `quick`, `standard`, `deep` (default: standard) |
+| `-v, --verbosity <level>` | Output verbosity: `summary`, `normal`, `rich` (default: normal) |
+| `--target-elo <rating>` | Target audience rating for explanations |
+| `--skip-maia` | Skip Maia human-likeness analysis |
+| `--skip-llm` | Skip LLM annotations (use templates only) |
+| `--show-config` | Print resolved configuration and exit |
+| `--no-color` | Disable colored output (useful for piping) |
+| `--dry-run` | Validate setup and configuration without running analysis |
+| `--version` | Display version |
+| `--help` | Display help |
 
 ### Analysis Profiles
 
-| Profile | Description |
-|---------|-------------|
-| `quick` | Fast analysis, minimal commentary |
-| `standard` | Balanced depth and speed (default) |
-| `deep` | Thorough analysis, detailed commentary |
+| Profile | Engine Depth | Critical Moments | MultiPV | Best For |
+|---------|--------------|------------------|---------|----------|
+| `quick` | 12/16 | ~15% of moves | 1 | Fast overview, blitz games |
+| `standard` | 14/22 | ~25% of moves | 3 | Balanced analysis (default) |
+| `deep` | 18/28 | ~35% of moves | 5 | Thorough study, tournament games |
 
 ### Verbosity Levels
 
 | Level | Description |
 |-------|-------------|
 | `summary` | Game overview and key moments only |
-| `normal` | Standard annotations (default) |
-| `rich` | Detailed explanations with sidelines |
+| `normal` | Standard annotations with key lines (default) |
+| `rich` | Detailed explanations with alternative variations |
+
+### Configuration
+
+ChessBeast supports configuration via files, environment variables, and CLI flags. See [docs/configuration.md](docs/configuration.md) for complete configuration options.
 
 ## Development
 
