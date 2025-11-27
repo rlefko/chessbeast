@@ -19,8 +19,19 @@ install: install-ts install-py  ## Install all dependencies (npm + uv)
 install-ts:
 	pnpm install
 
-install-py:
+install-py: check-uv  ## Install Python dependencies with uv
+	@echo "Setting up Python virtual environment..."
+	uv venv --python 3.12 .venv 2>/dev/null || true
 	uv sync --all-packages
+	@echo "Python dependencies installed in .venv/"
+
+check-uv:
+	@command -v uv >/dev/null 2>&1 || { \
+		echo "Error: uv is required but not installed."; \
+		echo "Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"; \
+		echo "Or see: https://docs.astral.sh/uv/getting-started/installation/"; \
+		exit 1; \
+	}
 
 install-hooks:
 	bash scripts/install-hooks.sh
