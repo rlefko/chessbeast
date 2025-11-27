@@ -5,6 +5,7 @@
 import { ResponseCache, generatePositionCacheKey } from '../cache/response-cache.js';
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { LLMConfig } from '../config/llm-config.js';
+import { RateLimitError } from '../errors.js';
 import type { PlannedAnnotation } from '../planner/annotation-planner.js';
 import { CHESS_ANNOTATOR_SYSTEM } from '../prompts/system-prompts.js';
 import type { CommentContext } from '../prompts/templates.js';
@@ -160,11 +161,22 @@ export class CommentGenerator {
   }
 
   private handleFailure(error: unknown, planned: PlannedAnnotation): GeneratedComment {
-    this.recordFailure();
-
-    // Log the error
-    if (error instanceof Error) {
-      console.warn(`LLM comment generation failed: ${error.message}`);
+    // Rate limit errors are recoverable - don't increase degradation as aggressively
+    // The retry logic should have handled most rate limits, but if we get here
+    // it means retries were exhausted
+    if (error instanceof RateLimitError) {
+      console.warn(
+        `LLM rate limited after all retries. This is NOT a token budget issue. ` +
+          `Consider reducing request frequency or upgrading API tier.`,
+      );
+      // Only record failure once for rate limits (don't trigger immediate degradation)
+      this.consecutiveFailures++;
+    } else {
+      this.recordFailure();
+      // Log the error with more context
+      if (error instanceof Error) {
+        console.warn(`LLM comment generation failed: ${error.message}`);
+      }
     }
 
     // Always return a fallback - never throw from public methods

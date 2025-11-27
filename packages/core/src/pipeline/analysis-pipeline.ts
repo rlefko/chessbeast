@@ -479,6 +479,7 @@ export class AnalysisPipeline {
 
   /**
    * Maia analysis pass - get human probability for each move
+   * Also adds Maia's predicted move as an alternative for mistakes/blunders
    */
   private async maiaPass(
     moves: MoveAnalysis[],
@@ -498,6 +499,66 @@ export class AnalysisPipeline {
         const playedMove = predictions.find((p) => p.san === move.san);
         if (playedMove) {
           move.humanProbability = playedMove.probability;
+        }
+
+        // For mistakes and blunders, add Maia's top predicted move as an alternative
+        // This shows what a human at this rating would likely play
+        if (
+          (move.classification === 'mistake' || move.classification === 'blunder') &&
+          predictions.length > 0
+        ) {
+          const maiaTopMove = predictions[0]!;
+
+          // Only add if it's different from both the played move and engine best move
+          if (maiaTopMove.san !== move.san && maiaTopMove.san !== move.bestMove) {
+            // Check if this move isn't already in alternatives
+            const existingAlt = move.alternatives?.find((alt) => alt.san === maiaTopMove.san);
+            if (!existingAlt) {
+              // Get engine evaluation for the Maia move to provide proper PV
+              let maiaEval: EngineEvaluation;
+              try {
+                // Evaluate the position after the Maia move
+                // We need to make the move first to get the resulting position
+                // For simplicity, we'll get a shallow eval with the move as first PV
+                const evalResults = await this.engine.evaluateMultiPv(move.fenBefore, {
+                  depth: this.config.shallowDepth,
+                  timeLimitMs: this.config.shallowTimeLimitMs,
+                  numLines: 1,
+                });
+                maiaEval = evalResults[0] ?? {
+                  depth: 0,
+                  pv: [maiaTopMove.san],
+                };
+                // Replace first move in PV with Maia move if it's different
+                if (maiaEval.pv[0] !== maiaTopMove.san) {
+                  maiaEval = {
+                    ...maiaEval,
+                    pv: [maiaTopMove.san, ...maiaEval.pv.slice(1)],
+                  };
+                }
+              } catch {
+                maiaEval = {
+                  depth: 0,
+                  pv: [maiaTopMove.san],
+                };
+              }
+
+              // Create a Maia alternative with a special tag
+              const maiaAlternative: AlternativeMove = {
+                san: maiaTopMove.san,
+                eval: maiaEval,
+                tag: 'strategic', // Maia moves tend to be more intuitive/strategic
+              };
+
+              // Initialize alternatives array if needed
+              if (!move.alternatives) {
+                move.alternatives = [];
+              }
+
+              // Add Maia alternative at the beginning to highlight it
+              move.alternatives.unshift(maiaAlternative);
+            }
+          }
         }
       } catch {
         // Maia prediction failed, continue without it

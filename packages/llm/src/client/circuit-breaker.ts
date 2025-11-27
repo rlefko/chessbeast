@@ -3,7 +3,7 @@
  */
 
 import type { CircuitBreakerConfig } from '../config/llm-config.js';
-import { CircuitOpenError } from '../errors.js';
+import { CircuitOpenError, RateLimitError } from '../errors.js';
 
 import type { CircuitState } from './types.js';
 
@@ -53,6 +53,11 @@ export class CircuitBreaker {
       this.recordSuccess();
       return result;
     } catch (error) {
+      // Rate limit errors are expected and recoverable - don't count as failures
+      // This prevents the circuit from tripping due to temporary rate limiting
+      if (error instanceof RateLimitError) {
+        throw error;
+      }
       this.recordFailure();
       throw error;
     }

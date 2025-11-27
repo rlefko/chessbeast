@@ -12,7 +12,7 @@ import {
   type MoveInfo,
 } from '@chessbeast/pgn';
 
-import type { ChessBeastConfig, OutputVerbosity } from '../config/schema.js';
+import type { ChessBeastConfig, OutputVerbosity, AnnotationPerspective } from '../config/schema.js';
 import { PgnError, AnalysisError } from '../errors/index.js';
 import type { ProgressReporter } from '../progress/reporter.js';
 import { createPipelineProgressCallback } from '../progress/reporter.js';
@@ -174,6 +174,8 @@ export async function orchestrateAnalysis(
         const result = await services.annotator.annotate(analysis, {
           preferredVerbosity,
           generateSummary: config.output.includeSummary,
+          perspective: config.output.perspective as AnnotationPerspective,
+          includeNags: config.output.includeNags,
         });
         analysis = result.analysis;
         totalAnnotations += result.positionsAnnotated;

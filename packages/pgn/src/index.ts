@@ -71,6 +71,10 @@ export type { RenderOptions } from './renderer/pgn-renderer.js';
 export { ChessPosition, STARTING_FEN } from './chess/position.js';
 export type { MoveResult } from './chess/position.js';
 
+// Re-export tension resolution utilities
+export { resolveVariationLength, hasTacticalTension } from './chess/tension-resolver.js';
+export type { TensionConfig } from './chess/tension-resolver.js';
+
 // Re-export error types
 export { PgnParseError, InvalidFenError, IllegalMoveError } from './errors.js';
 

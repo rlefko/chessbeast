@@ -15,6 +15,11 @@ export type AnalysisProfile = 'quick' | 'standard' | 'deep';
 export type OutputVerbosity = 'summary' | 'normal' | 'rich';
 
 /**
+ * Annotation perspective (whose point of view)
+ */
+export type AnnotationPerspective = 'white' | 'black' | 'neutral';
+
+/**
  * Analysis configuration
  */
 export interface AnalysisConfigSchema {
@@ -80,6 +85,7 @@ export interface OutputConfigSchema {
   includeVariations: boolean;
   includeNags: boolean;
   includeSummary: boolean;
+  perspective: AnnotationPerspective;
 }
 
 /**
@@ -168,6 +174,7 @@ const DEFAULT_CONFIG: ChessBeastConfig = {
     includeVariations: true,
     includeNags: true,
     includeSummary: true,
+    perspective: 'neutral',
   },
 };
 

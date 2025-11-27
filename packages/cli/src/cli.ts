@@ -4,7 +4,12 @@
 
 import { Command } from 'commander';
 
-import type { CliOptions, AnalysisProfile, OutputVerbosity } from './config/schema.js';
+import type {
+  CliOptions,
+  AnalysisProfile,
+  OutputVerbosity,
+  AnnotationPerspective,
+} from './config/schema.js';
 
 export const VERSION = '0.1.0';
 
@@ -23,6 +28,14 @@ const VERBOSITY_HELP = `Output verbosity:
     summary - Brief move comments, no variations
     normal  - Standard annotations with key lines [default]
     rich    - Detailed explanations with alternatives`;
+
+/**
+ * Perspective descriptions for help text
+ */
+const PERSPECTIVE_HELP = `Annotation perspective:
+    neutral - Objective commentary (White/Black) [default]
+    white   - From White's point of view (we/they)
+    black   - From Black's point of view (we/they)`;
 
 /**
  * Create and configure the CLI program
@@ -44,6 +57,7 @@ export function createProgram(): Command {
     .option('-c, --config <file>', 'Path to config file')
     .option('-p, --profile <profile>', PROFILE_HELP, 'standard')
     .option('-v, --verbosity <level>', VERBOSITY_HELP, 'normal')
+    .option('--perspective <side>', PERSPECTIVE_HELP, 'neutral')
     .option('--target-elo <rating>', 'Target audience rating for annotations', parseInt)
     .option('--skip-maia', 'Skip Maia human-likeness analysis')
     .option('--skip-llm', 'Skip LLM annotations (template only)')
@@ -71,6 +85,8 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['profile'] !== undefined) result.profile = options['profile'] as AnalysisProfile;
   if (options['verbosity'] !== undefined)
     result.verbosity = options['verbosity'] as OutputVerbosity;
+  if (options['perspective'] !== undefined)
+    result.perspective = options['perspective'] as AnnotationPerspective;
   if (options['targetElo'] !== undefined) result.targetElo = options['targetElo'] as number;
   if (options['skipMaia'] !== undefined) result.skipMaia = options['skipMaia'] as boolean;
   if (options['skipLlm'] !== undefined) result.skipLlm = options['skipLlm'] as boolean;

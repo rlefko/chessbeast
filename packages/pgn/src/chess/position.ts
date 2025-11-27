@@ -157,4 +157,59 @@ export class ChessPosition {
   clone(): ChessPosition {
     return new ChessPosition(this.fen());
   }
+
+  /**
+   * Convert a UCI move to SAN notation
+   * @param uci - Move in UCI format (e.g., "e2e4", "e7e8q")
+   * @returns Move in SAN format (e.g., "e4", "e8=Q")
+   * @throws IllegalMoveError if the move is not legal
+   */
+  uciToSan(uci: string): string {
+    const from = uci.slice(0, 2);
+    const to = uci.slice(2, 4);
+    const promotionChar = uci[4];
+
+    const fenBefore = this.chess.fen();
+    try {
+      // Build move object conditionally to satisfy exactOptionalPropertyTypes
+      const moveObj: { from: string; to: string; promotion?: string } = { from, to };
+      if (promotionChar) {
+        moveObj.promotion = promotionChar;
+      }
+      const result = this.chess.move(moveObj);
+      if (!result) {
+        throw new IllegalMoveError(uci, fenBefore);
+      }
+      // Undo the move to keep position unchanged
+      this.chess.undo();
+      return result.san;
+    } catch (err) {
+      if (err instanceof IllegalMoveError) {
+        throw err;
+      }
+      throw new IllegalMoveError(uci, fenBefore);
+    }
+  }
+
+  /**
+   * Convert a sequence of UCI moves to SAN notation
+   * Makes moves on a cloned position to get correct SAN for each move in context
+   * @param uciMoves - Array of UCI moves
+   * @param startingFen - Optional FEN of the starting position (defaults to current position)
+   * @returns Array of SAN moves
+   * @throws IllegalMoveError if any move is not legal
+   */
+  static convertPvToSan(uciMoves: string[], startingFen?: string): string[] {
+    const pos = startingFen ? new ChessPosition(startingFen) : new ChessPosition();
+    const sanMoves: string[] = [];
+
+    for (const uci of uciMoves) {
+      const san = pos.uciToSan(uci);
+      sanMoves.push(san);
+      // Make the move to update position for next conversion
+      pos.move(san);
+    }
+
+    return sanMoves;
+  }
 }

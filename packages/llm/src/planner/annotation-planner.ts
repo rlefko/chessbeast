@@ -5,7 +5,11 @@
 import type { GameAnalysis, MoveAnalysis, CriticalMoment } from '@chessbeast/core';
 
 import type { TokenBudget } from '../config/llm-config.js';
-import type { VerbosityLevel, CommentContext } from '../prompts/templates.js';
+import type {
+  VerbosityLevel,
+  CommentContext,
+  AnnotationPerspective,
+} from '../prompts/templates.js';
 
 import { estimateTokens, shouldAnnotate } from './verbosity.js';
 
@@ -55,6 +59,10 @@ export interface PlanOptions {
   minPriority?: number;
   /** Whether to skip non-critical positions when budget is tight (default: true) */
   adaptiveBudget?: boolean;
+  /** Annotation perspective (default: 'neutral') */
+  perspective?: AnnotationPerspective;
+  /** Whether NAGs will be included in output (for NAG-aware prompts) (default: true) */
+  includeNags?: boolean;
 }
 
 /**
@@ -257,6 +265,18 @@ function assignVerbosityLevels(
 }
 
 /**
+ * Classifications that result in a NAG glyph
+ */
+const CLASSIFICATIONS_WITH_NAG = ['blunder', 'mistake', 'inaccuracy', 'brilliant', 'excellent'];
+
+/**
+ * Check if a move classification will have a NAG glyph
+ */
+function classificationHasNag(classification: string): boolean {
+  return CLASSIFICATIONS_WITH_NAG.includes(classification);
+}
+
+/**
  * Build comment context for a planned annotation
  */
 export function buildCommentContext(
@@ -264,6 +284,8 @@ export function buildCommentContext(
   targetRating: number,
   legalMoves: string[],
   openingName?: string,
+  perspective: AnnotationPerspective = 'neutral',
+  includeNags: boolean = true,
 ): CommentContext {
   const { move, criticalMoment, verbosity } = planned;
   const moveNotation = `${move.moveNumber}${move.isWhiteMove ? '.' : '...'} ${move.san}`;
@@ -276,5 +298,7 @@ export function buildCommentContext(
     legalMoves,
     openingName,
     moveNotation,
+    perspective,
+    hasNag: includeNags && classificationHasNag(move.classification),
   };
 }

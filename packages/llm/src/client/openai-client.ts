@@ -18,6 +18,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Add jitter to a delay (±25%)
+ */
+function addJitter(delayMs: number): number {
+  const jitter = delayMs * 0.25 * (Math.random() * 2 - 1);
+  return Math.round(delayMs + jitter);
+}
+
+/**
  * Token tracker for budget management
  */
 export class TokenTracker {
@@ -188,8 +196,10 @@ export class OpenAIClient {
     const config = this.config.retry;
     let lastError: Error | undefined;
     let delay = config.initialDelayMs;
+    let rateLimitAttempts = 0;
+    const maxRateLimitRetries = 5; // More retries specifically for rate limits
 
-    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= config.maxRetries + maxRateLimitRetries; attempt++) {
       try {
         return await operation();
       } catch (error) {
@@ -201,15 +211,30 @@ export class OpenAIClient {
           throw error;
         }
 
-        // Handle rate limiting with retry-after
+        // Handle rate limiting specially - more retries and longer waits
         if (error instanceof RateLimitError) {
-          delay = Math.max(delay, error.retryAfterMs);
+          rateLimitAttempts++;
+          // Rate limits get extra retries
+          if (rateLimitAttempts <= maxRateLimitRetries) {
+            // Use retry-after from header with jitter, minimum 5 seconds
+            const rateLimitDelay = addJitter(Math.max(5000, error.retryAfterMs));
+            console.warn(
+              `Rate limited (attempt ${rateLimitAttempts}/${maxRateLimitRetries}), waiting ${rateLimitDelay}ms...`,
+            );
+            await sleep(rateLimitDelay);
+            continue;
+          }
         }
 
-        // Don't retry on last attempt
-        if (attempt < config.maxRetries) {
-          await sleep(delay);
+        // Don't retry on last attempt for non-rate-limit errors
+        const nonRateLimitAttempt = attempt - rateLimitAttempts;
+        if (nonRateLimitAttempt < config.maxRetries) {
+          const delayWithJitter = addJitter(delay);
+          await sleep(delayWithJitter);
           delay = Math.min(delay * config.backoffMultiplier, config.maxDelayMs);
+        } else {
+          // Exhausted retries
+          break;
         }
       }
     }

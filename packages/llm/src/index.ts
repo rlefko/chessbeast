@@ -113,14 +113,25 @@ export class Annotator {
     // Create annotation plan
     const plan = createAnnotationPlan(analysis, this.config.budget, planOptions);
 
+    // Get perspective and includeNags from options
+    const perspective = planOptions.perspective ?? 'neutral';
+    const includeNags = planOptions.includeNags ?? true;
+
     // Generate comments for each planned position
     let positionsAnnotated = 0;
     for (const planned of plan.positions) {
       // Get legal moves for validation (placeholder - would need chess library)
       const legalMoves = this.getLegalMoves(planned.move.fenBefore);
 
-      // Build context
-      const context = buildCommentContext(planned, plan.targetRating, legalMoves, plan.openingName);
+      // Build context with perspective and NAG awareness
+      const context = buildCommentContext(
+        planned,
+        plan.targetRating,
+        legalMoves,
+        plan.openingName,
+        perspective,
+        includeNags,
+      );
 
       // Generate comment
       const comment = await this.commentGenerator.generateComment(context, planned);

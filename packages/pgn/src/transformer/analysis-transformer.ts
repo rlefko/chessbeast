@@ -5,6 +5,8 @@
  * ParsedGame objects that can be rendered to PGN strings.
  */
 
+import { ChessPosition } from '../chess/position.js';
+import { resolveVariationLength } from '../chess/tension-resolver.js';
 import type { GameMetadata, MoveInfo, ParsedGame } from '../index.js';
 import { classificationToNag, type MoveClassification } from '../nag/index.js';
 
@@ -22,6 +24,10 @@ export interface TransformOptions {
   maxVariationDepth?: number;
   /** Include analysis metadata as custom tags (default: false) */
   includeAnalysisMetadata?: boolean;
+  /** Maximum moves in a variation (default: 15, uses tension resolution) */
+  maxVariationMoves?: number;
+  /** Use tension resolution for dynamic variation length (default: true) */
+  useTensionResolution?: boolean;
 }
 
 /**
@@ -109,6 +115,8 @@ const DEFAULT_OPTIONS: Required<TransformOptions> = {
   includeSummary: true,
   maxVariationDepth: 1,
   includeAnalysisMetadata: false,
+  maxVariationMoves: 15,
+  useTensionResolution: true,
 };
 
 /**
@@ -262,33 +270,76 @@ function transformAlternatives(
 function buildPvMoves(
   alt: AlternativeMove,
   parentMove: MoveAnalysisInput,
-  _opts: Required<TransformOptions>,
+  opts: Required<TransformOptions>,
 ): MoveInfo[] {
   // PV starts with the alternative move itself, so we skip the first element
   if (!alt.eval.pv || alt.eval.pv.length <= 1) {
     return [];
   }
 
+  // Get continuation moves (excluding the first which is the alternative itself)
+  const continuationMoves = alt.eval.pv.slice(1);
+
+  // Determine how many moves to include
+  let movesToInclude: number;
+  if (opts.useTensionResolution) {
+    // Calculate FEN after the alternative move to use as starting position
+    const pos = new ChessPosition(parentMove.fenBefore);
+    try {
+      pos.move(alt.san);
+      const fenAfterAlt = pos.fen();
+      movesToInclude = resolveVariationLength(fenAfterAlt, continuationMoves, {
+        maxMoves: opts.maxVariationMoves,
+      });
+    } catch {
+      // If we can't make the move, fall back to max
+      movesToInclude = Math.min(continuationMoves.length, opts.maxVariationMoves);
+    }
+  } else {
+    movesToInclude = Math.min(continuationMoves.length, opts.maxVariationMoves);
+  }
+
+  if (movesToInclude === 0) {
+    return [];
+  }
+
+  // Build move info with proper FEN tracking
   const pvMoves: MoveInfo[] = [];
   let currentMoveNumber = parentMove.moveNumber;
   let isWhiteMove = !parentMove.isWhiteMove; // Next move after the alternative
 
-  // Start from index 1 since index 0 is the alternative move itself
-  for (let i = 1; i < alt.eval.pv.length && i <= 3; i++) {
-    // Limit PV length
-    const san = alt.eval.pv[i];
+  // Track position for FEN generation
+  const pos = new ChessPosition(parentMove.fenBefore);
+  try {
+    pos.move(alt.san); // Make the alternative move first
+  } catch {
+    // Can't track position, use empty FENs
+  }
+
+  for (let i = 0; i < movesToInclude; i++) {
+    const san = continuationMoves[i];
     if (!san) continue;
 
     if (isWhiteMove) {
       currentMoveNumber++;
     }
 
+    const fenBefore = pos.fen();
+    let fenAfter = '';
+    try {
+      pos.move(san);
+      fenAfter = pos.fen();
+    } catch {
+      // Invalid move in PV, stop here
+      break;
+    }
+
     pvMoves.push({
-      moveNumber: isWhiteMove ? currentMoveNumber : currentMoveNumber,
+      moveNumber: currentMoveNumber,
       san,
       isWhiteMove,
-      fenBefore: '', // We don't have FEN for PV moves
-      fenAfter: '',
+      fenBefore,
+      fenAfter,
     });
 
     isWhiteMove = !isWhiteMove;
