@@ -57,7 +57,7 @@ describe('EcoClient', () => {
   describe('getOpeningByMoves', () => {
     it('should throw DatabaseNotFoundError if database does not exist', () => {
       const client = new EcoClient({ dbPath: 'nonexistent.db' });
-      expect(() => client.getOpeningByMoves(['e2e4'])).toThrow(DatabaseNotFoundError);
+      expect(() => client.getOpeningByMoves(['e4'])).toThrow(DatabaseNotFoundError);
       client.close();
     });
 
@@ -75,16 +75,6 @@ describe('EcoClient', () => {
     it('should throw DatabaseNotFoundError if database does not exist', () => {
       const client = new EcoClient({ dbPath: 'nonexistent.db' });
       expect(() => client.getByEco('B90')).toThrow(DatabaseNotFoundError);
-      client.close();
-    });
-  });
-
-  describe('getByPosition', () => {
-    it('should throw DatabaseNotFoundError if database does not exist', () => {
-      const client = new EcoClient({ dbPath: 'nonexistent.db' });
-      expect(() =>
-        client.getByPosition('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -'),
-      ).toThrow(DatabaseNotFoundError);
       client.close();
     });
   });

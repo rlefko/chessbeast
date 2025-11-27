@@ -23,8 +23,6 @@ interface RawOpeningRow {
   eco_code: string;
   name: string;
   moves_san: string;
-  moves_uci: string;
-  epd: string;
   num_plies: number;
 }
 
@@ -36,8 +34,6 @@ function rowToOpeningInfo(row: RawOpeningRow): OpeningInfo {
     eco: row.eco_code,
     name: row.name,
     mainLine: row.moves_san.split(' ').filter((m) => m.length > 0),
-    movesUci: row.moves_uci,
-    epd: row.epd,
     numPlies: row.num_plies,
   };
 }
@@ -57,11 +53,11 @@ export class EcoClient extends BaseDatabaseClient {
    * Find the best matching opening for a sequence of moves.
    * Returns the longest matching opening from the database.
    *
-   * @param movesUci - Array of moves in UCI format (e.g., ["e2e4", "c7c5"])
+   * @param movesSan - Array of moves in SAN format (e.g., ["e4", "c5"])
    * @returns Opening lookup result with match information
    */
-  getOpeningByMoves(movesUci: string[]): OpeningLookupResult {
-    if (movesUci.length === 0) {
+  getOpeningByMoves(movesSan: string[]): OpeningLookupResult {
+    if (movesSan.length === 0) {
       return {
         matchedPlies: 0,
         isExactMatch: false,
@@ -71,13 +67,13 @@ export class EcoClient extends BaseDatabaseClient {
     const db = this.ensureConnected();
 
     // Build the moves string for prefix matching
-    const movesStr = movesUci.join(' ');
+    const movesStr = movesSan.join(' ');
 
     // Find the longest matching opening
-    // We look for openings whose moves_uci is a prefix of our moves
+    // We look for openings whose moves_san is a prefix of our moves
     const stmt = db.prepare(`
       SELECT * FROM openings
-      WHERE ? LIKE moves_uci || '%' OR ? LIKE moves_uci || ' %'
+      WHERE ? LIKE moves_san || '%' OR ? LIKE moves_san || ' %'
       ORDER BY num_plies DESC
       LIMIT 1
     `);
@@ -93,8 +89,8 @@ export class EcoClient extends BaseDatabaseClient {
     }
 
     const opening = rowToOpeningInfo(row);
-    const isExact = movesUci.length === opening.numPlies;
-    const leftTheory = movesUci.length > opening.numPlies;
+    const isExact = movesSan.length === opening.numPlies;
+    const leftTheory = movesSan.length > opening.numPlies;
 
     const result: OpeningLookupResult = {
       opening,
@@ -127,25 +123,6 @@ export class EcoClient extends BaseDatabaseClient {
     `);
 
     const row = stmt.get(eco.toUpperCase()) as RawOpeningRow | undefined;
-    return row ? rowToOpeningInfo(row) : undefined;
-  }
-
-  /**
-   * Get opening information by position (EPD).
-   *
-   * @param epd - EPD string (FEN without move counters)
-   * @returns Opening info or undefined if not found
-   */
-  getByPosition(epd: string): OpeningInfo | undefined {
-    const db = this.ensureConnected();
-
-    const stmt = db.prepare(`
-      SELECT * FROM openings
-      WHERE epd = ?
-      LIMIT 1
-    `);
-
-    const row = stmt.get(epd) as RawOpeningRow | undefined;
     return row ? rowToOpeningInfo(row) : undefined;
   }
 

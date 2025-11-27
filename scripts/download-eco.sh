@@ -11,7 +11,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 DATA_DIR="$PROJECT_ROOT/data"
 ECO_DIR="$DATA_DIR/eco-source"
 
-REPO_URL="https://raw.githubusercontent.com/lichess-org/chess-openings/master/dist"
+# Files are in repo root (not dist/)
+REPO_URL="https://raw.githubusercontent.com/lichess-org/chess-openings/master"
 
 echo "Downloading ECO opening data..."
 echo "Target directory: $ECO_DIR"

@@ -12,10 +12,6 @@ export interface OpeningInfo {
   name: string;
   /** Main line moves in SAN notation */
   mainLine: string[];
-  /** Moves in UCI format (space-separated) */
-  movesUci: string;
-  /** EPD (Extended Position Description) after the moves */
-  epd: string;
   /** Number of half-moves (plies) in the opening line */
   numPlies: number;
 }

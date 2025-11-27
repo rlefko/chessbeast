@@ -20,8 +20,9 @@ const __dirname = path.dirname(__filename);
  * Get the path to the data directory
  */
 function getDataDir(): string {
-  // Navigate from packages/database/src/loaders/ to data/
-  return path.resolve(__dirname, '../../../../../data');
+  // Navigate from packages/database/dist/loaders/ to data/
+  // dist/loaders -> dist -> database -> packages -> chessbeast -> data
+  return path.resolve(__dirname, '../../../../data');
 }
 
 /**
@@ -43,31 +44,27 @@ function createSchema(db: BetterSqlite3.Database): void {
       eco_code TEXT NOT NULL,
       name TEXT NOT NULL,
       moves_san TEXT NOT NULL,
-      moves_uci TEXT NOT NULL,
-      epd TEXT NOT NULL,
       num_plies INTEGER NOT NULL
     );
 
     CREATE INDEX idx_eco_code ON openings(eco_code);
-    CREATE INDEX idx_epd ON openings(epd);
     CREATE INDEX idx_num_plies ON openings(num_plies DESC);
   `);
 }
 
 /**
  * Parse a TSV line into opening data
+ * Format: eco \t name \t pgn (3 columns, simplified format from Lichess)
  */
 interface OpeningRow {
   eco: string;
   name: string;
   pgn: string;
-  uci: string;
-  epd: string;
 }
 
 function parseTsvLine(line: string): OpeningRow | null {
   const parts = line.split('\t');
-  if (parts.length < 5) {
+  if (parts.length < 3) {
     return null;
   }
 
@@ -75,8 +72,6 @@ function parseTsvLine(line: string): OpeningRow | null {
     eco: parts[0] ?? '',
     name: parts[1] ?? '',
     pgn: parts[2] ?? '',
-    uci: parts[3] ?? '',
-    epd: parts[4] ?? '',
   };
 }
 
@@ -120,9 +115,10 @@ function loadTsvFile(
     }
 
     const movesSan = pgnToSan(row.pgn);
-    const numPlies = row.uci.split(' ').filter((m) => m.length > 0).length;
+    // Count plies from SAN moves (each space-separated token is a ply)
+    const numPlies = movesSan.split(' ').filter((m) => m.length > 0).length;
 
-    insertStmt.run(row.eco, row.name, movesSan, row.uci, row.epd, numPlies);
+    insertStmt.run(row.eco, row.name, movesSan, numPlies);
     count++;
   }
 
@@ -159,8 +155,8 @@ export function loadEcoDatabase(dbPath?: string): void {
 
     // Prepare insert statement
     const insertStmt = db.prepare(`
-      INSERT INTO openings (eco_code, name, moves_san, moves_uci, epd, num_plies)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO openings (eco_code, name, moves_san, num_plies)
+      VALUES (?, ?, ?, ?)
     `);
 
     // Load each TSV file
