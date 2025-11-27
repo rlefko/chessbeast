@@ -57,6 +57,18 @@ export interface ParsedGameInput {
 }
 
 /**
+ * Options for engine evaluation
+ */
+export interface EvaluationOptions {
+  /** Search depth limit */
+  depth?: number;
+  /** Time limit in milliseconds (engine stops at whichever limit is reached first) */
+  timeLimitMs?: number;
+  /** Number of principal variations to return */
+  numLines?: number;
+}
+
+/**
  * Engine evaluation service interface
  * (Implemented by gRPC client)
  */
@@ -64,7 +76,11 @@ export interface EngineService {
   /** Evaluate a position (shallow) */
   evaluate(fen: string, depth: number): Promise<EngineEvaluation>;
   /** Evaluate a position with multiple variations */
-  evaluateMultiPv(fen: string, depth: number, numLines: number): Promise<EngineEvaluation[]>;
+  evaluateMultiPv(
+    fen: string,
+    depthOrOptions: number | EvaluationOptions,
+    numLines?: number,
+  ): Promise<EngineEvaluation[]>;
 }
 
 /**
@@ -137,8 +153,12 @@ export interface ReferenceGameService {
 export interface AnalysisConfig {
   /** Depth for shallow pass (default 14) */
   shallowDepth?: number;
+  /** Time limit per position for shallow pass in ms (default 3000) */
+  shallowTimeLimitMs?: number;
   /** Depth for deep pass (default 22) */
   deepDepth?: number;
+  /** Time limit per position for deep pass in ms (default 10000) */
+  deepTimeLimitMs?: number;
   /** Number of lines for deep analysis (default 3) */
   multiPvCount?: number;
   /** Player rating for white (overrides metadata) */
@@ -156,7 +176,9 @@ export interface AnalysisConfig {
  */
 const DEFAULT_CONFIG: Required<AnalysisConfig> = {
   shallowDepth: 14,
+  shallowTimeLimitMs: 3000,
   deepDepth: 22,
+  deepTimeLimitMs: 10000,
   multiPvCount: 3,
   whiteRating: DEFAULT_RATING,
   blackRating: DEFAULT_RATING,
@@ -360,20 +382,20 @@ export class AnalysisPipeline {
       this.reportProgress('shallow_analysis', i, moves.length);
 
       // Evaluate position before move
-      const evalResults = await this.engine.evaluateMultiPv(
-        move.fenBefore,
-        this.config.shallowDepth,
-        1,
-      );
+      const evalResults = await this.engine.evaluateMultiPv(move.fenBefore, {
+        depth: this.config.shallowDepth,
+        timeLimitMs: this.config.shallowTimeLimitMs,
+        numLines: 1,
+      });
       const evalBefore = evalResults[0]!;
       const bestMove = evalBefore.pv[0] ?? move.san;
 
       // Evaluate position after move
-      const evalAfterResults = await this.engine.evaluateMultiPv(
-        move.fenAfter,
-        this.config.shallowDepth,
-        1,
-      );
+      const evalAfterResults = await this.engine.evaluateMultiPv(move.fenAfter, {
+        depth: this.config.shallowDepth,
+        timeLimitMs: this.config.shallowTimeLimitMs,
+        numLines: 1,
+      });
       const evalAfter = evalAfterResults[0]!;
 
       results.push({ move, evalBefore, evalAfter, bestMove });
@@ -430,11 +452,11 @@ export class AnalysisPipeline {
         this.reportProgress('deep_analysis', processed, criticalMoments.length);
 
         // Get multiple principal variations
-        const multiPvResults = await this.engine.evaluateMultiPv(
-          move.fenBefore,
-          this.config.deepDepth,
-          this.config.multiPvCount,
-        );
+        const multiPvResults = await this.engine.evaluateMultiPv(move.fenBefore, {
+          depth: this.config.deepDepth,
+          timeLimitMs: this.config.deepTimeLimitMs,
+          numLines: this.config.multiPvCount,
+        });
 
         // First PV updates the evaluation
         if (multiPvResults[0]) {

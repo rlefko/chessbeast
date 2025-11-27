@@ -20,8 +20,12 @@ export interface AnalysisConfigSchema {
   profile: AnalysisProfile;
   /** Depth for shallow pass (all positions) */
   shallowDepth: number;
+  /** Time limit per position for shallow pass (ms) */
+  shallowTimeLimitMs: number;
   /** Depth for deep pass (critical moments only) */
   deepDepth: number;
+  /** Time limit per position for deep pass (ms) */
+  deepTimeLimitMs: number;
   /** Number of principal variations for critical moments */
   multiPvCount: number;
   /** Maximum ratio of moves to mark as critical (0.0-1.0) */

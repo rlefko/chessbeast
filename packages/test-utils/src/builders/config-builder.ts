@@ -20,7 +20,9 @@ export type OutputVerbosity = 'summary' | 'normal' | 'rich';
 export interface AnalysisConfigSchema {
   profile: AnalysisProfile;
   shallowDepth: number;
+  shallowTimeLimitMs: number;
   deepDepth: number;
+  deepTimeLimitMs: number;
   multiPvCount: number;
   maxCriticalRatio: number;
   skipMaia: boolean;
@@ -98,19 +100,25 @@ export interface ChessBeastConfig {
 const ANALYSIS_PROFILES: Record<AnalysisProfile, Partial<AnalysisConfigSchema>> = {
   quick: {
     shallowDepth: 12,
+    shallowTimeLimitMs: 2000,
     deepDepth: 16,
+    deepTimeLimitMs: 5000,
     multiPvCount: 1,
     maxCriticalRatio: 0.15,
   },
   standard: {
     shallowDepth: 14,
+    shallowTimeLimitMs: 3000,
     deepDepth: 22,
+    deepTimeLimitMs: 10000,
     multiPvCount: 3,
     maxCriticalRatio: 0.25,
   },
   deep: {
     shallowDepth: 18,
+    shallowTimeLimitMs: 5000,
     deepDepth: 28,
+    deepTimeLimitMs: 20000,
     multiPvCount: 5,
     maxCriticalRatio: 0.35,
   },
@@ -123,7 +131,9 @@ const DEFAULT_CONFIG: ChessBeastConfig = {
   analysis: {
     profile: 'standard',
     shallowDepth: 14,
+    shallowTimeLimitMs: 3000,
     deepDepth: 22,
+    deepTimeLimitMs: 10000,
     multiPvCount: 3,
     maxCriticalRatio: 0.25,
     skipMaia: false,

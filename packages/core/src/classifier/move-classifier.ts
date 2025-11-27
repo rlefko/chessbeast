@@ -45,56 +45,76 @@ export interface ClassificationResult {
 }
 
 /**
- * Normalize an engine evaluation to be from the perspective of the side to move
+ * Normalize an engine evaluation that is already from the side-to-move's perspective
  *
- * @param eval_ - Engine evaluation
- * @param isWhiteToMove - Is it white's turn?
- * @returns Normalized evaluation (positive = side to move is better)
+ * Note: The Stockfish service returns evaluations from the side-to-move's perspective,
+ * so this function simply handles mate score conversion to centipawn-equivalent values.
+ *
+ * @param eval_ - Engine evaluation (already from side-to-move's perspective)
+ * @returns Normalized evaluation with mate scores converted to cp-equivalent
  */
-export function normalizeEval(eval_: EngineEvaluation, isWhiteToMove: boolean): NormalizedEval {
+function normalizeEvalSideToMove(eval_: EngineEvaluation): NormalizedEval {
   if (eval_.mate !== undefined) {
-    // Mate scores: positive = white mates, negative = black mates
-    // Normalize so positive = side to move mates
-    const normalizedMate = isWhiteToMove ? eval_.mate : -eval_.mate;
+    const mate = eval_.mate;
+    // mate > 0 = side to move delivers mate
+    // mate < 0 = side to move gets mated
     return {
-      cp: normalizedMate > 0 ? 100000 - normalizedMate * 100 : -100000 - normalizedMate * 100,
+      cp: mate > 0 ? 100000 - mate * 100 : -100000 - mate * 100,
       isMate: true,
-      mateIn: Math.abs(eval_.mate),
+      mateIn: Math.abs(mate),
     };
   }
-
-  // Centipawn: positive = white advantage
-  // Normalize so positive = side to move advantage
-  const cp = eval_.cp ?? 0;
-  const normalizedCp = isWhiteToMove ? cp : -cp;
-
   return {
-    cp: normalizedCp,
+    cp: eval_.cp ?? 0,
     isMate: false,
   };
 }
 
 /**
+ * Normalize an engine evaluation (legacy function, kept for API compatibility)
+ *
+ * Note: The Stockfish service already returns evaluations from the side-to-move's
+ * perspective, so the isWhiteToMove parameter is no longer used. This function
+ * now simply delegates to normalizeEvalSideToMove.
+ *
+ * @param eval_ - Engine evaluation (already from side-to-move's perspective)
+ * @param _isWhiteToMove - Unused, kept for API compatibility
+ * @returns Normalized evaluation (positive = side to move is better)
+ */
+export function normalizeEval(eval_: EngineEvaluation, _isWhiteToMove: boolean): NormalizedEval {
+  return normalizeEvalSideToMove(eval_);
+}
+
+/**
  * Calculate centipawn loss between two evaluations
  *
- * @param evalBefore - Evaluation of position before move
- * @param evalAfter - Evaluation of position after move
- * @param isWhiteMove - Did white make this move?
+ * The Stockfish service returns evaluations from the side-to-move's perspective:
+ * - evalBefore.cp: From the moving player's perspective (positive = good for them)
+ * - evalAfter.cp: From the opponent's perspective (positive = good for opponent)
+ *
+ * To calculate cpLoss, we need both from the moving player's perspective:
+ * - cpLoss = cpBefore - (-cpAfter) = cpBefore + cpAfter
+ *
+ * @param evalBefore - Evaluation of position before move (from moving player's perspective)
+ * @param evalAfter - Evaluation of position after move (from opponent's perspective)
+ * @param _isWhiteMove - Unused, kept for API compatibility
  * @returns Centipawn loss (0 or positive number)
  */
 export function calculateCpLoss(
   evalBefore: EngineEvaluation,
   evalAfter: EngineEvaluation,
-  isWhiteMove: boolean,
+  _isWhiteMove: boolean,
 ): number {
-  // Normalize both from the moving player's perspective
-  const normBefore = normalizeEval(evalBefore, isWhiteMove);
-  const normAfter = normalizeEval(evalAfter, !isWhiteMove); // After move, it's opponent's turn
+  // Handle mate scores by converting to cp-equivalent values
+  const normBefore = normalizeEvalSideToMove(evalBefore);
+  const normAfter = normalizeEvalSideToMove(evalAfter);
 
-  // Flip the after eval since now we're looking at it from the original player's view
+  // evalBefore is from player's perspective (player to move)
+  // evalAfter is from opponent's perspective (opponent to move)
+  // To get evalAfter from player's perspective, negate it
   const afterFromPlayerView = -normAfter.cp;
 
-  // CPLoss = eval_before - eval_after (from player's perspective)
+  // CPLoss = eval_before - eval_after (both from player's perspective)
   // Positive CPLoss means the move made position worse
   const cpLoss = normBefore.cp - afterFromPlayerView;
 

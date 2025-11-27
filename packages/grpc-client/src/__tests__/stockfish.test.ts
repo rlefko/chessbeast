@@ -49,7 +49,7 @@ describe('StockfishClient', () => {
     it('should have correct default values', () => {
       expect(DEFAULT_STOCKFISH_CONFIG.host).toBe('localhost');
       expect(DEFAULT_STOCKFISH_CONFIG.port).toBe(50051);
-      expect(DEFAULT_STOCKFISH_CONFIG.timeoutMs).toBe(60000);
+      expect(DEFAULT_STOCKFISH_CONFIG.timeoutMs).toBe(300000); // 5 minutes for deep analysis
     });
   });
 

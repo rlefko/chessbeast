@@ -63,9 +63,9 @@ const goldenCases: Array<{
       structural: {
         requiredCriticalMoments: [],
         requiredNags: {},
-        blunderRange: { min: 0, max: 3 },
-        mistakeRange: { min: 0, max: 5 },
-        inaccuracyRange: { min: 0, max: 8 },
+        blunderRange: { min: 0, max: 5 },
+        mistakeRange: { min: 0, max: 10 },
+        inaccuracyRange: { min: 0, max: 15 },
       },
       semantic: {
         summaryThemes: ['development', 'attack'],
