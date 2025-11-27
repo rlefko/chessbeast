@@ -93,8 +93,11 @@ class StockfishEngine:
         if self._engine is None:
             return False
         try:
-            # Check if process is still running
-            return self._engine.protocol.returncode is None
+            # Check if process is still running via transport
+            transport = self._engine.protocol.transport
+            if transport is None:
+                return False
+            return transport.get_returncode() is None
         except Exception:
             return False
 
