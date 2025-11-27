@@ -10,6 +10,13 @@
  * 6. Return analysis results
  */
 
+import { detectCriticalMoments, detectPhaseTransitions, type PlyEvaluation } from '../classifier/critical-moment-detector.js';
+import {
+  classifyMove,
+  calculateAccuracy,
+} from '../classifier/move-classifier.js';
+import { DEFAULT_RATING } from '../classifier/thresholds.js';
+import type { MoveClassification } from '../index.js';
 import type {
   AlternativeMove,
   CriticalMoment,
@@ -19,13 +26,6 @@ import type {
   MoveAnalysis,
   PlayerStats,
 } from '../types/analysis.js';
-import type { MoveClassification } from '../index.js';
-import {
-  classifyMove,
-  calculateAccuracy,
-} from '../classifier/move-classifier.js';
-import { detectCriticalMoments, detectPhaseTransitions, type PlyEvaluation } from '../classifier/critical-moment-detector.js';
-import { DEFAULT_RATING } from '../classifier/thresholds.js';
 
 /**
  * Input: A single move from a parsed game

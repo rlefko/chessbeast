@@ -2,12 +2,13 @@
  * Stockfish gRPC client implementation
  */
 
-import { BaseGrpcClient, ClientConfig } from './base.js';
 import type {
   EvaluateResponse,
   StockfishHealthCheckResponse,
   EvaluateOptions,
 } from '../types/stockfish.js';
+
+import { BaseGrpcClient, ClientConfig } from './base.js';
 
 /**
  * Default configuration for Stockfish client

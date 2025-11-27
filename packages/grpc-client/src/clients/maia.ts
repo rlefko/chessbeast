@@ -2,7 +2,6 @@
  * Maia gRPC client implementation
  */
 
-import { BaseGrpcClient, ClientConfig } from './base.js';
 import type {
   PredictResponse,
   MovePrediction,
@@ -10,6 +9,8 @@ import type {
   EstimateRatingResponse,
   MaiaHealthCheckResponse,
 } from '../types/maia.js';
+
+import { BaseGrpcClient, ClientConfig } from './base.js';
 
 /**
  * Default configuration for Maia client

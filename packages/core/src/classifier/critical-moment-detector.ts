@@ -13,6 +13,7 @@ import type {
   GamePhase,
   NormalizedEval,
 } from '../types/analysis.js';
+
 import { normalizeEval } from './move-classifier.js';
 import { CRITICAL_MOMENT_THRESHOLDS } from './thresholds.js';
 

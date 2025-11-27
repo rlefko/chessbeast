@@ -2,10 +2,12 @@
  * Base gRPC client with proto loading and connection management
  */
 
-import * as grpc from '@grpc/grpc-js';
-import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
+
 import { GrpcClientError, ConnectionError, mapGrpcError } from '../errors.js';
 
 const __filename = fileURLToPath(import.meta.url);

@@ -7,6 +7,7 @@
 
 import type { MoveClassification } from '../index.js';
 import type { EngineEvaluation, NormalizedEval } from '../types/analysis.js';
+
 import {
   getInterpolatedThresholds,
   DEFAULT_RATING,

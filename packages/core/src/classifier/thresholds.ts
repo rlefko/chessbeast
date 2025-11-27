@@ -177,7 +177,7 @@ export function getInterpolatedThresholds(rating: number): ClassificationThresho
   const factor = positionInBand / bandWidth;
 
   // Interpolate all values
-  const lerp = (a: number, b: number) => a + (b - a) * factor;
+  const lerp = (a: number, b: number): number => a + (b - a) * factor;
 
   return {
     minRating: lower.minRating,

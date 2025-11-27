@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { MaiaClient, DEFAULT_MAIA_CONFIG } from '../clients/maia.js';
 
 describe('MaiaClient', () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { StockfishClient, DEFAULT_STOCKFISH_CONFIG } from '../clients/stockfish.js';
 
 describe('StockfishClient', () => {
