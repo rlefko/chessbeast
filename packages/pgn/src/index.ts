@@ -60,7 +60,11 @@ export interface ParsedGame {
 export { parsePgnString as parsePgn } from './parser/pgn-parser.js';
 
 // Re-export rendering functions
-export { renderPgnString as renderPgn, wrapMoveText, DEFAULT_MAX_LINE_LENGTH } from './renderer/pgn-renderer.js';
+export {
+  renderPgnString as renderPgn,
+  wrapMoveText,
+  DEFAULT_MAX_LINE_LENGTH,
+} from './renderer/pgn-renderer.js';
 export type { RenderOptions } from './renderer/pgn-renderer.js';
 
 // Re-export chess position utilities
@@ -95,8 +99,4 @@ export type {
   AnalysisMetadata,
 } from './transformer/index.js';
 
-export {
-  transformAnalysisToGame,
-  hasAnnotations,
-  countAnnotations,
-} from './transformer/index.js';
+export { transformAnalysisToGame, hasAnnotations, countAnnotations } from './transformer/index.js';

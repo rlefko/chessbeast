@@ -335,10 +335,9 @@ describe('Analysis Transformer', () => {
 
   describe('hasAnnotations', () => {
     it('should return true when game has summary', () => {
-      const game = transformAnalysisToGame(
-        createMockAnalysis({ summary: 'Summary text' }),
-        { includeSummary: true },
-      );
+      const game = transformAnalysisToGame(createMockAnalysis({ summary: 'Summary text' }), {
+        includeSummary: true,
+      });
       expect(hasAnnotations(game)).toBe(true);
     });
 

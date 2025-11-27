@@ -223,8 +223,7 @@ export function wrapMoveText(text: string, maxLength: number): string {
 
   for (const token of tokens) {
     // Check if adding this token would exceed the line length
-    const wouldExceed =
-      currentLine.length > 0 && currentLine.length + 1 + token.length > maxLength;
+    const wouldExceed = currentLine.length > 0 && currentLine.length + 1 + token.length > maxLength;
 
     if (wouldExceed && currentLine.length > 0) {
       // Start a new line
