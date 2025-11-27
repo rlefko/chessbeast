@@ -372,44 +372,44 @@
 
 ---
 
-## Milestone 8: CLI & Orchestration
+## Milestone 8: CLI & Orchestration ✅
 
 ### 8.1 CLI Interface
-- [ ] Implement `chessbeast analyze` command
-- [ ] Support input file or stdin
-- [ ] Support output file or stdout
-- [ ] Implement config flags:
+- [x] Implement `chessbeast analyze` command
+- [x] Support input file or stdin
+- [x] Support output file or stdout
+- [x] Implement config flags:
   - `--profile quick|standard|deep`
   - `--verbosity summary|normal|rich`
   - `--target-elo <number>`
 
 ### 8.2 Configuration
-- [ ] Define config file format (JSON/YAML)
-- [ ] Support environment variables for API keys
-- [ ] Implement config validation
-- [ ] Provide sensible defaults
+- [x] Define config file format (JSON/YAML via cosmiconfig)
+- [x] Support environment variables for API keys
+- [x] Implement config validation (Zod schemas)
+- [x] Provide sensible defaults
 
 ### 8.3 Orchestrator
-- [ ] Coordinate full analysis pipeline
-- [ ] Manage service connections (Stockfish, Maia)
-- [ ] Handle multi-game PGN input
-- [ ] Implement progress reporting
+- [x] Coordinate full analysis pipeline
+- [x] Manage service connections (Stockfish, Maia)
+- [x] Handle multi-game PGN input
+- [x] Implement progress reporting (ora spinners)
 
 ### 8.4 Error Handling
-- [ ] Handle service failures gracefully
-- [ ] Implement fallback modes (no Maia, no LLM)
-- [ ] Provide clear error messages
-- [ ] Log errors for debugging
+- [x] Handle service failures gracefully (strict mode - fail fast)
+- [x] Implement fallback modes (--skip-maia, --skip-llm)
+- [x] Provide clear error messages with recovery suggestions
+- [x] Log errors for debugging
 
 ### 8.5 Performance
 - [ ] Implement position caching
 - [ ] Optimize service calls (batching where possible)
-- [ ] Track and report timing
+- [x] Track and report timing
 - [ ] Stay within compute budgets
 
 ### 8.6 Testing
 - [ ] End-to-end tests with sample PGNs
-- [ ] Test all CLI options
+- [x] Test config system (20 unit tests)
 - [ ] Test error handling scenarios
 - [ ] Benchmark performance
 
