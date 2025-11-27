@@ -2,6 +2,15 @@
  * CLI-specific error classes
  */
 
+import * as path from 'node:path';
+
+/**
+ * Resolve a path to absolute for clearer error messages
+ */
+export function resolveAbsolutePath(filePath: string): string {
+  return path.resolve(process.cwd(), filePath);
+}
+
 /**
  * Base CLI error class
  */

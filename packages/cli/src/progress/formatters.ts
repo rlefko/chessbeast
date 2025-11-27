@@ -93,3 +93,70 @@ export function formatFileSize(bytes: number): string {
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/**
+ * Format estimated time remaining in human-readable format
+ * @param ms Milliseconds remaining, or null if unknown
+ * @returns Formatted string like "~2m 30s" or empty string if null
+ */
+export function formatEta(ms: number | null): string {
+  if (ms === null) {
+    return '';
+  }
+
+  if (ms <= 0) {
+    return 'almost done';
+  }
+
+  if (ms < 1000) {
+    return 'less than a second';
+  }
+
+  if (ms < 60000) {
+    const seconds = Math.ceil(ms / 1000);
+    return `~${seconds}s`;
+  }
+
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.ceil((ms % 60000) / 1000);
+
+  if (seconds === 0) {
+    return `~${minutes}m`;
+  }
+
+  return `~${minutes}m ${seconds}s`;
+}
+
+/**
+ * Format a progress bar
+ * @param current Current progress value
+ * @param total Total progress value
+ * @param width Width of the progress bar in characters (default: 20)
+ * @returns Formatted progress bar like "[========          ]"
+ */
+export function formatProgressBar(current: number, total: number, width: number = 20): string {
+  if (total <= 0) {
+    return `[${'?'.repeat(width)}]`;
+  }
+
+  const ratio = Math.min(current / total, 1);
+  const filled = Math.round(ratio * width);
+  const empty = width - filled;
+
+  return `[${'='.repeat(filled)}${' '.repeat(empty)}]`;
+}
+
+/**
+ * Format a percentage
+ * @param current Current progress value
+ * @param total Total progress value
+ * @returns Formatted percentage like "42%"
+ */
+export function formatPercentage(current: number, total: number): string {
+  if (total <= 0) {
+    return '0%';
+  }
+
+  const percentage = Math.round((current / total) * 100);
+  return `${percentage}%`;
+}

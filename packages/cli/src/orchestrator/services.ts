@@ -9,7 +9,7 @@ import { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
 import { Annotator } from '@chessbeast/llm';
 
 import type { ChessBeastConfig } from '../config/schema.js';
-import { ServiceError, createServiceError } from '../errors/index.js';
+import { ServiceError, createServiceError, resolveAbsolutePath } from '../errors/index.js';
 import type { ServiceStatus } from '../progress/reporter.js';
 
 /**
@@ -87,22 +87,28 @@ function checkLlm(config: ChessBeastConfig): ServiceStatus {
  * Check if ECO database exists
  */
 function checkEcoDatabase(config: ChessBeastConfig): ServiceStatus {
-  const path = config.databases.ecoPath;
-  if (fs.existsSync(path)) {
+  const dbPath = config.databases.ecoPath;
+  const absolutePath = resolveAbsolutePath(dbPath);
+  if (fs.existsSync(absolutePath)) {
     return { name: 'ECO database', healthy: true };
   }
-  return { name: 'ECO database', healthy: false, error: 'file not found' };
+  return { name: 'ECO database', healthy: false, error: `file not found: ${absolutePath}` };
 }
 
 /**
  * Check if Lichess Elite database exists
  */
 function checkLichessDatabase(config: ChessBeastConfig): ServiceStatus {
-  const path = config.databases.lichessPath;
-  if (fs.existsSync(path)) {
+  const dbPath = config.databases.lichessPath;
+  const absolutePath = resolveAbsolutePath(dbPath);
+  if (fs.existsSync(absolutePath)) {
     return { name: 'Lichess Elite database', healthy: true };
   }
-  return { name: 'Lichess Elite database', healthy: false, error: 'file not found' };
+  return {
+    name: 'Lichess Elite database',
+    healthy: false,
+    error: `file not found: ${absolutePath}`,
+  };
 }
 
 /**
@@ -193,24 +199,26 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
 
   // Initialize ECO database (required)
   let ecoClient: EcoClient | null = null;
-  if (fs.existsSync(config.databases.ecoPath)) {
-    ecoClient = new EcoClient({ dbPath: config.databases.ecoPath });
+  const ecoAbsolutePath = resolveAbsolutePath(config.databases.ecoPath);
+  if (fs.existsSync(ecoAbsolutePath)) {
+    ecoClient = new EcoClient({ dbPath: ecoAbsolutePath });
   } else {
     throw new ServiceError(
       'ECO Database',
-      `Database file not found: ${config.databases.ecoPath}`,
+      `Database file not found: ${ecoAbsolutePath}`,
       "Run 'make setup' to download and set up the databases",
     );
   }
 
   // Initialize Lichess Elite database (required)
   let lichessClient: LichessEliteClient | null = null;
-  if (fs.existsSync(config.databases.lichessPath)) {
-    lichessClient = new LichessEliteClient({ dbPath: config.databases.lichessPath });
+  const lichessAbsolutePath = resolveAbsolutePath(config.databases.lichessPath);
+  if (fs.existsSync(lichessAbsolutePath)) {
+    lichessClient = new LichessEliteClient({ dbPath: lichessAbsolutePath });
   } else {
     throw new ServiceError(
       'Lichess Database',
-      `Database file not found: ${config.databases.lichessPath}`,
+      `Database file not found: ${lichessAbsolutePath}`,
       "Run 'make setup' to download and set up the databases",
     );
   }

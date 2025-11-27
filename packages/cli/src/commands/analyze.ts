@@ -3,11 +3,12 @@
  */
 
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as readline from 'node:readline';
 
 import { parseCliOptions, VERSION } from '../cli.js';
 import { loadConfig, formatConfig } from '../config/loader.js';
-import { InputError, OutputError, handleError } from '../errors/index.js';
+import { InputError, OutputError, handleError, resolveAbsolutePath } from '../errors/index.js';
 import { orchestrateAnalysis } from '../orchestrator/orchestrator.js';
 import {
   performHealthChecks,
@@ -87,7 +88,9 @@ function writeOutput(output: string, outputPath: string | undefined): void {
  */
 export async function analyzeCommand(rawOptions: Record<string, unknown>): Promise<void> {
   const options = parseCliOptions(rawOptions);
-  const reporter = new ProgressReporter();
+  const reporter = new ProgressReporter({
+    color: !options.noColor,
+  });
 
   try {
     // Load configuration
@@ -108,6 +111,49 @@ export async function analyzeCommand(rawOptions: Record<string, unknown>): Promi
     // Perform health checks
     const healthStatus = await performHealthChecks(config);
     reporter.reportServiceStatus(healthStatus);
+
+    // Dry-run mode: validate setup without running analysis
+    if (options.dryRun) {
+      reporter.printMessage('');
+      reporter.printMessage('Dry-run mode: validating setup...');
+      reporter.printMessage('');
+
+      const allHealthy = healthStatus.every((s) => s.healthy);
+
+      if (allHealthy) {
+        reporter.printSuccess('All services healthy. Ready to analyze.');
+      } else {
+        reporter.printWarning('Some services unavailable:');
+        for (const service of healthStatus.filter((s) => !s.healthy)) {
+          reporter.printMessage(`  - ${service.name}: ${service.error}`);
+        }
+      }
+
+      // Validate input file exists (if provided)
+      if (options.input) {
+        const inputPath = resolveAbsolutePath(options.input);
+        if (fs.existsSync(inputPath)) {
+          reporter.printSuccess(`Input file exists: ${inputPath}`);
+        } else {
+          reporter.printError(`Input file not found: ${inputPath}`);
+        }
+      }
+
+      // Validate output directory exists (if provided)
+      if (options.output) {
+        const outputPath = resolveAbsolutePath(options.output);
+        const outputDir = path.dirname(outputPath);
+        if (fs.existsSync(outputDir)) {
+          reporter.printSuccess(`Output directory exists: ${outputDir}`);
+        } else {
+          reporter.printWarning(`Output directory does not exist: ${outputDir}`);
+        }
+      }
+
+      reporter.printMessage('');
+      reporter.printMessage('Dry-run complete. No analysis was performed.');
+      return;
+    }
 
     // Check for required service failures
     const failedRequired = healthStatus.filter((s) => !s.healthy);

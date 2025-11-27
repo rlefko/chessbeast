@@ -3,7 +3,10 @@
  */
 
 import chalk from 'chalk';
-import ora, { type Ora } from 'ora';
+import ora, { type Ora, type Color } from 'ora';
+
+import { formatEta } from './formatters.js';
+import { TimeEstimator } from './time-estimator.js';
 
 /**
  * Analysis phases
@@ -47,6 +50,49 @@ export interface ServiceStatus {
 }
 
 /**
+ * Progress reporter options
+ */
+export interface ProgressReporterOptions {
+  /** Suppress all output */
+  silent?: boolean;
+  /** Enable colored output (default: true) */
+  color?: boolean;
+}
+
+// Helper functions for colorized output
+type ColorFn = (text: string) => string;
+
+function createColorFns(useColor: boolean): {
+  bold: ColorFn;
+  dim: ColorFn;
+  green: ColorFn;
+  red: ColorFn;
+  yellow: ColorFn;
+  cyan: ColorFn;
+} {
+  if (useColor) {
+    return {
+      bold: (text: string) => chalk.bold(text),
+      dim: (text: string) => chalk.dim(text),
+      green: (text: string) => chalk.green(text),
+      red: (text: string) => chalk.red(text),
+      yellow: (text: string) => chalk.yellow(text),
+      cyan: (text: string) => chalk.cyan(text),
+    };
+  }
+  // No colors - return text as-is
+  const identity = (text: string) => text;
+  return {
+    bold: identity,
+    dim: identity,
+    green: identity,
+    red: identity,
+    yellow: identity,
+    cyan: identity,
+  };
+}
+
+/**
  * Progress reporter for CLI output
  */
 export class ProgressReporter {
@@ -54,9 +100,27 @@ export class ProgressReporter {
   private startTime: number = 0;
   private phaseStartTime: number = 0;
   private silent: boolean;
+  private useColor: boolean;
+  private timeEstimator: TimeEstimator;
+  private currentPhaseName: string = '';
 
-  constructor(silent: boolean = false) {
-    this.silent = silent;
+  // Color functions
+  private c: ReturnType<typeof createColorFns>;
+
+  constructor(options: ProgressReporterOptions | boolean = {}) {
+    // Handle legacy boolean argument for backwards compatibility
+    if (typeof options === 'boolean') {
+      this.silent = options;
+      this.useColor = true;
+    } else {
+      this.silent = options.silent ?? false;
+      this.useColor = options.color ?? true;
+    }
+
+    this.timeEstimator = new TimeEstimator();
+
+    // Create color functions based on color setting
+    this.c = createColorFns(this.useColor);
   }
 
   /**
@@ -64,7 +128,7 @@ export class ProgressReporter {
    */
   printHeader(version: string): void {
     if (this.silent) return;
-    console.log(chalk.bold(`ChessBeast v${version}`));
+    console.log(this.c.bold(`ChessBeast v${version}`));
     console.log('');
   }
 
@@ -81,11 +145,12 @@ export class ProgressReporter {
   reportServiceStatus(services: ServiceStatus[]): void {
     if (this.silent) return;
 
-    console.log(chalk.dim('Checking services...'));
+    console.log(this.c.dim('Checking services...'));
     for (const service of services) {
-      const status = service.healthy ? chalk.green('✓') : chalk.red('✗');
-      const latency = service.latencyMs !== undefined ? chalk.dim(` - ${service.latencyMs}ms`) : '';
-      const error = service.error ? chalk.red(` (${service.error})`) : '';
+      const status = service.healthy ? this.c.green('✓') : this.c.red('✗');
+      const latency =
+        service.latencyMs !== undefined ? this.c.dim(` - ${service.latencyMs}ms`) : '';
+      const error = service.error ? this.c.red(` (${service.error})`) : '';
 
       console.log(`  ${status} ${service.name}${latency}${error}`);
     }
@@ -105,7 +170,9 @@ export class ProgressReporter {
     if (this.silent) return;
 
     const gameLabel = totalGames > 1 ? `game ${gameIndex + 1}/${totalGames}` : 'game';
-    console.log(chalk.bold(`Analyzing ${gameLabel}: ${white} vs ${black} (${totalMoves} moves)`));
+    console.log(
+      this.c.bold(`Analyzing ${gameLabel}: ${white} vs ${black} (${totalMoves} moves)`),
+    );
   }
 
   /**
@@ -115,27 +182,45 @@ export class ProgressReporter {
     if (this.silent) return;
 
     this.phaseStartTime = Date.now();
-    const phaseName = PHASE_NAMES[phase];
+    this.currentPhaseName = PHASE_NAMES[phase];
+
+    // Reset time estimator for new phase
+    this.timeEstimator.reset();
 
     // Stop any existing spinner
     if (this.spinner) {
       this.spinner.stop();
     }
 
-    this.spinner = ora({
-      text: phaseName,
+    // Build ora options - only include color if colors are enabled
+    const oraOptions: { text: string; prefixText: string; color?: Color } = {
+      text: this.currentPhaseName,
       prefixText: '  ',
-    }).start();
+    };
+    if (this.useColor) {
+      oraOptions.color = 'cyan';
+    }
+
+    this.spinner = ora(oraOptions).start();
   }
 
   /**
-   * Update phase progress
+   * Update phase progress with move counter and ETA
    */
   updateProgress(current: number, total: number): void {
     if (this.silent || !this.spinner) return;
 
-    const phaseName = this.spinner.text.split('...')[0];
-    this.spinner.text = `${phaseName}... ${current}/${total}`;
+    // Record sample for ETA estimation
+    this.timeEstimator.record(current);
+
+    // Calculate ETA
+    const etaMs = this.timeEstimator.estimateRemaining(current, total);
+    const etaStr = etaMs !== null ? this.c.dim(` (${formatEta(etaMs)} remaining)`) : '';
+
+    // Build progress string
+    const progressStr = `${current}/${total}`;
+
+    this.spinner.text = `${this.currentPhaseName}... ${progressStr}${etaStr}`;
   }
 
   /**
@@ -146,14 +231,14 @@ export class ProgressReporter {
 
     const duration = Date.now() - this.phaseStartTime;
     const phaseName = PHASE_NAMES[phase];
-    const durationStr = duration > 1000 ? chalk.dim(` (${(duration / 1000).toFixed(1)}s)`) : '';
-    const detailStr = detail ? chalk.dim(`: ${detail}`) : '';
+    const durationStr = duration > 1000 ? this.c.dim(` (${(duration / 1000).toFixed(1)}s)`) : '';
+    const detailStr = detail ? this.c.dim(`: ${detail}`) : '';
 
     if (this.spinner) {
       this.spinner.succeed(`${phaseName}${detailStr}${durationStr}`);
       this.spinner = null;
     } else {
-      console.log(`  ${chalk.green('✓')} ${phaseName}${detailStr}${durationStr}`);
+      console.log(`  ${this.c.green('✓')} ${phaseName}${detailStr}${durationStr}`);
     }
   }
 
@@ -169,7 +254,7 @@ export class ProgressReporter {
       this.spinner.fail(`${phaseName}: ${error}`);
       this.spinner = null;
     } else {
-      console.log(`  ${chalk.red('✗')} ${phaseName}: ${error}`);
+      console.log(`  ${this.c.red('✗')} ${phaseName}: ${error}`);
     }
   }
 
@@ -206,7 +291,7 @@ export class ProgressReporter {
         : `${(totalTime / 1000).toFixed(1)}s`;
 
     console.log('');
-    console.log(chalk.bold('Summary:'));
+    console.log(this.c.bold('Summary:'));
     console.log(`  Games analyzed: ${stats.gamesAnalyzed}`);
     console.log(`  Total time: ${timeStr}`);
     console.log(`  Critical moments: ${stats.criticalMoments}`);
@@ -219,7 +304,39 @@ export class ProgressReporter {
   printOutputLocation(outputPath: string): void {
     if (this.silent) return;
     console.log('');
-    console.log(`Output written to: ${chalk.cyan(outputPath)}`);
+    console.log(`Output written to: ${this.c.cyan(outputPath)}`);
+  }
+
+  /**
+   * Print a message (respects color and silent settings)
+   */
+  printMessage(message: string): void {
+    if (this.silent) return;
+    console.log(message);
+  }
+
+  /**
+   * Print a success message
+   */
+  printSuccess(message: string): void {
+    if (this.silent) return;
+    console.log(this.c.green(`✓ ${message}`));
+  }
+
+  /**
+   * Print a warning message
+   */
+  printWarning(message: string): void {
+    if (this.silent) return;
+    console.log(this.c.yellow(`⚠ ${message}`));
+  }
+
+  /**
+   * Print an error message
+   */
+  printError(message: string): void {
+    if (this.silent) return;
+    console.log(this.c.red(`✗ ${message}`));
   }
 
   /**
@@ -230,6 +347,13 @@ export class ProgressReporter {
       this.spinner.stop();
       this.spinner = null;
     }
+  }
+
+  /**
+   * Check if colors are enabled
+   */
+  hasColors(): boolean {
+    return this.useColor;
   }
 }
 
