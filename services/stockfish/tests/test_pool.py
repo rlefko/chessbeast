@@ -359,8 +359,8 @@ class TestEnginePoolHealthCheck:
         pool = EnginePool(pool_config, engine_config)
         pool.start()
 
-        # Simulate one engine dying
-        mock_simple_engine.protocol.returncode = 1
+        # Simulate one engine dying - transport.get_returncode() returns non-None when process exits
+        mock_simple_engine.protocol.transport.get_returncode.return_value = 1
 
         health = pool.health_check()
 

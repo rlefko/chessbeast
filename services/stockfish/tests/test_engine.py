@@ -134,8 +134,8 @@ class TestStockfishEngineIsAlive:
         engine = StockfishEngine()
         engine.start()
 
-        # Simulate crash
-        mock_simple_engine.protocol.returncode = 1
+        # Simulate crash - transport.get_returncode() returns non-None when process exits
+        mock_simple_engine.protocol.transport.get_returncode.return_value = 1
         assert not engine.is_alive()
 
 

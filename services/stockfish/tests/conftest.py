@@ -50,6 +50,8 @@ def mock_simple_engine(monkeypatch):
     mock_engine = MagicMock()
     mock_engine.id = {"name": "Stockfish 16 Mock"}
     mock_engine.protocol.returncode = None
+    # Mock transport.get_returncode() for is_alive() check
+    mock_engine.protocol.transport.get_returncode.return_value = None
 
     # Mock popen_uci to return our mock engine
     monkeypatch.setattr(

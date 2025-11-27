@@ -54,11 +54,16 @@ class TestMaia2ModelLoad:
 
     def test_load_import_error(self, monkeypatch, model_config):
         """Test that ImportError raises ModelLoadError."""
-        # Clear any existing maia2 module
-        import sys
+        import builtins
 
-        if "maia2" in sys.modules:
-            del sys.modules["maia2"]
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "maia2" or name.startswith("maia2."):
+                raise ImportError("No module named 'maia2'")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", mock_import)
 
         model = Maia2Model(model_config)
 
