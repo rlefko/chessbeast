@@ -6,6 +6,7 @@ import {
   type EngineService,
   type MaiaService,
   type ParsedGameInput,
+  type EvaluationOptions,
 } from '../pipeline/analysis-pipeline.js';
 import type { EngineEvaluation } from '../types/analysis.js';
 
@@ -25,7 +26,17 @@ describe('Analysis Pipeline', () => {
         return defaultEval;
       }),
       evaluateMultiPv: vi.fn(
-        async (_fen: string, _depth: number, numLines: number): Promise<EngineEvaluation[]> => {
+        async (
+          _fen: string,
+          depthOrOptions: number | EvaluationOptions,
+          numLinesArg?: number,
+        ): Promise<EngineEvaluation[]> => {
+          // Handle both old signature (depth, numLines) and new signature (options)
+          const numLines =
+            typeof depthOrOptions === 'number'
+              ? (numLinesArg ?? 1)
+              : (depthOrOptions.numLines ?? 1);
+
           const results: EngineEvaluation[] = [];
           for (let i = 0; i < numLines; i++) {
             if (evalSequence && callCount < evalSequence.length) {

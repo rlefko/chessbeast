@@ -11,19 +11,25 @@ import type { AnalysisProfile, AnalysisConfigSchema, ChessBeastConfig } from './
 export const ANALYSIS_PROFILES: Record<AnalysisProfile, Partial<AnalysisConfigSchema>> = {
   quick: {
     shallowDepth: 12,
+    shallowTimeLimitMs: 2000, // 2 seconds max per position
     deepDepth: 16,
+    deepTimeLimitMs: 5000, // 5 seconds max per position
     multiPvCount: 1,
     maxCriticalRatio: 0.15,
   },
   standard: {
     shallowDepth: 14,
+    shallowTimeLimitMs: 3000, // 3 seconds max per position
     deepDepth: 22,
+    deepTimeLimitMs: 10000, // 10 seconds max per position
     multiPvCount: 3,
     maxCriticalRatio: 0.25,
   },
   deep: {
     shallowDepth: 18,
+    shallowTimeLimitMs: 5000, // 5 seconds max per position
     deepDepth: 28,
+    deepTimeLimitMs: 20000, // 20 seconds max per position
     multiPvCount: 5,
     maxCriticalRatio: 0.35,
   },
@@ -35,7 +41,9 @@ export const ANALYSIS_PROFILES: Record<AnalysisProfile, Partial<AnalysisConfigSc
 export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfigSchema = {
   profile: 'standard',
   shallowDepth: 14,
+  shallowTimeLimitMs: 3000,
   deepDepth: 22,
+  deepTimeLimitMs: 10000,
   multiPvCount: 3,
   maxCriticalRatio: 0.25,
   skipMaia: false,

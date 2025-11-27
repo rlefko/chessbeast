@@ -124,10 +124,14 @@ describe('Critical Moment Detector', () => {
     });
 
     it('should detect large evaluation swings', () => {
+      // Side-to-move perspective: positive = good for side to move
+      // Ply 0: White plays, position stays equal
+      // Ply 1: Black blunders, position swings to +350 for White
+      // Ply 2: White plays neutral, position stays +350 for White
       const plies: PlyEvaluation[] = [
-        createPlyWithEval(0, 0, -50),
-        createPlyWithEval(1, 50, 350), // Large swing!
-        createPlyWithEval(2, -350, -350),
+        createPlyWithEval(0, 0, 0), // White plays, stays equal
+        createPlyWithEval(1, 0, 350), // Black blunders! evalSwing = |0 - -350| = 350
+        createPlyWithEval(2, 350, -350), // White plays neutral, evalSwing = 0
       ];
 
       const moments = detectCriticalMoments(plies);

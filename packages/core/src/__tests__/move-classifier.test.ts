@@ -13,20 +13,17 @@ import type { EngineEvaluation } from '../types/analysis.js';
 
 describe('Move Classifier', () => {
   describe('normalizeEval', () => {
-    it('should keep positive cp for white to move', () => {
+    // Note: normalizeEval now treats input as side-to-move perspective
+    // The isWhiteToMove parameter is kept for API compatibility but not used
+
+    it('should keep cp value unchanged (side-to-move perspective)', () => {
       const eval_: EngineEvaluation = { cp: 50, depth: 20, pv: ['e4'] };
-      const normalized = normalizeEval(eval_, true);
-      expect(normalized.cp).toBe(50);
-      expect(normalized.isMate).toBe(false);
+      // Input is already from side-to-move perspective, should be unchanged
+      expect(normalizeEval(eval_, true).cp).toBe(50);
+      expect(normalizeEval(eval_, false).cp).toBe(50);
     });
 
-    it('should flip cp sign for black to move', () => {
-      const eval_: EngineEvaluation = { cp: 50, depth: 20, pv: ['e4'] };
-      const normalized = normalizeEval(eval_, false);
-      expect(normalized.cp).toBe(-50);
-    });
-
-    it('should handle mate scores for white to move', () => {
+    it('should handle positive mate scores (side to move delivers mate)', () => {
       const eval_: EngineEvaluation = { mate: 3, depth: 20, pv: ['Qh7#'] };
       const normalized = normalizeEval(eval_, true);
       expect(normalized.isMate).toBe(true);
@@ -34,7 +31,7 @@ describe('Move Classifier', () => {
       expect(normalized.cp).toBeGreaterThan(10000);
     });
 
-    it('should handle getting mated for white to move', () => {
+    it('should handle negative mate scores (side to move gets mated)', () => {
       const eval_: EngineEvaluation = { mate: -2, depth: 20, pv: ['Kg1'] };
       const normalized = normalizeEval(eval_, true);
       expect(normalized.isMate).toBe(true);
@@ -50,73 +47,125 @@ describe('Move Classifier', () => {
   });
 
   describe('calculateCpLoss', () => {
+    // Note: Stockfish returns evaluations from side-to-move perspective:
+    // - evalBefore.cp: From moving player's perspective (positive = good for them)
+    // - evalAfter.cp: From opponent's perspective (positive = good for opponent)
+
+    describe('side-to-move perspective handling', () => {
+      it('should return 0 for a neutral move when White plays', () => {
+        // White plays, position stays +200 for White
+        // Before: White to move, +200 (White is better)
+        // After: Black to move, -200 (Black is worse, i.e. White is still +200)
+        const evalBefore: EngineEvaluation = { cp: 200, depth: 20, pv: ['e4'] };
+        const evalAfter: EngineEvaluation = { cp: -200, depth: 20, pv: ['e5'] };
+        expect(calculateCpLoss(evalBefore, evalAfter, true)).toBe(0);
+      });
+
+      it('should return 0 for a neutral move when Black plays', () => {
+        // Black plays, position stays +200 for White (Black is -200)
+        // Before: Black to move, -200 (Black is worse)
+        // After: White to move, +200 (White is better)
+        const evalBefore: EngineEvaluation = { cp: -200, depth: 20, pv: ['e5'] };
+        const evalAfter: EngineEvaluation = { cp: 200, depth: 20, pv: ['Nf3'] };
+        expect(calculateCpLoss(evalBefore, evalAfter, false)).toBe(0);
+      });
+
+      it('should detect cp loss when White blunders', () => {
+        // White blunders, goes from +200 to -100 (from White's consistent perspective)
+        // Before: White to move, +200 (White is better)
+        // After: Black to move, +100 (Black is now +100, so White is -100)
+        const evalBefore: EngineEvaluation = { cp: 200, depth: 20, pv: ['e4'] };
+        const evalAfter: EngineEvaluation = { cp: 100, depth: 20, pv: ['e5'] };
+        expect(calculateCpLoss(evalBefore, evalAfter, true)).toBe(300);
+      });
+
+      it('should detect cp loss when Black blunders', () => {
+        // Black blunders, goes from equal to -300 (from Black's perspective)
+        // Before: Black to move, 0 (equal)
+        // After: White to move, +300 (White is now +300, so Black is -300)
+        const evalBefore: EngineEvaluation = { cp: 0, depth: 20, pv: ['e5'] };
+        const evalAfter: EngineEvaluation = { cp: 300, depth: 20, pv: ['Nf3'] };
+        expect(calculateCpLoss(evalBefore, evalAfter, false)).toBe(300);
+      });
+    });
+
     it('should return 0 for perfect move (maintained advantage)', () => {
-      // Before: +50 for white, After: +50 for white (from white's perspective)
+      // White plays, stays +50
       const evalBefore: EngineEvaluation = { cp: 50, depth: 20, pv: ['e4'] };
-      const evalAfter: EngineEvaluation = { cp: 50, depth: 20, pv: ['e5'] };
+      const evalAfter: EngineEvaluation = { cp: -50, depth: 20, pv: ['e5'] };
       const cpLoss = calculateCpLoss(evalBefore, evalAfter, true);
       expect(cpLoss).toBe(0);
     });
 
     it('should calculate positive cpLoss when position worsens', () => {
-      // Before: +50 for white, After: -100 for white (lost 150 cp)
+      // White plays, goes from +50 to -100 (lost 150 cp)
+      // Before: White +50, After: Black +100 (White is -100)
       const evalBefore: EngineEvaluation = { cp: 50, depth: 20, pv: ['e4'] };
-      const evalAfter: EngineEvaluation = { cp: -100, depth: 20, pv: ['e5'] };
+      const evalAfter: EngineEvaluation = { cp: 100, depth: 20, pv: ['e5'] };
       const cpLoss = calculateCpLoss(evalBefore, evalAfter, true);
-      expect(cpLoss).toBeGreaterThan(0);
+      expect(cpLoss).toBe(150);
     });
 
-    it('should handle black moves', () => {
-      // Before: -50 (black is +50), After: +100 (white is +100, so black lost 150)
+    it('should handle black moves correctly', () => {
+      // Black plays, goes from -50 (Black worse) to White +100 (Black even more worse)
+      // cpLoss = 50 cp lost from Black's perspective
       const evalBefore: EngineEvaluation = { cp: -50, depth: 20, pv: ['e5'] };
       const evalAfter: EngineEvaluation = { cp: 100, depth: 20, pv: ['Nf3'] };
       const cpLoss = calculateCpLoss(evalBefore, evalAfter, false);
-      expect(cpLoss).toBeGreaterThan(0);
+      expect(cpLoss).toBe(50);
     });
 
     it('should never return negative cpLoss even when position improves', () => {
-      // Before: +50 for white, After: +100 for white (improved!)
+      // White plays, improves from +50 to +100
+      // Before: White +50, After: Black -100 (White is +100)
       const evalBefore: EngineEvaluation = { cp: 50, depth: 20, pv: ['e4'] };
-      const evalAfter: EngineEvaluation = { cp: 100, depth: 20, pv: ['e5'] };
+      const evalAfter: EngineEvaluation = { cp: -100, depth: 20, pv: ['e5'] };
       const cpLoss = calculateCpLoss(evalBefore, evalAfter, true);
       expect(cpLoss).toBe(0);
     });
   });
 
   describe('classifyMove', () => {
+    // Note: All evaluations are from side-to-move perspective
     const goodPosition: EngineEvaluation = { cp: 50, depth: 20, pv: ['e4'] };
 
     it('should classify book moves as book', () => {
-      const result = classifyMove(goodPosition, goodPosition, true, { isBookMove: true });
+      // After a neutral move: +50 for White -> Black sees -50
+      const afterNeutral: EngineEvaluation = { cp: -50, depth: 20, pv: ['e5'] };
+      const result = classifyMove(goodPosition, afterNeutral, true, { isBookMove: true });
       expect(result.classification).toBe('book');
     });
 
     it('should classify low cpLoss as excellent', () => {
-      // Before: +50, After: +48 (only lost 2 cp)
-      const after: EngineEvaluation = { cp: 48, depth: 20, pv: ['e5'] };
+      // White plays, stays around +50 (loses only 2 cp)
+      // Before: White +50, After: Black -48 (White is +48)
+      const after: EngineEvaluation = { cp: -48, depth: 20, pv: ['e5'] };
       const result = classifyMove(goodPosition, after, true, { rating: 1500 });
       expect(result.classification).toBe('excellent');
       expect(result.cpLoss).toBeLessThanOrEqual(10);
     });
 
     it('should classify high cpLoss as blunder at intermediate level', () => {
-      // Before: +50, After: -250 (lost 300 cp)
-      const after: EngineEvaluation = { cp: -250, depth: 20, pv: ['e5'] };
+      // White plays, goes from +50 to -250 (lost 300 cp)
+      // Before: White +50, After: Black +250 (White is -250)
+      const after: EngineEvaluation = { cp: 250, depth: 20, pv: ['e5'] };
       const result = classifyMove(goodPosition, after, true, { rating: 1300 });
       expect(result.classification).toBe('blunder');
     });
 
     it('should be more lenient for beginners', () => {
-      // Before: +50, After: -200 (lost 250 cp)
-      const after: EngineEvaluation = { cp: -200, depth: 20, pv: ['e5'] };
+      // White plays, goes from +50 to -200 (lost 250 cp)
+      // Before: White +50, After: Black +200 (White is -200)
+      const after: EngineEvaluation = { cp: 200, depth: 20, pv: ['e5'] };
       const result = classifyMove(goodPosition, after, true, { rating: 800 });
       // At 800 rating, 250 cp loss is just a mistake, not a blunder (threshold is 500)
       expect(result.classification).not.toBe('blunder');
     });
 
     it('should be stricter for masters', () => {
-      // Before: +50, After: -50 (lost 100 cp)
-      const after: EngineEvaluation = { cp: -50, depth: 20, pv: ['e5'] };
+      // White plays, goes from +50 to -50 (lost 100 cp)
+      // Before: White +50, After: Black +50 (White is -50)
+      const after: EngineEvaluation = { cp: 50, depth: 20, pv: ['e5'] };
       const result = classifyMove(goodPosition, after, true, { rating: 2300 });
       // At 2300 rating, 100 cp loss is a mistake/inaccuracy
       expect(['inaccuracy', 'mistake', 'blunder']).toContain(result.classification);

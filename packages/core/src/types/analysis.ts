@@ -6,11 +6,15 @@ import type { MoveClassification } from '../index.js';
 
 /**
  * Engine evaluation result
+ *
+ * Note: The Stockfish service returns evaluations from the side-to-move's perspective,
+ * meaning positive values indicate the side to move is better, negative values indicate
+ * they are worse.
  */
 export interface EngineEvaluation {
-  /** Centipawns from white's perspective (positive = white advantage) */
+  /** Centipawns from side-to-move's perspective (positive = side to move is better) */
   cp?: number;
-  /** Mate in N moves (positive = white mates, negative = black mates) */
+  /** Mate in N moves from side-to-move's perspective (positive = delivers mate, negative = gets mated) */
   mate?: number;
   /** Search depth reached */
   depth: number;

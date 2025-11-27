@@ -10,6 +10,7 @@ import type {
   OpeningLookupResult,
   ReferenceGameInfo,
   EngineEvaluation,
+  EvaluationOptions,
 } from '@chessbeast/core';
 import type { EcoClient, LichessEliteClient } from '@chessbeast/database';
 import type { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
@@ -35,10 +36,31 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
 
     async evaluateMultiPv(
       fen: string,
-      depth: number,
-      numLines: number,
+      depthOrOptions: number | EvaluationOptions,
+      numLines?: number,
     ): Promise<EngineEvaluation[]> {
-      const result = await client.evaluate(fen, { depth, multipv: numLines });
+      // Handle both old signature (depth, numLines) and new signature (options object)
+      let depth: number | undefined;
+      let timeLimitMs: number | undefined;
+      let multipv: number;
+
+      if (typeof depthOrOptions === 'number') {
+        // Old signature: evaluateMultiPv(fen, depth, numLines)
+        depth = depthOrOptions;
+        multipv = numLines ?? 1;
+      } else {
+        // New signature: evaluateMultiPv(fen, options)
+        depth = depthOrOptions.depth;
+        timeLimitMs = depthOrOptions.timeLimitMs;
+        multipv = depthOrOptions.numLines ?? 1;
+      }
+
+      // Build options object, only including defined values (for exactOptionalPropertyTypes)
+      const options: { depth?: number; timeLimitMs?: number; multipv: number } = { multipv };
+      if (depth !== undefined) options.depth = depth;
+      if (timeLimitMs !== undefined) options.timeLimitMs = timeLimitMs;
+
+      const result = await client.evaluate(fen, options);
 
       // First line is the main result
       const firstEval: EngineEvaluation = {
