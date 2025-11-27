@@ -14,7 +14,7 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { fileURLToPath } from 'url';
 
-import Database from 'better-sqlite3';
+import BetterSqlite3 from 'better-sqlite3';
 
 import { hashFen } from '../utils/fen-hash.js';
 
@@ -38,7 +38,7 @@ function getLichessSourcePath(): string {
 /**
  * Create the Lichess Elite database schema
  */
-function createSchema(db: Database.Database): void {
+function createSchema(db: BetterSqlite3.Database): void {
   db.exec(`
     DROP TABLE IF EXISTS positions;
     DROP TABLE IF EXISTS games;
@@ -387,7 +387,7 @@ export async function loadLichessDatabase(
   }
 
   // Create database
-  const db = new Database(targetPath);
+  const db = new BetterSqlite3(targetPath);
 
   try {
     // Enable WAL mode for better write performance

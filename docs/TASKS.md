@@ -278,53 +278,53 @@
 
 ---
 
-## Milestone 6: LLM Annotation Generation
+## Milestone 6: LLM Annotation Generation ✅
 
 ### 6.1 OpenAI Integration
-- [ ] Set up OpenAI client
-- [ ] Implement retry logic and error handling
-- [ ] Track token usage
-- [ ] Handle rate limiting
+- [x] Set up OpenAI client (OpenAIClient class with configurable model)
+- [x] Implement retry logic and error handling (exponential backoff, circuit breaker)
+- [x] Track token usage (TokenTracker class with budget management)
+- [x] Handle rate limiting (RateLimitError with retry-after parsing)
 
 ### 6.2 Prompt Engineering
-- [ ] Design system prompt for chess annotation
-- [ ] Create templates for different annotation types:
+- [x] Design system prompt for chess annotation (CHESS_ANNOTATOR_SYSTEM, GAME_SUMMARY_SYSTEM)
+- [x] Create templates for different annotation types:
   - Opening commentary
-  - Critical moment explanation
-  - Sideline description
-  - Game summary
-- [ ] Include rating-awareness in prompts
-- [ ] Prevent hallucination about games/openings
+  - Critical moment explanation (buildCriticalMomentPrompt)
+  - Sideline description (buildBriefMovePrompt)
+  - Game summary (buildSummaryPrompt)
+- [x] Include rating-awareness in prompts (targetRating parameter)
+- [x] Prevent hallucination about games/openings (move validator, legal move checking)
 
 ### 6.3 Annotation Planner
-- [ ] For each critical moment, create structured annotation plan
-- [ ] Include: position context, evals, themes, sidelines
-- [ ] Determine verbosity level per position
-- [ ] Chunk positions for efficient LLM batching
+- [x] For each critical moment, create structured annotation plan (createAnnotationPlan)
+- [x] Include: position context, evals, themes, sidelines (PlannedAnnotation)
+- [x] Determine verbosity level per position (calculateVerbosity)
+- [x] Chunk positions for efficient LLM batching (generateBatch method)
 
 ### 6.4 Comment Generation
-- [ ] Generate natural language for each annotated position
-- [ ] Include move explanations
-- [ ] Explain why moves are good/bad at player's level
-- [ ] Generate sideline descriptions
+- [x] Generate natural language for each annotated position (CommentGenerator)
+- [x] Include move explanations (in prompt templates)
+- [x] Explain why moves are good/bad at player's level (rating-aware prompts)
+- [x] Generate sideline descriptions (templates support variations)
 
 ### 6.5 Game Summary
-- [ ] Generate opening synopsis
-- [ ] Generate "story of the game" overview
-- [ ] Extract top 3 lessons for player's level
-- [ ] Identify key novelty or critical mistake
+- [x] Generate opening synopsis (GeneratedSummary.openingSynopsis)
+- [x] Generate "story of the game" overview (GeneratedSummary.gameNarrative)
+- [x] Extract top 3 lessons for player's level (lessonsLearned, limited to 3)
+- [x] Identify key novelty or critical mistake (GeneratedSummary.keyMoments)
 
 ### 6.6 Output Validation
-- [ ] Validate LLM output structure
-- [ ] Verify NAG codes are valid
-- [ ] Check move references match actual game
-- [ ] Handle LLM failures gracefully (fallback to basic annotations)
+- [x] Validate LLM output structure (validateComment, validateSummary)
+- [x] Verify NAG codes are valid (isValidNag, filterValidNags, classificationToNag)
+- [x] Check move references match actual game (validateMoveReferences, extractMoveReferences)
+- [x] Handle LLM failures gracefully (DegradationLevel enum, template-based fallbacks)
 
 ### 6.7 Testing
-- [ ] Test prompt effectiveness on sample positions
-- [ ] Test annotation quality on full games
-- [ ] Test failure handling
-- [ ] Measure token usage per game
+- [x] Test prompt effectiveness on sample positions (unit tests)
+- [x] Test annotation quality on full games (planner integration tests)
+- [x] Test failure handling (circuit-breaker tests, degradation tests)
+- [x] Measure token usage per game (TokenTracker with budget tests)
 
 ---
 
