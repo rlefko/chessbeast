@@ -248,9 +248,7 @@ export class AnalysisPipeline {
   /**
    * Shallow analysis pass - evaluate all positions
    */
-  private async shallowPass(
-    moves: ParsedMove[],
-  ): Promise<
+  private async shallowPass(moves: ParsedMove[]): Promise<
     Array<{
       move: ParsedMove;
       evalBefore: EngineEvaluation;
