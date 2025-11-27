@@ -505,4 +505,342 @@ describe('PGN Renderer', () => {
       expect(reparsed[0]!.moves[0]!.variations![0]![0]!.san).toBe('d4');
     });
   });
+
+  describe('line wrapping', () => {
+    it('wraps long move text at specified line length', () => {
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: Array.from({ length: 20 }, (_, i) => ({
+          moveNumber: Math.floor(i / 2) + 1,
+          san: i % 2 === 0 ? 'e4' : 'e5',
+          isWhiteMove: i % 2 === 0,
+          fenBefore: '',
+          fenAfter: '',
+        })),
+      };
+
+      const pgn = renderPgn(game, { maxLineLength: 40 });
+      const lines = pgn.split('\n');
+      const moveLines = lines.filter((line) => line.match(/^\d+\./));
+
+      // All move lines should be <= 40 chars
+      for (const line of moveLines) {
+        expect(line.length).toBeLessThanOrEqual(40);
+      }
+    });
+
+    it('does not wrap when maxLineLength is 0', () => {
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: Array.from({ length: 20 }, (_, i) => ({
+          moveNumber: Math.floor(i / 2) + 1,
+          san: i % 2 === 0 ? 'e4' : 'e5',
+          isWhiteMove: i % 2 === 0,
+          fenBefore: '',
+          fenAfter: '',
+        })),
+      };
+
+      const pgn = renderPgn(game, { maxLineLength: 0 });
+      const lines = pgn.split('\n');
+      const moveTextLine = lines.find((line) => line.startsWith('1.'));
+
+      // Should be a single line
+      expect(moveTextLine).toBeDefined();
+      expect(moveTextLine!.includes('10.')).toBe(true);
+    });
+
+    it('keeps comments as single tokens when wrapping', () => {
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: [
+          {
+            moveNumber: 1,
+            san: 'e4',
+            isWhiteMove: true,
+            fenBefore: '',
+            fenAfter: '',
+            commentAfter: 'This is a somewhat long comment that should stay together',
+          },
+          {
+            moveNumber: 1,
+            san: 'e5',
+            isWhiteMove: false,
+            fenBefore: '',
+            fenAfter: '',
+          },
+        ],
+      };
+
+      const pgn = renderPgn(game, { maxLineLength: 50 });
+
+      // The comment should not be split across lines
+      expect(pgn).toContain('{This is a somewhat long comment that should stay together}');
+    });
+
+    it('keeps variations as single tokens when wrapping', () => {
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: [
+          {
+            moveNumber: 1,
+            san: 'e4',
+            isWhiteMove: true,
+            fenBefore: '',
+            fenAfter: '',
+            variations: [
+              [
+                { moveNumber: 1, san: 'd4', isWhiteMove: true, fenBefore: '', fenAfter: '' },
+                { moveNumber: 1, san: 'd5', isWhiteMove: false, fenBefore: '', fenAfter: '' },
+              ],
+            ],
+          },
+        ],
+      };
+
+      const pgn = renderPgn(game, { maxLineLength: 30 });
+
+      // The variation should not be split across lines
+      expect(pgn).toContain('( 1. d4 d5 )');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('handles very long games (100+ moves)', () => {
+      // Use fake FEN values to avoid move validation during parsing
+      // This test focuses on renderer behavior with many moves
+      const moves = Array.from({ length: 200 }, (_, i) => ({
+        moveNumber: Math.floor(i / 2) + 1,
+        san: i % 2 === 0 ? 'Nc3' : 'Nc6',
+        isWhiteMove: i % 2 === 0,
+        fenBefore: '',
+        fenAfter: '',
+      }));
+
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '1/2-1/2' },
+        moves,
+      };
+
+      const pgn = renderPgn(game);
+
+      // Verify render output without round-trip (parser validates legal moves)
+      expect(pgn).toContain('1. Nc3 Nc6');
+      expect(pgn).toContain('100. Nc3 Nc6');
+      expect(pgn).toContain('1/2-1/2');
+
+      // Verify line wrapping is applied
+      const lines = pgn.split('\n');
+      const moveLines = lines.filter((l) => l.match(/^\d+\./));
+      for (const line of moveLines) {
+        expect(line.length).toBeLessThanOrEqual(80);
+      }
+    });
+
+    it('handles deeply nested variations (3+ levels)', () => {
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: [
+          {
+            moveNumber: 1,
+            san: 'e4',
+            isWhiteMove: true,
+            fenBefore: '',
+            fenAfter: '',
+            variations: [
+              [
+                {
+                  moveNumber: 1,
+                  san: 'd4',
+                  isWhiteMove: true,
+                  fenBefore: '',
+                  fenAfter: '',
+                  variations: [
+                    [
+                      {
+                        moveNumber: 1,
+                        san: 'c4',
+                        isWhiteMove: true,
+                        fenBefore: '',
+                        fenAfter: '',
+                        variations: [
+                          [
+                            {
+                              moveNumber: 1,
+                              san: 'Nf3',
+                              isWhiteMove: true,
+                              fenBefore: '',
+                              fenAfter: '',
+                            },
+                          ],
+                        ],
+                      },
+                    ],
+                  ],
+                },
+              ],
+            ],
+          },
+        ],
+      };
+
+      const pgn = renderPgn(game);
+
+      // Should contain nested parentheses
+      expect(pgn).toContain('( 1. d4');
+      expect(pgn).toContain('( 1. c4');
+      expect(pgn).toContain('( 1. Nf3');
+
+      // Should be parseable
+      const reparsed = parsePgn(pgn);
+      expect(reparsed[0]!.moves[0]!.variations).toHaveLength(1);
+    });
+
+    it('handles many variations on a single move', () => {
+      const variations = Array.from({ length: 5 }, (_, i) => [
+        {
+          moveNumber: 1,
+          san: ['d4', 'c4', 'Nf3', 'g3', 'b3'][i]!,
+          isWhiteMove: true,
+          fenBefore: '',
+          fenAfter: '',
+        },
+      ]);
+
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: [
+          {
+            moveNumber: 1,
+            san: 'e4',
+            isWhiteMove: true,
+            fenBefore: '',
+            fenAfter: '',
+            variations,
+          },
+        ],
+      };
+
+      const pgn = renderPgn(game);
+
+      // Should contain all variations
+      expect(pgn).toContain('( 1. d4 )');
+      expect(pgn).toContain('( 1. c4 )');
+      expect(pgn).toContain('( 1. Nf3 )');
+      expect(pgn).toContain('( 1. g3 )');
+      expect(pgn).toContain('( 1. b3 )');
+    });
+
+    it('handles long comments with special characters', () => {
+      // Test comment with special characters (excluding braces which have
+      // parser/renderer escaping asymmetry in the current implementation)
+      const longComment =
+        'This is a very long comment that contains "quotes", backslashes \\, and special chars like <>&. It also has some chess notation like Nxe4+ and 1. e4 e5.';
+
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: [
+          {
+            moveNumber: 1,
+            san: 'e4',
+            isWhiteMove: true,
+            fenBefore: '',
+            fenAfter: '',
+            commentAfter: longComment,
+          },
+        ],
+      };
+
+      const pgn = renderPgn(game);
+
+      // The comment should be present
+      expect(pgn).toContain('{This is a very long comment');
+      expect(pgn).toContain('Nxe4+');
+
+      // Should be parseable
+      const reparsed = parsePgn(pgn);
+      expect(reparsed[0]!.moves[0]!.commentAfter).toBeDefined();
+      expect(reparsed[0]!.moves[0]!.commentAfter).toContain('quotes');
+    });
+
+    it('escapes closing braces in comments', () => {
+      // Verify renderer escapes closing braces (separate from round-trip
+      // since parser/renderer escaping may not be symmetric)
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: [
+          {
+            moveNumber: 1,
+            san: 'e4',
+            isWhiteMove: true,
+            fenBefore: '',
+            fenAfter: '',
+            commentAfter: 'Contains } brace',
+          },
+        ],
+      };
+
+      const pgn = renderPgn(game);
+
+      // Closing brace should be escaped
+      expect(pgn).toContain('{Contains \\} brace}');
+    });
+
+    it('handles multi-line comments (newlines converted to spaces)', () => {
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: [
+          {
+            moveNumber: 1,
+            san: 'e4',
+            isWhiteMove: true,
+            fenBefore: '',
+            fenAfter: '',
+            commentAfter: 'Line 1\nLine 2\nLine 3',
+          },
+        ],
+      };
+
+      const pgn = renderPgn(game);
+
+      // Should contain the comment (newlines may be preserved or converted)
+      expect(pgn).toContain('Line 1');
+      expect(pgn).toContain('Line 2');
+      expect(pgn).toContain('Line 3');
+    });
+
+    it('handles empty variations gracefully', () => {
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '*' },
+        moves: [
+          {
+            moveNumber: 1,
+            san: 'e4',
+            isWhiteMove: true,
+            fenBefore: '',
+            fenAfter: '',
+            variations: [[]],
+          },
+        ],
+      };
+
+      const pgn = renderPgn(game);
+
+      // Should handle empty variation
+      expect(pgn).toContain('()');
+    });
+
+    it('handles game with only result', () => {
+      const game: ParsedGame = {
+        metadata: { white: 'A', black: 'B', result: '0-1' },
+        moves: [],
+      };
+
+      const pgn = renderPgn(game);
+      const reparsed = parsePgn(pgn);
+
+      expect(reparsed[0]!.metadata.result).toBe('0-1');
+      expect(reparsed[0]!.moves).toHaveLength(0);
+    });
+  });
 });

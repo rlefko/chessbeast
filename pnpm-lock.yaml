@@ -99,6 +99,9 @@ importers:
       '@chessbeast/core':
         specifier: workspace:*
         version: link:../core
+      '@chessbeast/pgn':
+        specifier: workspace:*
+        version: link:../pgn
       openai:
         specifier: ^4.73.0
         version: 4.104.0

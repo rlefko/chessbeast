@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@chessbeast/core": "workspace:*",
+    "@chessbeast/pgn": "workspace:*",
     "openai": "^4.73.0"
   },
   "devDependencies": {

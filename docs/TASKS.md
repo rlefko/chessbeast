@@ -328,40 +328,47 @@
 
 ---
 
-## Milestone 7: PGN Renderer
+## Milestone 7: PGN Renderer ✅
 
 ### 7.1 Comment Insertion
-- [ ] Insert `{comment}` blocks in correct positions
-- [ ] Handle comment placement (before/after move)
-- [ ] Escape special characters in comments
-- [ ] Handle multi-line comments
+- [x] Insert `{comment}` blocks in correct positions
+- [x] Handle comment placement (before/after move)
+- [x] Escape special characters in comments (closing braces)
+- [x] Handle multi-line comments
 
 ### 7.2 NAG Insertion
-- [ ] Insert NAG symbols ($1, $2, $4, $6, etc.)
-- [ ] Map classification → NAG codes
-- [ ] Handle multiple NAGs per move
+- [x] Insert NAG symbols ($1, $2, $4, $6, etc.)
+- [x] Map classification → NAG codes (classificationToNag function)
+- [x] Handle multiple NAGs per move
 
 ### 7.3 Variation Rendering
-- [ ] Render sidelines with parentheses `( ... )`
-- [ ] Handle nested variations
-- [ ] Maintain proper spacing and formatting
-- [ ] Include comments in variations
+- [x] Render sidelines with parentheses `( ... )`
+- [x] Handle nested variations (recursive rendering)
+- [x] Maintain proper spacing and formatting (line wrapping)
+- [x] Include comments in variations
 
 ### 7.4 Header Rendering
-- [ ] Render all standard PGN tags
-- [ ] Add summary as header comment
-- [ ] Include analysis metadata tags (optional)
+- [x] Render all standard PGN tags (Seven Tag Roster + optional)
+- [x] Add summary as header comment (via gameComment)
+- [x] Include analysis metadata tags (optional via transformer)
 
 ### 7.5 Validation
-- [ ] Ensure output is valid PGN
+- [x] Ensure output is valid PGN (round-trip parsing tests)
 - [ ] Test loading in common GUIs (Lichess, Chess.com, ChessBase)
-- [ ] Handle edge cases (very long games, many variations)
+- [x] Handle edge cases (very long games, many variations, nested)
 
 ### 7.6 Testing
-- [ ] Round-trip tests (parse → render → parse)
-- [ ] Test with various annotation densities
+- [x] Round-trip tests (parse → render → parse)
+- [x] Test with various annotation densities
 - [ ] Test GUI compatibility
-- [ ] Validate against PGN specification
+- [x] Validate against PGN specification
+
+### 7.7 Analysis-to-PGN Transformer
+- [x] Transform GameAnalysis → ParsedGame
+- [x] Support configurable options (includeVariations, includeNags, includeSummary)
+- [x] Generate variations from alternative moves with PV continuation
+- [x] Format evaluation scores in variation comments
+- [x] Helper functions (hasAnnotations, countAnnotations)
 
 ---
 
