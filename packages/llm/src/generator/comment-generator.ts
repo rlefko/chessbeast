@@ -13,8 +13,6 @@ import { buildCriticalMomentPrompt, buildBriefMovePrompt } from '../prompts/temp
 import type { GeneratedComment } from '../validator/output-validator.js';
 import { parseJsonResponse, validateComment } from '../validator/output-validator.js';
 
-import { generateFallbackComment } from './fallback-generator.js';
-
 /**
  * Degradation levels for the comment generator
  */
@@ -32,11 +30,15 @@ export enum DegradationLevel {
 }
 
 /**
- * Comment generator with circuit breaker integration and degradation
+ * Comment generator with circuit breaker integration
+ *
+ * IMPORTANT: We do NOT use global degradation that affects all subsequent moves.
+ * Each move is evaluated independently. If the LLM fails for one move, we silently
+ * skip that move (return empty comment) rather than producing generic fallback text.
+ * This prevents a single failure from cascading to ruin all remaining annotations.
  */
 export class CommentGenerator {
   private degradationLevel: DegradationLevel = DegradationLevel.FULL;
-  private consecutiveFailures = 0;
   private readonly cache: ResponseCache<GeneratedComment>;
 
   constructor(
@@ -58,11 +60,13 @@ export class CommentGenerator {
    */
   resetDegradation(): void {
     this.degradationLevel = DegradationLevel.FULL;
-    this.consecutiveFailures = 0;
   }
 
   /**
    * Generate a comment for a single position
+   *
+   * Each move is evaluated independently. Failures don't cascade to other moves.
+   * If we can't generate a good comment, we return empty (let the NAG speak).
    */
   async generateComment(
     context: CommentContext,
@@ -70,9 +74,9 @@ export class CommentGenerator {
   ): Promise<GeneratedComment> {
     const isCritical = planned.criticalMoment !== undefined;
 
-    // Check if we should skip based on degradation
-    if (this.shouldSkip(isCritical)) {
-      return generateFallbackComment(planned.move, planned.criticalMoment);
+    // For non-critical moves, skip LLM entirely - NAGs are sufficient
+    if (!isCritical && this.degradationLevel >= DegradationLevel.CRITICAL_ONLY) {
+      return { comment: undefined, nags: [] };
     }
 
     // Check cache first
@@ -86,19 +90,19 @@ export class CommentGenerator {
       return cached;
     }
 
-    // Check if we can afford this request
+    // Check if we can afford this request - silently skip if out of budget
+    // (don't produce generic fallback, just let the NAG speak for itself)
     if (!this.client.canAfford(planned.estimatedTokens)) {
       const usage = this.client.getTokenUsage();
       console.warn(
-        `[LLM] Token budget exhausted: need ~${planned.estimatedTokens}, have ${usage.remaining} remaining (${usage.used} used)`,
+        `[LLM] Token budget exhausted: need ~${planned.estimatedTokens}, have ${usage.remaining} remaining (${usage.used} used). Skipping this move.`,
       );
-      this.increaseDegradation();
-      return generateFallbackComment(planned.move, planned.criticalMoment);
+      // Return empty comment - silence is better than generic fallback
+      return { comment: undefined, nags: [] };
     }
 
     try {
       const comment = await this.callLLM(context);
-      this.recordSuccess();
 
       // Cache the result
       this.cache.set(cacheKey, comment);
@@ -152,69 +156,27 @@ export class CommentGenerator {
     return validation.sanitized;
   }
 
-  private shouldSkip(isCritical: boolean): boolean {
-    switch (this.degradationLevel) {
-      case DegradationLevel.CRITICAL_ONLY:
-        return !isCritical;
-      case DegradationLevel.TEMPLATE:
-      case DegradationLevel.MINIMAL:
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  private handleFailure(error: unknown, planned: PlannedAnnotation): GeneratedComment {
-    // Rate limit errors are recoverable - don't increase degradation as aggressively
-    // The retry logic should have handled most rate limits, but if we get here
-    // it means retries were exhausted
+  /**
+   * Handle LLM failure for a single move
+   *
+   * IMPORTANT: We do NOT cascade failures to other moves. If this move fails,
+   * we return an empty comment and let the next move try fresh.
+   */
+  private handleFailure(error: unknown, _planned: PlannedAnnotation): GeneratedComment {
+    // Log the error for debugging
     if (error instanceof RateLimitError) {
       console.warn(
         `[LLM] Rate limit error after exhausting all retries. ` +
-          `Consider reducing request frequency or upgrading API tier. ` +
-          `Note: This is NOT a token budget issue - the API is throttling requests.`,
+          `Consider reducing request frequency or upgrading API tier.`,
       );
-      // Only record failure once for rate limits (don't trigger immediate degradation)
-      this.consecutiveFailures++;
+    } else if (error instanceof Error) {
+      console.warn(`[LLM] Comment generation failed: ${error.constructor.name}: ${error.message}`);
     } else {
-      this.recordFailure();
-      // Log the error with more context
-      if (error instanceof Error) {
-        console.warn(
-          `[LLM] Comment generation failed: ${error.constructor.name}: ${error.message}`,
-        );
-      } else {
-        console.warn(`[LLM] Comment generation failed with unknown error`);
-      }
+      console.warn(`[LLM] Comment generation failed with unknown error`);
     }
 
-    // Always return a fallback - never throw from public methods
-    return generateFallbackComment(planned.move, planned.criticalMoment);
-  }
-
-  private recordSuccess(): void {
-    this.consecutiveFailures = 0;
-    // Potentially recover from degradation
-    if (this.degradationLevel > DegradationLevel.FULL) {
-      this.degradationLevel = Math.max(
-        DegradationLevel.FULL,
-        this.degradationLevel - 1,
-      ) as DegradationLevel;
-    }
-  }
-
-  private recordFailure(): void {
-    this.consecutiveFailures++;
-
-    // Increase degradation after multiple failures
-    if (this.consecutiveFailures >= 3 && this.degradationLevel < DegradationLevel.TEMPLATE) {
-      this.increaseDegradation();
-    }
-  }
-
-  private increaseDegradation(): void {
-    if (this.degradationLevel < DegradationLevel.MINIMAL) {
-      this.degradationLevel++;
-    }
+    // Return empty comment - silence is better than generic fallback
+    // This move failed, but don't affect other moves
+    return { comment: undefined, nags: [] };
   }
 }

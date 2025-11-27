@@ -23,19 +23,20 @@ describe('Verbosity Calculator', () => {
     });
 
     it('should prioritize critical moments for verbosity', () => {
-      // avgBudget = 900/2 = 450 >= TOKENS_BY_VERBOSITY.detailed (450)
-      const result = calculateVerbosity(900, 2, true, 'detailed');
+      // avgBudget = 2400/2 = 1200 >= TOKENS_BY_VERBOSITY.detailed (1200)
+      const result = calculateVerbosity(2400, 2, true, 'detailed');
       expect(result).toBe('detailed');
     });
 
     it('should reduce non-critical verbosity when budget is tight', () => {
-      // avgBudget = 500/2 = 250 >= TOKENS_BY_VERBOSITY.normal (250)
-      const result = calculateVerbosity(500, 2, false, 'detailed');
+      // avgBudget = 1800/2 = 900 >= TOKENS_BY_VERBOSITY.normal (900)
+      const result = calculateVerbosity(1800, 2, false, 'detailed');
       expect(result).toBe('normal');
     });
 
     it('should respect user preference when budget allows', () => {
-      const result = calculateVerbosity(5000, 5, false, 'detailed');
+      // avgBudget = 6000/5 = 1200 >= TOKENS_BY_VERBOSITY.detailed (1200)
+      const result = calculateVerbosity(6000, 5, false, 'detailed');
       expect(result).toBe('detailed');
     });
   });
@@ -50,8 +51,9 @@ describe('Verbosity Calculator', () => {
       expect(shouldAnnotate('mistake', false)).toBe(true);
     });
 
-    it('should annotate brilliant moves', () => {
-      expect(shouldAnnotate('brilliant', false)).toBe(true);
+    it('should NOT annotate brilliant moves (NAG is sufficient)', () => {
+      // v3 change: brilliant moves only get NAG (!!) - no LLM comment needed
+      expect(shouldAnnotate('brilliant', false)).toBe(false);
     });
 
     it('should skip normal good moves', () => {
@@ -59,7 +61,9 @@ describe('Verbosity Calculator', () => {
     });
 
     it('should annotate unexpected moves (low human probability)', () => {
-      expect(shouldAnnotate('good', false, 0.05)).toBe(true);
+      // v3 change: threshold is now 0.05, so probability must be < 0.05
+      expect(shouldAnnotate('good', false, 0.04)).toBe(true);
+      expect(shouldAnnotate('good', false, 0.05)).toBe(false); // exactly at threshold = no
     });
   });
 
