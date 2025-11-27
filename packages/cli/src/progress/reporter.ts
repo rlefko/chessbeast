@@ -170,9 +170,7 @@ export class ProgressReporter {
     if (this.silent) return;
 
     const gameLabel = totalGames > 1 ? `game ${gameIndex + 1}/${totalGames}` : 'game';
-    console.log(
-      this.c.bold(`Analyzing ${gameLabel}: ${white} vs ${black} (${totalMoves} moves)`),
-    );
+    console.log(this.c.bold(`Analyzing ${gameLabel}: ${white} vs ${black} (${totalMoves} moves)`));
   }
 
   /**
