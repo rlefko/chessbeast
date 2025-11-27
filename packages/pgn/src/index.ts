@@ -28,7 +28,7 @@ export interface GameMetadata {
 }
 
 /**
- * A single move with position information
+ * A single move with position information and optional annotations
  */
 export interface MoveInfo {
   moveNumber: number;
@@ -36,6 +36,14 @@ export interface MoveInfo {
   isWhiteMove: boolean;
   fenBefore: string;
   fenAfter: string;
+  /** Comment appearing before the move */
+  commentBefore?: string;
+  /** Comment appearing after the move */
+  commentAfter?: string;
+  /** NAG symbols (e.g., ["$1", "$18"]) */
+  nags?: string[];
+  /** Variations (alternative lines) branching from this move */
+  variations?: MoveInfo[][];
 }
 
 /**
@@ -44,6 +52,8 @@ export interface MoveInfo {
 export interface ParsedGame {
   metadata: GameMetadata;
   moves: MoveInfo[];
+  /** Comment appearing before the first move (game-level comment) */
+  gameComment?: string;
 }
 
 // Re-export parsing functions

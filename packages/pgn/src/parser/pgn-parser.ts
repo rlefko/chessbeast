@@ -44,6 +44,13 @@ interface RawTags {
 }
 
 /**
+ * Comment diagnostic from pgn-parser
+ */
+interface CommentDiag {
+  comment?: string;
+}
+
+/**
  * Raw move from pgn-parser
  */
 interface RawMove {
@@ -54,8 +61,16 @@ interface RawMove {
   variations?: RawMove[][];
   commentBefore?: string;
   commentAfter?: string;
+  commentDiag?: CommentDiag;
   nag?: string[];
   turn?: 'w' | 'b';
+}
+
+/**
+ * Game comment from pgn-parser
+ */
+interface RawGameComment {
+  comment?: string;
 }
 
 /**
@@ -64,6 +79,7 @@ interface RawMove {
 interface RawGame {
   tags?: RawTags;
   moves?: RawMove[];
+  gameComment?: RawGameComment;
 }
 
 /**
@@ -101,7 +117,14 @@ function transformGame(rawGame: RawGame): ParsedGame {
 
   const moves = processMoves(rawGame.moves ?? [], position);
 
-  return { metadata, moves };
+  const game: ParsedGame = { metadata, moves };
+
+  // Extract game comment if present
+  if (rawGame.gameComment?.comment) {
+    game.gameComment = rawGame.gameComment.comment;
+  }
+
+  return game;
 }
 
 /**
@@ -181,15 +204,48 @@ function processMoves(rawMoves: RawMove[], position: ChessPosition): MoveInfo[] 
     }
 
     const san = rawMove.notation.notation;
+    const fenBeforeMove = position.fen();
+
+    // Get move metadata BEFORE making the move (from position state)
+    const isWhiteMove = position.turn() === 'w';
+    const moveNumber = position.moveNumber();
+
     const result = position.move(san);
 
-    moves.push({
-      moveNumber: Math.floor(moves.length / 2) + 1,
+    const moveInfo: MoveInfo = {
+      moveNumber,
       san: result.san,
-      isWhiteMove: moves.length % 2 === 0,
+      isWhiteMove,
       fenBefore: result.fenBefore,
       fenAfter: result.fenAfter,
-    });
+    };
+
+    // Capture comment before (if present)
+    if (rawMove.commentBefore) {
+      moveInfo.commentBefore = rawMove.commentBefore;
+    }
+
+    // Capture comment after (prefer commentAfter, fall back to commentDiag)
+    const commentAfter = rawMove.commentAfter ?? rawMove.commentDiag?.comment;
+    if (commentAfter) {
+      moveInfo.commentAfter = commentAfter;
+    }
+
+    // Capture NAGs
+    if (rawMove.nag && rawMove.nag.length > 0) {
+      moveInfo.nags = rawMove.nag;
+    }
+
+    // Process variations (recursive)
+    if (rawMove.variations && rawMove.variations.length > 0) {
+      moveInfo.variations = rawMove.variations.map((variationMoves) => {
+        // Clone position BEFORE this move to start variation
+        const variationPosition = ChessPosition.fromFen(fenBeforeMove);
+        return processMoves(variationMoves, variationPosition);
+      });
+    }
+
+    moves.push(moveInfo);
   }
 
   return moves;

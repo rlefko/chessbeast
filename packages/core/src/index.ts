@@ -22,23 +22,11 @@ export type MoveClassification =
   | 'brilliant'
   | 'forced';
 
-/**
- * Engine evaluation result
- */
-export interface EngineEval {
-  /** Centipawns from side to move */
-  cp?: number;
-  /** Mate in N (positive = side to move mates) */
-  mate?: number;
-  /** Search depth reached */
-  depth: number;
-  /** Best line in SAN or UCI */
-  bestLine: string[];
-}
+// Re-export types
+export * from './types/index.js';
 
-/**
- * Placeholder for the main analysis function
- */
-export function analyzeGame(): void {
-  console.log('Analysis pipeline not yet implemented');
-}
+// Re-export classifier utilities
+export * from './classifier/index.js';
+
+// Re-export pipeline
+export * from './pipeline/index.js';
