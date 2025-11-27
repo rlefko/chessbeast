@@ -163,4 +163,4 @@ Commits must be a single sentence with an emoji prefix and no ending punctuation
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+GPL-3.0 License - see [LICENSE](LICENSE) for details.
