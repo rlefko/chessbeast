@@ -274,7 +274,14 @@ describe('PGN Renderer', () => {
         const game: ParsedGame = {
           metadata: { white: 'A', black: 'B', result: '*' },
           moves: [
-            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '', commentAfter: 'Best move' },
+            {
+              moveNumber: 1,
+              san: 'e4',
+              isWhiteMove: true,
+              fenBefore: '',
+              fenAfter: '',
+              commentAfter: 'Best move',
+            },
           ],
         };
 
@@ -285,9 +292,7 @@ describe('PGN Renderer', () => {
       it('renders game comment before moves', () => {
         const game: ParsedGame = {
           metadata: { white: 'A', black: 'B', result: '*' },
-          moves: [
-            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '' },
-          ],
+          moves: [{ moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '' }],
           gameComment: 'An interesting game',
         };
 
@@ -303,7 +308,14 @@ describe('PGN Renderer', () => {
         const game: ParsedGame = {
           metadata: { white: 'A', black: 'B', result: '*' },
           moves: [
-            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '', commentAfter: 'A } brace' },
+            {
+              moveNumber: 1,
+              san: 'e4',
+              isWhiteMove: true,
+              fenBefore: '',
+              fenAfter: '',
+              commentAfter: 'A } brace',
+            },
           ],
         };
 
@@ -317,7 +329,14 @@ describe('PGN Renderer', () => {
         const game: ParsedGame = {
           metadata: { white: 'A', black: 'B', result: '*' },
           moves: [
-            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '', nags: ['$1'] },
+            {
+              moveNumber: 1,
+              san: 'e4',
+              isWhiteMove: true,
+              fenBefore: '',
+              fenAfter: '',
+              nags: ['$1'],
+            },
           ],
         };
 
@@ -329,7 +348,14 @@ describe('PGN Renderer', () => {
         const game: ParsedGame = {
           metadata: { white: 'A', black: 'B', result: '*' },
           moves: [
-            { moveNumber: 1, san: 'e4', isWhiteMove: true, fenBefore: '', fenAfter: '', nags: ['$1', '$18'] },
+            {
+              moveNumber: 1,
+              san: 'e4',
+              isWhiteMove: true,
+              fenBefore: '',
+              fenAfter: '',
+              nags: ['$1', '$18'],
+            },
           ],
         };
 
@@ -349,9 +375,9 @@ describe('PGN Renderer', () => {
               isWhiteMove: true,
               fenBefore: '',
               fenAfter: '',
-              variations: [[
-                { moveNumber: 1, san: 'd4', isWhiteMove: true, fenBefore: '', fenAfter: '' },
-              ]],
+              variations: [
+                [{ moveNumber: 1, san: 'd4', isWhiteMove: true, fenBefore: '', fenAfter: '' }],
+              ],
             },
           ],
         };
@@ -371,9 +397,9 @@ describe('PGN Renderer', () => {
               isWhiteMove: false,
               fenBefore: '',
               fenAfter: '',
-              variations: [[
-                { moveNumber: 1, san: 'c5', isWhiteMove: false, fenBefore: '', fenAfter: '' },
-              ]],
+              variations: [
+                [{ moveNumber: 1, san: 'c5', isWhiteMove: false, fenBefore: '', fenAfter: '' }],
+              ],
             },
           ],
         };
@@ -419,9 +445,9 @@ describe('PGN Renderer', () => {
               fenAfter: '',
               nags: ['$1'],
               commentAfter: 'Best',
-              variations: [[
-                { moveNumber: 1, san: 'd4', isWhiteMove: true, fenBefore: '', fenAfter: '' },
-              ]],
+              variations: [
+                [{ moveNumber: 1, san: 'd4', isWhiteMove: true, fenBefore: '', fenAfter: '' }],
+              ],
             },
           ],
         };

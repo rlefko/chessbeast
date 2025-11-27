@@ -118,7 +118,9 @@ export abstract class BaseGrpcClient {
 
     const ServiceConstructor = current[this.getServiceName()] as grpc.ServiceClientConstructor;
     if (!ServiceConstructor) {
-      throw new GrpcClientError(`Service '${this.getServiceName()}' not found in package '${this.getPackageName()}'`);
+      throw new GrpcClientError(
+        `Service '${this.getServiceName()}' not found in package '${this.getPackageName()}'`,
+      );
     }
 
     return ServiceConstructor;
@@ -156,10 +158,7 @@ export abstract class BaseGrpcClient {
       const ServiceConstructor = this.getServiceConstructor(proto);
 
       const address = `${this.config.host}:${this.config.port}`;
-      const client = new ServiceConstructor(
-        address,
-        grpc.credentials.createInsecure()
-      );
+      const client = new ServiceConstructor(address, grpc.credentials.createInsecure());
 
       return client;
     } catch (err) {
@@ -175,7 +174,7 @@ export abstract class BaseGrpcClient {
    */
   protected async unaryCall<TRequest, TResponse>(
     method: string,
-    request: TRequest
+    request: TRequest,
   ): Promise<TResponse> {
     const client = await this.ensureConnected();
 
@@ -188,7 +187,7 @@ export abstract class BaseGrpcClient {
         request: TRequest,
         metadata: grpc.Metadata,
         options: { deadline: Date },
-        callback: (err: grpc.ServiceError | null, response: TResponse) => void
+        callback: (err: grpc.ServiceError | null, response: TResponse) => void,
       ) => void;
 
       if (typeof methodFn !== 'function') {
@@ -207,7 +206,7 @@ export abstract class BaseGrpcClient {
           } else {
             resolve(response);
           }
-        }
+        },
       );
     });
   }

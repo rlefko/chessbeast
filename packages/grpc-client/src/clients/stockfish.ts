@@ -58,10 +58,7 @@ export class StockfishClient extends BaseGrpcClient {
       nodes: options.nodes ?? 0,
     };
 
-    const response = await this.unaryCall<typeof request, RawEvaluateResponse>(
-      'evaluate',
-      request
-    );
+    const response = await this.unaryCall<typeof request, RawEvaluateResponse>('evaluate', request);
 
     return transformEvaluateResponse(response);
   }
@@ -72,7 +69,7 @@ export class StockfishClient extends BaseGrpcClient {
   async healthCheck(): Promise<StockfishHealthCheckResponse> {
     const response = await this.unaryCall<Record<string, never>, RawHealthCheckResponse>(
       'healthCheck',
-      {}
+      {},
     );
 
     return {

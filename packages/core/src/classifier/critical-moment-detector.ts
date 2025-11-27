@@ -81,7 +81,10 @@ export function estimateGamePhase(plyIndex: number, totalPlies: number): GamePha
  * @param eval_ - Normalized evaluation
  * @returns Expected result: 'white', 'black', or 'draw'
  */
-function getExpectedResult(eval_: NormalizedEval, isWhiteToMove: boolean): 'white' | 'black' | 'draw' {
+function getExpectedResult(
+  eval_: NormalizedEval,
+  isWhiteToMove: boolean,
+): 'white' | 'black' | 'draw' {
   const { cp, isMate } = eval_;
 
   if (isMate) {
@@ -128,7 +131,7 @@ function calculateInterestingness(
   // Normalize evaluations
   const normBefore = normalizeEval(evalBefore, isWhiteMove);
   const normAfter = normalizeEval(evalAfter, !isWhiteMove);
-  const evalSwing = Math.abs(normBefore.cp - (-normAfter.cp));
+  const evalSwing = Math.abs(normBefore.cp - -normAfter.cp);
 
   // Check for various critical moment types
 

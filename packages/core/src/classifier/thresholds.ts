@@ -138,10 +138,7 @@ export function getThresholdsForRating(rating: number): ClassificationThresholds
   );
 
   // Should always find a band, but default to intermediate if not
-  return (
-    band ??
-    RATING_THRESHOLDS.find((t) => t.minRating === 1200 && t.maxRating === 1400)!
-  );
+  return band ?? RATING_THRESHOLDS.find((t) => t.minRating === 1200 && t.maxRating === 1400)!;
 }
 
 /**

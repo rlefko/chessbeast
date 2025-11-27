@@ -24,18 +24,20 @@ describe('Analysis Pipeline', () => {
         }
         return defaultEval;
       }),
-      evaluateMultiPv: vi.fn(async (_fen: string, _depth: number, numLines: number): Promise<EngineEvaluation[]> => {
-        const results: EngineEvaluation[] = [];
-        for (let i = 0; i < numLines; i++) {
-          if (evalSequence && callCount < evalSequence.length) {
-            results.push(evalSequence[callCount]!);
-            callCount++;
-          } else {
-            results.push({ ...defaultEval, cp: i * 10, pv: [`move${i}`] });
+      evaluateMultiPv: vi.fn(
+        async (_fen: string, _depth: number, numLines: number): Promise<EngineEvaluation[]> => {
+          const results: EngineEvaluation[] = [];
+          for (let i = 0; i < numLines; i++) {
+            if (evalSequence && callCount < evalSequence.length) {
+              results.push(evalSequence[callCount]!);
+              callCount++;
+            } else {
+              results.push({ ...defaultEval, cp: i * 10, pv: [`move${i}`] });
+            }
           }
-        }
-        return results;
-      }),
+          return results;
+        },
+      ),
     };
   }
 
@@ -58,10 +60,34 @@ describe('Analysis Pipeline', () => {
       result: '1-0',
     },
     moves: [
-      { san: 'e4', fenBefore: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', fenAfter: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', moveNumber: 1, isWhiteMove: true },
-      { san: 'e5', fenBefore: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', fenAfter: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2', moveNumber: 1, isWhiteMove: false },
-      { san: 'Nf3', fenBefore: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2', fenAfter: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', moveNumber: 2, isWhiteMove: true },
-      { san: 'Nc6', fenBefore: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', fenAfter: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', moveNumber: 2, isWhiteMove: false },
+      {
+        san: 'e4',
+        fenBefore: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        fenAfter: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+        moveNumber: 1,
+        isWhiteMove: true,
+      },
+      {
+        san: 'e5',
+        fenBefore: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+        fenAfter: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+        moveNumber: 1,
+        isWhiteMove: false,
+      },
+      {
+        san: 'Nf3',
+        fenBefore: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+        fenAfter: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
+        moveNumber: 2,
+        isWhiteMove: true,
+      },
+      {
+        san: 'Nc6',
+        fenBefore: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
+        fenAfter: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3',
+        moveNumber: 2,
+        isWhiteMove: false,
+      },
     ],
   };
 
@@ -101,22 +127,30 @@ describe('Analysis Pipeline', () => {
       // All moves should have a classification
       for (const move of result.moves) {
         expect(move.classification).toBeDefined();
-        expect(['book', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder', 'brilliant', 'forced'])
-          .toContain(move.classification);
+        expect([
+          'book',
+          'excellent',
+          'good',
+          'inaccuracy',
+          'mistake',
+          'blunder',
+          'brilliant',
+          'forced',
+        ]).toContain(move.classification);
       }
     });
 
     it('should detect critical moments', async () => {
       // Create evaluations that include a "blunder"
       const evals: EngineEvaluation[] = [
-        { cp: 0, depth: 14, pv: ['e4'] },      // Before e4
-        { cp: 0, depth: 14, pv: ['e5'] },      // After e4
-        { cp: 0, depth: 14, pv: ['e5'] },      // Before e5
-        { cp: 0, depth: 14, pv: ['Nf3'] },     // After e5
-        { cp: 0, depth: 14, pv: ['Nf3'] },     // Before Nf3
-        { cp: 0, depth: 14, pv: ['Nc6'] },     // After Nf3
-        { cp: 0, depth: 14, pv: ['Nc6'] },     // Before Nc6
-        { cp: 500, depth: 14, pv: ['Bb5'] },   // After Nc6 - sudden advantage!
+        { cp: 0, depth: 14, pv: ['e4'] }, // Before e4
+        { cp: 0, depth: 14, pv: ['e5'] }, // After e4
+        { cp: 0, depth: 14, pv: ['e5'] }, // Before e5
+        { cp: 0, depth: 14, pv: ['Nf3'] }, // After e5
+        { cp: 0, depth: 14, pv: ['Nf3'] }, // Before Nf3
+        { cp: 0, depth: 14, pv: ['Nc6'] }, // After Nf3
+        { cp: 0, depth: 14, pv: ['Nc6'] }, // Before Nc6
+        { cp: 500, depth: 14, pv: ['Bb5'] }, // After Nc6 - sudden advantage!
       ];
 
       const engine = createMockEngine(evals);

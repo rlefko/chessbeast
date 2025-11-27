@@ -10,11 +10,12 @@
  * 6. Return analysis results
  */
 
-import { detectCriticalMoments, detectPhaseTransitions, type PlyEvaluation } from '../classifier/critical-moment-detector.js';
 import {
-  classifyMove,
-  calculateAccuracy,
-} from '../classifier/move-classifier.js';
+  detectCriticalMoments,
+  detectPhaseTransitions,
+  type PlyEvaluation,
+} from '../classifier/critical-moment-detector.js';
+import { classifyMove, calculateAccuracy } from '../classifier/move-classifier.js';
 import { DEFAULT_RATING } from '../classifier/thresholds.js';
 import type { MoveClassification } from '../index.js';
 import type {
@@ -249,7 +250,14 @@ export class AnalysisPipeline {
    */
   private async shallowPass(
     moves: ParsedMove[],
-  ): Promise<Array<{ move: ParsedMove; evalBefore: EngineEvaluation; evalAfter: EngineEvaluation; bestMove: string }>> {
+  ): Promise<
+    Array<{
+      move: ParsedMove;
+      evalBefore: EngineEvaluation;
+      evalAfter: EngineEvaluation;
+      bestMove: string;
+    }>
+  > {
     const results: Array<{
       move: ParsedMove;
       evalBefore: EngineEvaluation;

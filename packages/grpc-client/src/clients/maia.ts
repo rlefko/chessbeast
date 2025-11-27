@@ -59,7 +59,7 @@ export class MaiaClient extends BaseGrpcClient {
 
     const response = await this.unaryCall<typeof request, RawPredictResponse>(
       'predictMoves',
-      request
+      request,
     );
 
     return {
@@ -83,7 +83,7 @@ export class MaiaClient extends BaseGrpcClient {
 
     const response = await this.unaryCall<typeof request, RawEstimateRatingResponse>(
       'estimateRating',
-      request
+      request,
     );
 
     return {
@@ -99,7 +99,7 @@ export class MaiaClient extends BaseGrpcClient {
   async healthCheck(): Promise<MaiaHealthCheckResponse> {
     const response = await this.unaryCall<Record<string, never>, RawHealthCheckResponse>(
       'healthCheck',
-      {}
+      {},
     );
 
     return {

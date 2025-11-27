@@ -198,8 +198,13 @@ export function classifyMove(
   isWhiteMove: boolean,
   options: ClassifyMoveOptions = {},
 ): ClassificationResult {
-  const { rating = DEFAULT_RATING, isBookMove, humanProbability, isSacrifice, legalMoveCount } =
-    options;
+  const {
+    rating = DEFAULT_RATING,
+    isBookMove,
+    humanProbability,
+    isSacrifice,
+    legalMoveCount,
+  } = options;
 
   // Book moves are always classified as 'book'
   if (isBookMove) {

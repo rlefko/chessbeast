@@ -35,10 +35,7 @@ describe('Critical Moment Detector', () => {
   });
 
   describe('detectPhaseTransitions', () => {
-    function createPly(
-      plyIndex: number,
-      cp: number = 0,
-    ): PlyEvaluation {
+    function createPly(plyIndex: number, cp: number = 0): PlyEvaluation {
       const eval_: EngineEvaluation = { cp, depth: 20, pv: ['e4'] };
       return {
         plyIndex,
@@ -84,7 +81,13 @@ describe('Critical Moment Detector', () => {
       plyIndex: number,
       cpBefore: number,
       cpAfter: number,
-      classification: 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder' | 'brilliant' = 'good',
+      classification:
+        | 'excellent'
+        | 'good'
+        | 'inaccuracy'
+        | 'mistake'
+        | 'blunder'
+        | 'brilliant' = 'good',
     ): PlyEvaluation {
       return {
         plyIndex,
@@ -93,7 +96,7 @@ describe('Critical Moment Detector', () => {
         evalBefore: { cp: cpBefore, depth: 20, pv: ['e4'] },
         evalAfter: { cp: cpAfter, depth: 20, pv: ['e5'] },
         classification,
-        cpLoss: Math.max(0, cpBefore - (-cpAfter)),
+        cpLoss: Math.max(0, cpBefore - -cpAfter),
       };
     }
 

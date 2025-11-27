@@ -9,7 +9,7 @@ export class GrpcClientError extends Error {
   constructor(
     message: string,
     public readonly code?: number,
-    public readonly details?: string
+    public readonly details?: string,
   ) {
     super(message);
     this.name = 'GrpcClientError';
@@ -27,12 +27,12 @@ export class ConnectionError extends GrpcClientError {
   constructor(
     public readonly host: string,
     public readonly port: number,
-    cause?: Error
+    cause?: Error,
   ) {
     super(
       `Failed to connect to gRPC service at ${host}:${port}${cause ? `: ${cause.message}` : ''}`,
       14, // UNAVAILABLE
-      cause?.message
+      cause?.message,
     );
     this.name = 'ConnectionError';
   }
@@ -44,11 +44,11 @@ export class ConnectionError extends GrpcClientError {
 export class TimeoutError extends GrpcClientError {
   constructor(
     public readonly operation: string,
-    public readonly timeoutMs: number
+    public readonly timeoutMs: number,
   ) {
     super(
       `Operation '${operation}' timed out after ${timeoutMs}ms`,
-      4 // DEADLINE_EXCEEDED
+      4, // DEADLINE_EXCEEDED
     );
     this.name = 'TimeoutError';
   }
@@ -71,7 +71,7 @@ export class ServiceUnavailableError extends GrpcClientError {
   constructor(service: string, reason?: string) {
     super(
       `Service '${service}' is unavailable${reason ? `: ${reason}` : ''}`,
-      14 // UNAVAILABLE
+      14, // UNAVAILABLE
     );
     this.name = 'ServiceUnavailableError';
   }
@@ -90,11 +90,7 @@ export class InternalError extends GrpcClientError {
 /**
  * Map gRPC status code to appropriate error class
  */
-export function mapGrpcError(
-  code: number,
-  message: string,
-  details?: string
-): GrpcClientError {
+export function mapGrpcError(code: number, message: string, details?: string): GrpcClientError {
   switch (code) {
     case 3: // INVALID_ARGUMENT
       return new InvalidArgumentError(message);
