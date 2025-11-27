@@ -100,6 +100,7 @@ export const DEFAULT_OUTPUT_CONFIG = {
   includeVariations: true,
   includeNags: true,
   includeSummary: true,
+  perspective: 'neutral' as const,
 };
 
 /**

@@ -10,6 +10,11 @@ import type { GameAnalysis, MoveAnalysis, CriticalMoment } from '@chessbeast/cor
 export type VerbosityLevel = 'brief' | 'normal' | 'detailed';
 
 /**
+ * Annotation perspective (whose point of view)
+ */
+export type AnnotationPerspective = 'white' | 'black' | 'neutral';
+
+/**
  * Context for generating a move comment
  */
 export interface CommentContext {
@@ -27,6 +32,10 @@ export interface CommentContext {
   openingName: string | undefined;
   /** Move number in standard notation (e.g., "15. Nf3" or "15...Nf6") */
   moveNotation: string;
+  /** Annotation perspective (white, black, or neutral) */
+  perspective: AnnotationPerspective;
+  /** Whether a NAG glyph will be shown (to avoid redundant classification language) */
+  hasNag: boolean;
 }
 
 /**
@@ -94,6 +103,24 @@ VERBOSITY: ${verbosity}`;
   // Include legal moves to prevent hallucination
   prompt += `\n\nLEGAL MOVES IN THIS POSITION:\n${legalMoves.join(', ')}`;
 
+  // Add perspective instructions if not neutral
+  if (context.perspective !== 'neutral') {
+    const side = context.perspective === 'white' ? 'White' : 'Black';
+    const isOurMove =
+      (context.move.isWhiteMove && context.perspective === 'white') ||
+      (!context.move.isWhiteMove && context.perspective === 'black');
+    prompt += `\n\nPERSPECTIVE: Write from ${side}'s point of view.`;
+    prompt += ` Use "we/our/us" for ${side}, "they/their/opponent" for the other side.`;
+    prompt += isOurMove ? ` This is our move.` : ` This is the opponent's move.`;
+  }
+
+  // Add NAG-awareness instructions
+  if (context.hasNag) {
+    prompt += `\n\nIMPORTANT: A glyph symbol (!, !!, ?, ??, !?, ?!) will already indicate the move quality.`;
+    prompt += ` Do NOT repeat classification language like "This is a blunder" or "This move is a mistake".`;
+    prompt += ` Focus instead on WHY the move is problematic/good and what should be played.`;
+  }
+
   prompt += `\n\nProvide a ${verbosity} annotation for this move appropriate for a ${targetRating}-rated player.`;
   prompt += `\n\nRespond with JSON: { "comment": "your annotation", "nags": ["$1"] }`;
   prompt += `\nNAG codes: $1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!`;
@@ -110,17 +137,27 @@ export function buildBriefMovePrompt(context: CommentContext): string {
   const evalBefore = formatEval(move.evalBefore.cp, move.evalBefore.mate);
   const evalAfter = formatEval(move.evalAfter.cp, move.evalAfter.mate);
 
-  return `Briefly annotate this chess move for a ${targetRating}-rated player.
+  let prompt = `Briefly annotate this chess move for a ${targetRating}-rated player.
 
 POSITION: ${move.fenBefore}
 MOVE: ${context.moveNotation}
 EVALUATION: ${evalBefore} → ${evalAfter}
 CLASSIFICATION: ${move.classification}
 
-LEGAL MOVES: ${legalMoves.slice(0, 10).join(', ')}${legalMoves.length > 10 ? '...' : ''}
+LEGAL MOVES: ${legalMoves.slice(0, 10).join(', ')}${legalMoves.length > 10 ? '...' : ''}`;
+
+  // Add perspective instructions if not neutral
+  if (context.perspective !== 'neutral') {
+    const side = context.perspective === 'white' ? 'White' : 'Black';
+    prompt += `\n\nPERSPECTIVE: Write from ${side}'s point of view using "we/our".`;
+  }
+
+  prompt += `
 
 Respond with JSON: { "comment": "brief annotation or empty string", "nags": [] }
 Only add a comment if noteworthy. Keep it under 20 words.`;
+
+  return prompt;
 }
 
 /**

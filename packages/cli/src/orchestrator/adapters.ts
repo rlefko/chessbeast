@@ -14,6 +14,25 @@ import type {
 } from '@chessbeast/core';
 import type { EcoClient, LichessEliteClient } from '@chessbeast/database';
 import type { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
+import { ChessPosition } from '@chessbeast/pgn';
+
+/**
+ * Convert UCI principal variation to SAN notation
+ * @param uciPv - Array of UCI moves (e.g., ["e2e4", "e7e5"])
+ * @param fen - Starting position FEN
+ * @returns Array of SAN moves (e.g., ["e4", "e5"])
+ */
+function convertPvToSan(uciPv: string[], fen: string): string[] {
+  if (!uciPv || uciPv.length === 0) return [];
+  try {
+    return ChessPosition.convertPvToSan(uciPv, fen);
+  } catch {
+    // If conversion fails (e.g., illegal move in PV), return original
+    // This shouldn't happen with valid engine output, but provides safety
+    console.warn(`Failed to convert PV to SAN for position ${fen}`);
+    return uciPv;
+  }
+}
 
 /**
  * Adapt StockfishClient to EngineService interface
@@ -26,7 +45,7 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
       const eval_: EngineEvaluation = {
         cp: result.cp,
         depth: result.depth,
-        pv: result.bestLine,
+        pv: convertPvToSan(result.bestLine, fen),
       };
       if (result.mate !== 0) {
         eval_.mate = result.mate;
@@ -66,7 +85,7 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
       const firstEval: EngineEvaluation = {
         cp: result.cp,
         depth: result.depth,
-        pv: result.bestLine,
+        pv: convertPvToSan(result.bestLine, fen),
       };
       if (result.mate !== 0) {
         firstEval.mate = result.mate;
@@ -79,7 +98,7 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
           const altEval: EngineEvaluation = {
             cp: alt.cp,
             depth: alt.depth,
-            pv: alt.bestLine,
+            pv: convertPvToSan(alt.bestLine, fen),
           };
           if (alt.mate !== 0) {
             altEval.mate = alt.mate;

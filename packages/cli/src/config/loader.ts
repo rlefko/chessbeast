@@ -5,7 +5,13 @@
 import { cosmiconfig } from 'cosmiconfig';
 
 import { DEFAULT_CONFIG, applyProfile, ANALYSIS_PROFILES } from './defaults.js';
-import type { ChessBeastConfig, CliOptions, AnalysisProfile, OutputVerbosity } from './schema.js';
+import type {
+  ChessBeastConfig,
+  CliOptions,
+  AnalysisProfile,
+  OutputVerbosity,
+  AnnotationPerspective,
+} from './schema.js';
 import { validateConfig, validatePartialConfig } from './validation.js';
 
 /**
@@ -41,6 +47,7 @@ const ENV_VAR_MAP: Record<string, string> = {
 
   // Output
   CHESSBEAST_VERBOSITY: 'output.verbosity',
+  CHESSBEAST_PERSPECTIVE: 'output.perspective',
 };
 
 /**
@@ -230,6 +237,18 @@ function mapCliToConfig(options: CliOptions): Partial<ChessBeastConfig> {
     config.output = {
       ...config.output,
       verbosity: verbosityMap[options.verbosity],
+    } as ChessBeastConfig['output'];
+  }
+
+  if (options.perspective !== undefined) {
+    const perspectiveMap: Record<AnnotationPerspective, AnnotationPerspective> = {
+      white: 'white',
+      black: 'black',
+      neutral: 'neutral',
+    };
+    config.output = {
+      ...config.output,
+      perspective: perspectiveMap[options.perspective],
     } as ChessBeastConfig['output'];
   }
 

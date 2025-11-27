@@ -13,6 +13,11 @@ export type AnalysisProfile = 'quick' | 'standard' | 'deep';
 export type OutputVerbosity = 'summary' | 'normal' | 'rich';
 
 /**
+ * Annotation perspective (whose point of view)
+ */
+export type AnnotationPerspective = 'white' | 'black' | 'neutral';
+
+/**
  * Analysis configuration
  */
 export interface AnalysisConfigSchema {
@@ -104,6 +109,8 @@ export interface OutputConfigSchema {
   includeNags: boolean;
   /** Include game summary */
   includeSummary: boolean;
+  /** Annotation perspective (white, black, or neutral) */
+  perspective: AnnotationPerspective;
 }
 
 /**
@@ -150,4 +157,6 @@ export interface CliOptions {
   noColor?: boolean;
   /** Validate setup without running analysis */
   dryRun?: boolean;
+  /** Annotation perspective */
+  perspective?: AnnotationPerspective;
 }
