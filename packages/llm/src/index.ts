@@ -12,13 +12,14 @@
  */
 
 import type { GameAnalysis } from '@chessbeast/core';
+
 import { OpenAIClient } from './client/openai-client.js';
+import type { HealthStatus } from './client/types.js';
 import type { LLMConfig } from './config/llm-config.js';
 import { createLLMConfig, loadConfigFromEnv } from './config/llm-config.js';
-import { createAnnotationPlan, buildCommentContext, type PlanOptions } from './planner/annotation-planner.js';
 import { CommentGenerator, DegradationLevel } from './generator/comment-generator.js';
 import { SummaryGenerator, formatSummaryAsString } from './generator/summary-generator.js';
-import type { HealthStatus } from './client/types.js';
+import { createAnnotationPlan, buildCommentContext, type PlanOptions } from './planner/annotation-planner.js';
 
 /**
  * Options for annotation
@@ -186,9 +187,9 @@ export class Annotator {
 export type { LLMConfig, TokenBudget, RetryConfig, CacheConfig } from './config/llm-config.js';
 export { createLLMConfig, loadConfigFromEnv, DEFAULT_LLM_CONFIG } from './config/llm-config.js';
 
-export type { HealthStatus, TokenUsage } from './client/types.js';
+export type { HealthStatus, TokenUsage, CircuitState } from './client/types.js';
 export { OpenAIClient, TokenTracker } from './client/openai-client.js';
-export { CircuitBreaker, type CircuitState } from './client/circuit-breaker.js';
+export { CircuitBreaker } from './client/circuit-breaker.js';
 
 export type { VerbosityLevel, CommentContext } from './prompts/templates.js';
 export { buildCriticalMomentPrompt, buildSummaryPrompt } from './prompts/templates.js';

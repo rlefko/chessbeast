@@ -3,6 +3,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
+
+import { ValidationError } from '../errors.js';
+import {
+  extractMoveReferences,
+  isLegalMove,
+  validateMoveReferences,
+} from '../validator/move-validator.js';
 import {
   isValidNag,
   normalizeNag,
@@ -10,17 +17,11 @@ import {
   filterValidNags,
 } from '../validator/nag-validator.js';
 import {
-  extractMoveReferences,
-  isLegalMove,
-  validateMoveReferences,
-} from '../validator/move-validator.js';
-import {
   parseJsonResponse,
   validateComment,
   validateSummary,
   sanitizePgnComment,
 } from '../validator/output-validator.js';
-import { ValidationError } from '../errors.js';
 
 describe('NAG Validator', () => {
   describe('isValidNag', () => {

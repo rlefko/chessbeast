@@ -2,16 +2,17 @@
  * Comment generator with degradation levels
  */
 
+import { ResponseCache, generatePositionCacheKey } from '../cache/response-cache.js';
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { LLMConfig } from '../config/llm-config.js';
-import type { CommentContext } from '../prompts/templates.js';
 import type { PlannedAnnotation } from '../planner/annotation-planner.js';
-import type { GeneratedComment } from '../validator/output-validator.js';
 import { CHESS_ANNOTATOR_SYSTEM } from '../prompts/system-prompts.js';
+import type { CommentContext } from '../prompts/templates.js';
 import { buildCriticalMomentPrompt, buildBriefMovePrompt } from '../prompts/templates.js';
+import type { GeneratedComment } from '../validator/output-validator.js';
 import { parseJsonResponse, validateComment } from '../validator/output-validator.js';
+
 import { generateFallbackComment } from './fallback-generator.js';
-import { ResponseCache, generatePositionCacheKey } from '../cache/response-cache.js';
 
 /**
  * Degradation levels for the comment generator

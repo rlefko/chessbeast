@@ -3,9 +3,10 @@
  */
 
 import type { GameAnalysis, MoveAnalysis, CriticalMoment, CriticalMomentType, MoveClassification } from '@chessbeast/core';
-import type { GeneratedComment, GeneratedSummary } from '../validator/output-validator.js';
-import { classificationToNag } from '../validator/nag-validator.js';
+
 import { formatEval } from '../prompts/templates.js';
+import { classificationToNag } from '../validator/nag-validator.js';
+import type { GeneratedComment, GeneratedSummary } from '../validator/output-validator.js';
 
 /**
  * Generate a fallback comment using templates

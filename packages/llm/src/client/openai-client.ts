@@ -2,7 +2,8 @@
  * OpenAI client wrapper with retry logic and error handling
  */
 
-import OpenAI from 'openai';
+import OpenAILib from 'openai';
+
 import type { LLMConfig } from '../config/llm-config.js';
 import {
   LLMError,
@@ -11,6 +12,7 @@ import {
   TimeoutError,
   APIError,
 } from '../errors.js';
+
 import { CircuitBreaker } from './circuit-breaker.js';
 import type { LLMRequest, LLMResponse, TokenUsage, HealthStatus, CircuitState } from './types.js';
 
@@ -70,7 +72,7 @@ export class TokenTracker {
  * OpenAI client with retry logic, circuit breaker, and token tracking
  */
 export class OpenAIClient {
-  private readonly client: OpenAI;
+  private readonly client: OpenAILib;
   private readonly config: LLMConfig;
   private readonly circuitBreaker: CircuitBreaker;
   private readonly tokenTracker: TokenTracker;
@@ -78,7 +80,7 @@ export class OpenAIClient {
 
   constructor(config: LLMConfig) {
     this.config = config;
-    this.client = new OpenAI({
+    this.client = new OpenAILib({
       apiKey: config.apiKey,
       timeout: config.timeout,
     });
@@ -225,7 +227,7 @@ export class OpenAIClient {
       return error;
     }
 
-    if (error instanceof OpenAI.APIError) {
+    if (error instanceof OpenAILib.APIError) {
       // Handle rate limiting
       if (error.status === 429) {
         const retryAfter = this.parseRetryAfter(error);

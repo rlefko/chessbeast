@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-import Database from 'better-sqlite3';
+import BetterSqlite3 from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,7 +34,7 @@ function getEcoSourceDir(): string {
 /**
  * Create the ECO database schema
  */
-function createSchema(db: Database.Database): void {
+function createSchema(db: BetterSqlite3.Database): void {
   db.exec(`
     DROP TABLE IF EXISTS openings;
 
@@ -95,9 +95,9 @@ function pgnToSan(pgn: string): string {
  * Load a single TSV file into the database
  */
 function loadTsvFile(
-  _db: Database.Database,
+  _db: BetterSqlite3.Database,
   filePath: string,
-  insertStmt: Database.Statement,
+  insertStmt: BetterSqlite3.Statement,
 ): number {
   const content = fs.readFileSync(filePath, 'utf-8');
   const lines = content.trim().split('\n');
@@ -147,7 +147,7 @@ export function loadEcoDatabase(dbPath?: string): void {
   console.log(`Loading from: ${sourceDir}`);
 
   // Create database
-  const db = new Database(targetPath);
+  const db = new BetterSqlite3(targetPath);
 
   try {
     // Enable WAL mode for better write performance

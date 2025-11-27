@@ -3,8 +3,9 @@
  */
 
 import { ValidationError } from '../errors.js';
-import { filterValidNags } from './nag-validator.js';
+
 import { validateMoveReferences, sanitizeMoveReferences } from './move-validator.js';
+import { filterValidNags } from './nag-validator.js';
 
 /**
  * Generated comment from LLM

@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { CircuitBreaker } from '../client/circuit-breaker.js';
 import { CircuitOpenError } from '../errors.js';
 

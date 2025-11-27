@@ -3,14 +3,16 @@
  */
 
 import { describe, it, expect } from 'vitest';
+
+import { DEFAULT_TOKEN_BUDGET } from '../config/llm-config.js';
+import { createAnnotationPlan } from '../planner/annotation-planner.js';
 import {
   calculateVerbosity,
   shouldAnnotate,
   estimateTokens,
   TOKENS_BY_VERBOSITY,
 } from '../planner/verbosity.js';
-import { createAnnotationPlan } from '../planner/annotation-planner.js';
-import { DEFAULT_TOKEN_BUDGET } from '../config/llm-config.js';
+
 import { createMockGameAnalysis } from './mocks/mock-openai.js';
 
 describe('Verbosity Calculator', () => {

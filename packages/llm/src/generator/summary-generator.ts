@@ -3,12 +3,14 @@
  */
 
 import type { GameAnalysis } from '@chessbeast/core';
+
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { LLMConfig } from '../config/llm-config.js';
-import type { GeneratedSummary } from '../validator/output-validator.js';
 import { GAME_SUMMARY_SYSTEM } from '../prompts/system-prompts.js';
 import { buildSummaryPrompt } from '../prompts/templates.js';
+import type { GeneratedSummary } from '../validator/output-validator.js';
 import { parseJsonResponse, validateSummary } from '../validator/output-validator.js';
+
 import { generateFallbackSummary } from './fallback-generator.js';
 
 /**

@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-import Database from 'better-sqlite3';
+import BetterSqlite3 from 'better-sqlite3';
 
 import { ConnectionError, DatabaseNotFoundError } from '../errors.js';
 
@@ -29,7 +29,7 @@ export interface DatabaseClientConfig {
  * Base class for SQLite database clients
  */
 export abstract class BaseDatabaseClient {
-  protected db: Database.Database | null = null;
+  protected db: BetterSqlite3.Database | null = null;
   protected readonly config: Required<DatabaseClientConfig>;
 
   constructor(config: DatabaseClientConfig) {
@@ -61,7 +61,7 @@ export abstract class BaseDatabaseClient {
   /**
    * Ensure database connection is established (lazy initialization)
    */
-  protected ensureConnected(): Database.Database {
+  protected ensureConnected(): BetterSqlite3.Database {
     if (this.db) {
       return this.db;
     }
@@ -74,7 +74,7 @@ export abstract class BaseDatabaseClient {
     }
 
     try {
-      this.db = new Database(fullPath, {
+      this.db = new BetterSqlite3(fullPath, {
         readonly: this.config.readonly,
         timeout: this.config.timeoutMs,
       });

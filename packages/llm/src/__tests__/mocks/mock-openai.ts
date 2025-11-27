@@ -3,13 +3,28 @@
  */
 
 import { vi } from 'vitest';
+
 import type { LLMConfig } from '../../config/llm-config.js';
 import { DEFAULT_LLM_CONFIG } from '../../config/llm-config.js';
+
+interface MockAPIError extends Error {
+  status: number;
+  headers: Record<string, string>;
+}
+
+interface MockAPIErrorConstructor {
+  new (status: number, message: string): MockAPIError;
+}
+
+interface MockOpenAIModule {
+  default: ReturnType<typeof import('vitest').vi.fn>;
+  APIError: MockAPIErrorConstructor;
+}
 
 /**
  * Create a mock OpenAI module
  */
-export function createMockOpenAI(responses?: Map<string, string>) {
+export function createMockOpenAI(responses?: Map<string, string>): MockOpenAIModule {
   const defaultResponse = JSON.stringify({
     comment: 'Mock annotation for testing',
     nags: ['$1'],
@@ -63,10 +78,70 @@ export function createMockConfig(overrides?: Partial<LLMConfig>): LLMConfig {
   } as LLMConfig;
 }
 
+interface MockGameAnalysis {
+  metadata: {
+    white: string;
+    black: string;
+    result: string;
+    event: string;
+    whiteElo: number;
+    blackElo: number;
+    openingName: string;
+    eco: string;
+  };
+  moves: Array<{
+    plyIndex: number;
+    moveNumber: number;
+    isWhiteMove: boolean;
+    san: string;
+    fenBefore: string;
+    fenAfter: string;
+    evalBefore: { cp: number; depth: number; pv: string[] };
+    evalAfter: { cp: number; depth: number; pv: string[] };
+    bestMove: string;
+    cpLoss: number;
+    classification: 'book' | 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder' | 'brilliant' | 'forced';
+    humanProbability?: number;
+    isCriticalMoment: boolean;
+  }>;
+  criticalMoments: Array<{
+    plyIndex: number;
+    type: 'eval_swing' | 'result_change' | 'missed_win' | 'missed_draw' | 'phase_transition' | 'tactical_moment' | 'turning_point' | 'time_pressure' | 'blunder_recovery';
+    score: number;
+    reason: string;
+  }>;
+  stats: {
+    totalMoves: number;
+    totalPlies: number;
+    white: {
+      averageCpLoss: number;
+      inaccuracies: number;
+      mistakes: number;
+      blunders: number;
+      excellentMoves: number;
+      brilliantMoves: number;
+      accuracy: number;
+    };
+    black: {
+      averageCpLoss: number;
+      inaccuracies: number;
+      mistakes: number;
+      blunders: number;
+      excellentMoves: number;
+      brilliantMoves: number;
+      accuracy: number;
+    };
+    phaseTransitions: Array<{
+      toPly: number;
+      phase: 'opening' | 'middlegame' | 'endgame';
+    }>;
+  };
+}
+
 /**
  * Create mock game analysis for testing
  */
-export function createMockGameAnalysis() {
+export function createMockGameAnalysis(): MockGameAnalysis {
   return {
     metadata: {
       white: 'Player1',
@@ -126,7 +201,7 @@ export function createMockGameAnalysis() {
     criticalMoments: [
       {
         plyIndex: 10,
-        type: 'tactical_moment' as const,
+        type: 'tactical_moment',
         score: 75,
         reason: 'Premature sacrifice leads to material loss',
       },

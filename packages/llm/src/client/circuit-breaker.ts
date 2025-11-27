@@ -4,10 +4,8 @@
 
 import type { CircuitBreakerConfig } from '../config/llm-config.js';
 import { CircuitOpenError } from '../errors.js';
-import type { CircuitState } from './types.js';
 
-// Re-export CircuitState for convenience
-export type { CircuitState } from './types.js';
+import type { CircuitState } from './types.js';
 
 /**
  * Circuit breaker for protecting against cascade failures

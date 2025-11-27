@@ -3,8 +3,10 @@
  */
 
 import type { GameAnalysis, MoveAnalysis, CriticalMoment } from '@chessbeast/core';
+
 import type { TokenBudget } from '../config/llm-config.js';
 import type { VerbosityLevel, CommentContext } from '../prompts/templates.js';
+
 import { estimateTokens, shouldAnnotate } from './verbosity.js';
 
 /**
@@ -110,7 +112,7 @@ export function createAnnotationPlan(
 
   // Calculate available budget
   const summaryBudget = budget.maxTokensPerSummary;
-  let availableBudget = budget.maxTokensPerGame * (1 - budget.reserveForFallback) - summaryBudget;
+  const availableBudget = budget.maxTokensPerGame * (1 - budget.reserveForFallback) - summaryBudget;
 
   // Assign verbosity levels based on budget
   if (adaptiveBudget) {

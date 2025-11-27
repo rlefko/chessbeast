@@ -3,10 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
+
 import {
   generateFallbackComment,
   generateFallbackSummary,
 } from '../generator/fallback-generator.js';
+
 import { createMockGameAnalysis } from './mocks/mock-openai.js';
 
 describe('Fallback Generator', () => {
