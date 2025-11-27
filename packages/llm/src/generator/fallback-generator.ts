@@ -1,5 +1,8 @@
 /**
  * Template-based fallback generator for when LLM is unavailable
+ *
+ * Note: Fallback comments intentionally avoid evaluation numbers
+ * since we don't want numeric evals in the output.
  */
 
 import type {
@@ -10,7 +13,6 @@ import type {
   MoveClassification,
 } from '@chessbeast/core';
 
-import { formatEval } from '../prompts/templates.js';
 import { classificationToNag } from '../validator/nag-validator.js';
 import type { GeneratedComment, GeneratedSummary } from '../validator/output-validator.js';
 
@@ -95,8 +97,11 @@ function getCriticalMomentTemplate(moment: CriticalMoment, move: MoveAnalysis): 
     result_change: () => `This move shifts the expected outcome of the game.`,
 
     missed_win: (m) => {
-      const evalBefore = formatEval(m.evalBefore.cp, m.evalBefore.mate);
-      return `A winning opportunity was missed. The position was ${evalBefore} and ${m.bestMove} would maintain the advantage.`;
+      // Note: We don't include evaluation numbers in output
+      if (m.evalBefore.mate !== undefined && m.evalBefore.mate > 0) {
+        return `Mate was available! ${m.bestMove} would have started the winning sequence.`;
+      }
+      return `A winning opportunity was missed. ${m.bestMove} would have maintained the advantage.`;
     },
 
     missed_draw: (m) => `${m.san} misses a drawing resource. ${m.bestMove} would have held.`,

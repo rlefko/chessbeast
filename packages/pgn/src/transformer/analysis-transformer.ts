@@ -8,7 +8,7 @@
 import { ChessPosition } from '../chess/position.js';
 import { resolveVariationLength } from '../chess/tension-resolver.js';
 import type { GameMetadata, MoveInfo, ParsedGame } from '../index.js';
-import { classificationToNag, type MoveClassification } from '../nag/index.js';
+import { classificationToNag, evalToPositionNag, type MoveClassification } from '../nag/index.js';
 
 /**
  * Options for transforming analysis to PGN
@@ -18,6 +18,10 @@ export interface TransformOptions {
   includeVariations?: boolean;
   /** Include NAG symbols for move classifications (default: true) */
   includeNags?: boolean;
+  /** Include position assessment NAGs like ⩲, ±, +- (default: true) */
+  includePositionNags?: boolean;
+  /** Target audience rating (affects position NAG thresholds, default: 1500) */
+  targetRating?: number;
   /** Include game summary as header comment (default: true) */
   includeSummary?: boolean;
   /** Maximum depth for nested variations (default: 1) */
@@ -112,6 +116,8 @@ export interface AnalysisMetadata {
 const DEFAULT_OPTIONS: Required<TransformOptions> = {
   includeVariations: true,
   includeNags: true,
+  includePositionNags: true,
+  targetRating: 1500,
   includeSummary: true,
   maxVariationDepth: 1,
   includeAnalysisMetadata: false,
@@ -221,6 +227,19 @@ function transformMove(move: MoveAnalysisInput, opts: Required<TransformOptions>
     }
   }
 
+  // Add position assessment NAG (⩲, ±, +-, etc.) after move quality NAG
+  if (opts.includePositionNags) {
+    const posNag = evalToPositionNag(
+      move.evalAfter.cp,
+      move.evalAfter.mate,
+      opts.targetRating,
+    );
+    if (posNag) {
+      moveInfo.nags = moveInfo.nags ?? [];
+      moveInfo.nags.push(posNag);
+    }
+  }
+
   // Add variations from alternatives if enabled
   if (opts.includeVariations && move.alternatives && move.alternatives.length > 0) {
     moveInfo.variations = transformAlternatives(move, opts);
@@ -230,17 +249,63 @@ function transformMove(move: MoveAnalysisInput, opts: Required<TransformOptions>
 }
 
 /**
+ * Filter and sort alternatives by importance
+ *
+ * Only critical moments get variations, and max 2 per position.
+ * Priority: best evaluation first (engine's top choices).
+ */
+function filterAlternatives(move: MoveAnalysisInput): AlternativeMove[] {
+  if (!move.alternatives || move.alternatives.length === 0) {
+    return [];
+  }
+
+  // Non-critical moves: no variations (NAG is enough)
+  if (!move.isCriticalMoment) {
+    return [];
+  }
+
+  // Sort by evaluation (best first)
+  const sorted = [...move.alternatives].sort((a, b) => {
+    // Mate is always best
+    if (a.eval.mate !== undefined && b.eval.mate === undefined) return -1;
+    if (b.eval.mate !== undefined && a.eval.mate === undefined) return 1;
+    if (a.eval.mate !== undefined && b.eval.mate !== undefined) {
+      // Positive mate (we're mating) is better than negative (getting mated)
+      // Smaller positive mate is better (mate in 2 > mate in 5)
+      if (a.eval.mate > 0 && b.eval.mate > 0) return a.eval.mate - b.eval.mate;
+      if (a.eval.mate < 0 && b.eval.mate < 0) return b.eval.mate - a.eval.mate;
+      return b.eval.mate - a.eval.mate; // Positive > negative
+    }
+
+    // Compare centipawn evaluations
+    const aScore = a.eval.cp ?? 0;
+    const bScore = b.eval.cp ?? 0;
+    return bScore - aScore; // Higher is better
+  });
+
+  // Max 2 variations per critical moment
+  return sorted.slice(0, 2);
+}
+
+/**
  * Transform alternative moves into variations
+ *
+ * Note: We intentionally do NOT add evaluation comments to variations.
+ * Position assessment NAGs will be used instead.
+ * Only critical moments get variations, max 2 per position.
  */
 function transformAlternatives(
   move: MoveAnalysisInput,
   opts: Required<TransformOptions>,
 ): MoveInfo[][] {
-  if (!move.alternatives || move.alternatives.length === 0) {
+  // Filter to only important alternatives
+  const filteredAlternatives = filterAlternatives(move);
+
+  if (filteredAlternatives.length === 0) {
     return [];
   }
 
-  return move.alternatives.map((alt) => {
+  return filteredAlternatives.map((alt) => {
     // Create a single-move variation for each alternative
     const variationMove: MoveInfo = {
       moveNumber: move.moveNumber,
@@ -251,11 +316,9 @@ function transformAlternatives(
       fenAfter: '',
     };
 
-    // Add evaluation as comment
-    const evalComment = formatEvaluation(alt.eval);
-    if (evalComment) {
-      variationMove.commentAfter = evalComment;
-    }
+    // NOTE: We removed formatEvaluation() call here.
+    // Engine evaluation numbers should NOT appear in PGN output.
+    // Position assessment NAGs (⩲, ±, +-, etc.) will indicate who stands better.
 
     // Add the principal variation continuation if available
     const pvMoves = buildPvMoves(alt, move, opts);
@@ -348,23 +411,9 @@ function buildPvMoves(
   return pvMoves;
 }
 
-/**
- * Format engine evaluation for display in comments
- */
-function formatEvaluation(eval_: EngineEvaluation): string | undefined {
-  if (eval_.mate !== undefined) {
-    const sign = eval_.mate > 0 ? '+' : '';
-    return `M${sign}${eval_.mate}`;
-  }
-
-  if (eval_.cp !== undefined) {
-    const cpVal = eval_.cp / 100;
-    const sign = cpVal >= 0 ? '+' : '';
-    return `${sign}${cpVal.toFixed(2)}`;
-  }
-
-  return undefined;
-}
+// NOTE: formatEvaluation() function was removed.
+// Engine evaluation numbers should not appear in PGN output.
+// Position assessment NAGs (⩲, ±, +-, etc.) indicate who stands better instead.
 
 /**
  * Check if the transformation resulted in any annotations

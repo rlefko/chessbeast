@@ -237,3 +237,34 @@ export function validateSummary(raw: unknown): ValidationResult<GeneratedSummary
 export function sanitizePgnComment(text: string): string {
   return text.replace(/\{/g, '(').replace(/\}/g, ')').replace(/\\/g, '').replace(/\n/g, ' ').trim();
 }
+
+/**
+ * Extract chess moves mentioned in a comment that are legal in the position
+ *
+ * This helps identify moves the LLM discusses that could be shown as variations.
+ * For example, "Bxf7+ wins the queen" should show Bxf7+ as a variation.
+ *
+ * @param comment - The annotation comment to search
+ * @param legalMoves - List of legal moves in the position
+ * @returns Array of legal moves mentioned in the comment
+ */
+export function extractMentionedMoves(comment: string, legalMoves: string[]): string[] {
+  if (!comment || legalMoves.length === 0) {
+    return [];
+  }
+
+  // Pattern matches common SAN notation:
+  // - Piece moves: Nf3, Bxe5, Qh7+, Rxd8#
+  // - Pawn moves: e4, exd5, e8=Q
+  // - Castling: O-O, O-O-O
+  const sanPattern =
+    /\b([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?)\b/g;
+
+  const matches = comment.match(sanPattern) ?? [];
+
+  // Filter to only legal moves, remove duplicates
+  const legalSet = new Set(legalMoves);
+  const mentionedMoves = [...new Set(matches)].filter((m) => legalSet.has(m));
+
+  return mentionedMoves;
+}

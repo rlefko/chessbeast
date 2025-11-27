@@ -1,5 +1,12 @@
 /**
  * Prompt templates for generating annotations
+ *
+ * Design principles:
+ * - NEVER include move notation in prompts (already shown with NAG)
+ * - NEVER include evaluation numbers (we don't want them in output)
+ * - NEVER include classification text when NAG present (glyph shows it)
+ * - Always include strict word limits
+ * - Always detect and mention mate-in-X situations
  */
 
 import type { GameAnalysis, MoveAnalysis, CriticalMoment } from '@chessbeast/core';
@@ -39,125 +46,149 @@ export interface CommentContext {
 }
 
 /**
- * Format evaluation for human-readable display
+ * Get word limit based on verbosity and whether it's a critical moment
  */
-export function formatEval(cp: number | undefined, mate: number | undefined): string {
-  if (mate !== undefined) {
-    return mate > 0 ? `M${mate}` : `-M${Math.abs(mate)}`;
+function getWordLimit(verbosity: VerbosityLevel, isCritical: boolean): number {
+  if (!isCritical) {
+    return verbosity === 'detailed' ? 15 : 10;
   }
-  if (cp !== undefined) {
-    const sign = cp >= 0 ? '+' : '';
-    return `${sign}${(cp / 100).toFixed(2)}`;
+  switch (verbosity) {
+    case 'brief':
+      return 15;
+    case 'normal':
+      return 25;
+    case 'detailed':
+      return 40;
   }
-  return '?';
 }
 
 /**
- * Format evaluation change between moves
+ * Check if there's a mate available and format it
  */
-export function formatEvalChange(before: number | undefined, after: number | undefined): string {
-  if (before === undefined || after === undefined) return '';
-  const diff = after - before;
-  if (Math.abs(diff) < 10) return 'equal';
-  const sign = diff > 0 ? '+' : '';
-  return `${sign}${(diff / 100).toFixed(2)}`;
+function getMateInfo(
+  evalBefore: { cp?: number; mate?: number },
+  evalAfter: { cp?: number; mate?: number },
+): string | undefined {
+  // Check if mate was available before the move (missed mate)
+  if (evalBefore.mate !== undefined && Math.abs(evalBefore.mate) <= 10) {
+    return `Mate in ${Math.abs(evalBefore.mate)} was available`;
+  }
+  // Check if mate is now available after the move
+  if (evalAfter.mate !== undefined && Math.abs(evalAfter.mate) <= 10) {
+    return `Mate in ${Math.abs(evalAfter.mate)} now`;
+  }
+  return undefined;
 }
 
 /**
  * Build prompt for critical moment annotation
+ *
+ * Redesigned to:
+ * - NOT include move notation (already shown in PGN with NAG)
+ * - NOT include evaluation numbers (we don't want them in output)
+ * - NOT include classification text when NAG present
+ * - Include strict word limits
+ * - Detect and mention mate situations
  */
 export function buildCriticalMomentPrompt(context: CommentContext): string {
   const { move, criticalMoment, targetRating, verbosity, legalMoves, openingName } = context;
+  const parts: string[] = [];
 
-  const evalBefore = formatEval(move.evalBefore.cp, move.evalBefore.mate);
-  const evalAfter = formatEval(move.evalAfter.cp, move.evalAfter.mate);
+  // Position context (FEN for understanding, not for repeating)
+  parts.push(`POSITION: ${move.fenBefore}`);
 
-  let prompt = `Analyze this chess position and the move played.
+  // Mate detection - critical for user to know
+  const mateInfo = getMateInfo(move.evalBefore, move.evalAfter);
+  if (mateInfo) {
+    parts.push(`MATE SITUATION: ${mateInfo}`);
+  }
 
-POSITION: ${move.fenBefore}
-MOVE PLAYED: ${context.moveNotation}
-BEST MOVE (ENGINE): ${move.bestMove}
-EVALUATION: ${evalBefore} → ${evalAfter}
-CP LOSS: ${move.cpLoss}
-CLASSIFICATION: ${move.classification}
-TARGET RATING: ${targetRating}
-VERBOSITY: ${verbosity}`;
+  // Best move if different from played move (without evals)
+  if (move.bestMove !== move.san) {
+    parts.push(`BETTER MOVE: ${move.bestMove}`);
+  }
 
+  // Opening context if relevant
   if (openingName) {
-    prompt += `\nOPENING: ${openingName}`;
+    parts.push(`OPENING: ${openingName}`);
   }
 
+  // Critical moment context (type only, reason helps LLM focus)
   if (criticalMoment) {
-    prompt += `\n\nCRITICAL MOMENT TYPE: ${criticalMoment.type}`;
-    prompt += `\nREASON: ${criticalMoment.reason}`;
+    parts.push(`SITUATION: ${criticalMoment.reason}`);
   }
 
+  // Alternative moves (just the moves, no evals)
   if (move.alternatives && move.alternatives.length > 0) {
-    const alts = move.alternatives
-      .slice(0, 3)
-      .map((a) => `- ${a.san}: ${formatEval(a.eval.cp, a.eval.mate)}`)
-      .join('\n');
-    prompt += `\n\nALTERNATIVES:\n${alts}`;
+    const alts = move.alternatives.slice(0, 2).map((a) => a.san);
+    parts.push(`OTHER OPTIONS: ${alts.join(', ')}`);
   }
 
-  // Include legal moves to prevent hallucination
-  prompt += `\n\nLEGAL MOVES IN THIS POSITION:\n${legalMoves.join(', ')}`;
+  // Legal moves for hallucination prevention
+  parts.push(`LEGAL MOVES: ${legalMoves.slice(0, 15).join(', ')}${legalMoves.length > 15 ? '...' : ''}`);
 
-  // Add perspective instructions if not neutral
+  // Target rating context
+  parts.push(`TARGET RATING: ${targetRating}`);
+
+  // Perspective handling
   if (context.perspective !== 'neutral') {
     const side = context.perspective === 'white' ? 'White' : 'Black';
     const isOurMove =
       (context.move.isWhiteMove && context.perspective === 'white') ||
       (!context.move.isWhiteMove && context.perspective === 'black');
-    prompt += `\n\nPERSPECTIVE: Write from ${side}'s point of view.`;
-    prompt += ` Use "we/our/us" for ${side}, "they/their/opponent" for the other side.`;
-    prompt += isOurMove ? ` This is our move.` : ` This is the opponent's move.`;
+    parts.push(`PERSPECTIVE: ${side}'s view (${isOurMove ? 'our move' : "opponent's move"})`);
   }
 
-  // Add NAG-awareness instructions
-  if (context.hasNag) {
-    prompt += `\n\nIMPORTANT: A glyph symbol (!, !!, ?, ??, !?, ?!) will already indicate the move quality.`;
-    prompt += ` Do NOT repeat classification language like "This is a blunder" or "This move is a mistake".`;
-    prompt += ` Focus instead on WHY the move is problematic/good and what should be played.`;
-  }
+  // Word limit - strict
+  const wordLimit = getWordLimit(verbosity, true);
+  parts.push('');
+  parts.push(`INSTRUCTIONS: Explain WHY this move matters in UNDER ${wordLimit} WORDS.`);
+  parts.push(`- Focus on the tactic/idea, not the move quality label`);
+  parts.push(`- If mate exists, mention it with the key move`);
+  parts.push(`- NO evaluation numbers (+1.5, -0.3, etc.)`);
+  parts.push(`- NO phrases like "This is a blunder/mistake"`);
 
-  prompt += `\n\nProvide a ${verbosity} annotation for this move appropriate for a ${targetRating}-rated player.`;
-  prompt += `\n\nRespond with JSON: { "comment": "your annotation", "nags": ["$1"] }`;
-  prompt += `\nNAG codes: $1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!`;
+  parts.push('');
+  parts.push('Respond with JSON: { "comment": "your annotation" }');
 
-  return prompt;
+  return parts.join('\n');
 }
 
 /**
  * Build prompt for non-critical move annotation (brief)
+ *
+ * For non-critical moves, we want very minimal annotations.
+ * Most non-critical moves should have NO comment at all.
  */
 export function buildBriefMovePrompt(context: CommentContext): string {
-  const { move, targetRating, legalMoves } = context;
+  const { move, targetRating, legalMoves, verbosity } = context;
+  const parts: string[] = [];
 
-  const evalBefore = formatEval(move.evalBefore.cp, move.evalBefore.mate);
-  const evalAfter = formatEval(move.evalAfter.cp, move.evalAfter.mate);
+  parts.push(`POSITION: ${move.fenBefore}`);
 
-  let prompt = `Briefly annotate this chess move for a ${targetRating}-rated player.
+  // Legal moves for hallucination prevention
+  parts.push(`LEGAL MOVES: ${legalMoves.slice(0, 10).join(', ')}${legalMoves.length > 10 ? '...' : ''}`);
 
-POSITION: ${move.fenBefore}
-MOVE: ${context.moveNotation}
-EVALUATION: ${evalBefore} → ${evalAfter}
-CLASSIFICATION: ${move.classification}
+  parts.push(`TARGET RATING: ${targetRating}`);
 
-LEGAL MOVES: ${legalMoves.slice(0, 10).join(', ')}${legalMoves.length > 10 ? '...' : ''}`;
-
-  // Add perspective instructions if not neutral
+  // Perspective handling
   if (context.perspective !== 'neutral') {
     const side = context.perspective === 'white' ? 'White' : 'Black';
-    prompt += `\n\nPERSPECTIVE: Write from ${side}'s point of view using "we/our".`;
+    parts.push(`PERSPECTIVE: ${side}'s view`);
   }
 
-  prompt += `
+  // Word limit - very strict for non-critical
+  const wordLimit = getWordLimit(verbosity, false);
+  parts.push('');
+  parts.push(`INSTRUCTIONS: Only comment if truly noteworthy. UNDER ${wordLimit} WORDS.`);
+  parts.push('- Return empty string if nothing important to say');
+  parts.push('- NO evaluation numbers');
+  parts.push('- NO "good move" / "solid move" filler');
 
-Respond with JSON: { "comment": "brief annotation or empty string", "nags": [] }
-Only add a comment if noteworthy. Keep it under 20 words.`;
+  parts.push('');
+  parts.push('Respond with JSON: { "comment": "annotation or empty string" }');
 
-  return prompt;
+  return parts.join('\n');
 }
 
 /**
