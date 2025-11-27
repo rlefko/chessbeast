@@ -81,7 +81,7 @@ function createColorFns(useColor: boolean): {
     };
   }
   // No colors - return text as-is
-  const identity = (text: string) => text;
+  const identity = (text: string): string => text;
   return {
     bold: identity,
     dim: identity,
