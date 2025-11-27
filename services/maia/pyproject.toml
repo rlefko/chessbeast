@@ -8,6 +8,16 @@ dependencies = [
     "protobuf>=4.25",
     "chess>=1.10",
     "maia2>=0.1.0",
+    # maia2 has undeclared dependencies, adding them explicitly:
+    "numpy>=1.26",
+    "torch>=2.0",
+    "requests>=2.31",
+    "tqdm>=4.66",
+    "pyzstd>=0.15",
+    "pyyaml>=6.0",
+    "gdown>=5.0",
+    "pandas>=2.0",
+    "einops>=0.7",
 ]
 
 [build-system]
