@@ -6,12 +6,22 @@
  * Main entry point for the chessbeast command-line interface.
  */
 
-export const VERSION = '0.1.0';
+import { createProgram } from './cli.js';
+import { handleError } from './errors/index.js';
 
-export function main(): void {
-  console.log(`ChessBeast CLI v${VERSION}`);
-  console.log('AI Chess Annotator - Coming Soon!');
+export { VERSION } from './cli.js';
+
+/**
+ * Main entry point
+ */
+export async function main(): Promise<void> {
+  try {
+    const program = createProgram();
+    await program.parseAsync(process.argv);
+  } catch (error) {
+    handleError(error);
+  }
 }
 
 // Run if executed directly
-main();
+main().catch(handleError);
