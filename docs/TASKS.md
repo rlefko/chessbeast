@@ -458,15 +458,18 @@
 - [ ] Provide contribution guidelines
 
 ### 10.3 Setup Scripts
-- [ ] Script to download Stockfish
+- [x] Script to download Stockfish
 - [ ] Script to download Maia models
 - [ ] Script to download/setup Lichess database
 - [ ] Provide all-in-one setup command
 
-### 10.4 Final Polish
-- [ ] Review and clean up code
-- [ ] Ensure consistent error messages
-- [ ] Add helpful CLI output (progress, statistics)
+### 10.4 Final Polish (Milestone 10a) ✅
+- [x] Review and clean up code
+- [x] Ensure consistent error messages
+- [x] Add helpful CLI output (progress, statistics, time estimates)
+- [x] Add --no-color flag for piped output
+- [x] Add --dry-run flag for setup validation
+- [x] Improve CLI help text with detailed option descriptions
 - [ ] Final testing pass
 
 ---
