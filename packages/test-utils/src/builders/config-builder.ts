@@ -365,23 +365,23 @@ export function config(): ConfigBuilder {
  */
 export const configPresets = {
   /** Quick analysis config */
-  quick: () => config().withProfile('quick').build(),
+  quick: (): ChessBeastConfig => config().withProfile('quick').build(),
 
   /** Standard analysis config */
-  standard: () => config().withProfile('standard').build(),
+  standard: (): ChessBeastConfig => config().withProfile('standard').build(),
 
   /** Deep analysis config */
-  deep: () => config().withProfile('deep').build(),
+  deep: (): ChessBeastConfig => config().withProfile('deep').build(),
 
   /** Config with no LLM */
-  noLlm: () => config().withSkipLlm().build(),
+  noLlm: (): ChessBeastConfig => config().withSkipLlm().build(),
 
   /** Config with no Maia */
-  noMaia: () => config().withSkipMaia().build(),
+  noMaia: (): ChessBeastConfig => config().withSkipMaia().build(),
 
   /** Minimal config (no LLM or Maia) */
-  minimal: () => config().withSkipLlm().withSkipMaia().build(),
+  minimal: (): ChessBeastConfig => config().withSkipLlm().withSkipMaia().build(),
 
   /** Test config with fake API key */
-  test: () => config().withLlmApiKey('test-api-key').build(),
+  test: (): ChessBeastConfig => config().withLlmApiKey('test-api-key').build(),
 };

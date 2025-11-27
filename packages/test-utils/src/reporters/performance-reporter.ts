@@ -179,7 +179,7 @@ export class BenchmarkRunner {
     const variance = sorted.reduce((sum, t) => sum + Math.pow(t - mean, 2), 0) / n;
     const stdDev = Math.sqrt(variance);
 
-    const percentile = (p: number) => {
+    const percentile = (p: number): number => {
       const index = Math.floor((p / 100) * n);
       return sorted[Math.min(index, n - 1)] ?? 0;
     };

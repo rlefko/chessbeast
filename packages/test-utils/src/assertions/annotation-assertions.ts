@@ -2,8 +2,9 @@
  * Custom assertions for annotation validation
  */
 
-import { expect } from 'vitest';
 import type { GameAnalysis, MoveAnalysis } from '@chessbeast/core';
+import { expect } from 'vitest';
+
 import {
   isAnnotationCoherent,
   matchesTheme,

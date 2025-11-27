@@ -10,13 +10,13 @@ import {
   type MockEngine,
   type EvaluateResponse,
 } from './mock-engine.js';
+import { createMockAnnotator, type MockLlmConfig, type MockAnnotator } from './mock-llm.js';
 import {
   createMockMaia,
   type MockMaiaConfig,
   type MockMaia,
   type PredictResponse,
 } from './mock-maia.js';
-import { createMockAnnotator, type MockLlmConfig, type MockAnnotator } from './mock-llm.js';
 
 /**
  * Configuration for all mock services
@@ -36,6 +36,7 @@ export interface MockServicesConfig {
 /**
  * Mock ECO client
  */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createMockEcoClient() {
   const lookupByFen = vi.fn((fen: string) => {
     // Return a mock opening based on common starting positions
@@ -117,6 +118,7 @@ export function createMockEcoClient() {
  * Mock Lichess Elite client
  * Implements the LichessEliteClient interface used by the adapter
  */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createMockLichessClient() {
   const getReferenceGames = vi.fn((_fen: string, _limit?: number) => {
     // Return empty result for most positions
@@ -170,11 +172,10 @@ export function createNullReporter(): any {
 export function createTrackingReporter(): any {
   const calls: Array<{ method: string; args: unknown[] }> = [];
 
-  const track =
-    (method: string) =>
-    (...args: unknown[]) => {
-      calls.push({ method, args });
-    };
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  const track = (method: string) => (...args: unknown[]) => {
+    calls.push({ method, args });
+  };
 
   return {
     startPhase: vi.fn(track('startPhase')),
@@ -185,7 +186,9 @@ export function createTrackingReporter(): any {
     updateProgress: vi.fn(track('updateProgress')),
     reportServiceStatus: vi.fn(track('reportServiceStatus')),
     // For test inspection
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
     _getCalls: () => calls,
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
     _reset: () => {
       calls.length = 0;
     },

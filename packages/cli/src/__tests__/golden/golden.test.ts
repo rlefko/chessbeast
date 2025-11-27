@@ -3,17 +3,19 @@
  * Tests against curated games with expected outcomes
  */
 
-import { describe, it, expect } from 'vitest';
-import { orchestrateAnalysis } from '../../orchestrator/orchestrator.js';
-import { DEFAULT_CONFIG } from '../../config/defaults.js';
 import {
   createMockServices,
   createDeterministicMocks,
   createNullReporter,
   loadPgn,
 } from '@chessbeast/test-utils';
-import { runGoldenTest, generateGoldenReport } from './runner.js';
+import { describe, it, expect } from 'vitest';
+
+import { DEFAULT_CONFIG } from '../../config/defaults.js';
+import { orchestrateAnalysis } from '../../orchestrator/orchestrator.js';
+
 import { mergeCriteria, type GoldenCriteria } from './criteria.js';
+import { runGoldenTest, generateGoldenReport } from './runner.js';
 
 /**
  * Golden test cases

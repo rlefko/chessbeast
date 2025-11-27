@@ -3,9 +3,6 @@
  * Tests the full analysis pipeline with mocked services
  */
 
-import { describe, it, expect } from 'vitest';
-import { orchestrateAnalysis } from '../../orchestrator/orchestrator.js';
-import { DEFAULT_CONFIG } from '../../config/defaults.js';
 import {
   createMockServices,
   createNullReporter,
@@ -13,6 +10,10 @@ import {
   assertValidAnalysis,
   assertCriticalMomentCount,
 } from '@chessbeast/test-utils';
+import { describe, it, expect } from 'vitest';
+
+import { DEFAULT_CONFIG } from '../../config/defaults.js';
+import { orchestrateAnalysis } from '../../orchestrator/orchestrator.js';
 
 describe('Orchestrator Integration', () => {
   describe('GM Games', () => {

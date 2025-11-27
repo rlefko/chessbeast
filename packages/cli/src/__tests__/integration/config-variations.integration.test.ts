@@ -3,8 +3,6 @@
  * Tests different analysis profiles and settings
  */
 
-import { describe, it, expect } from 'vitest';
-import { orchestrateAnalysis } from '../../orchestrator/orchestrator.js';
 import {
   createMockServices,
   createNullReporter,
@@ -12,6 +10,9 @@ import {
   config,
   configPresets,
 } from '@chessbeast/test-utils';
+import { describe, it, expect } from 'vitest';
+
+import { orchestrateAnalysis } from '../../orchestrator/orchestrator.js';
 
 describe('Configuration Variations', () => {
   describe('Analysis Profiles', () => {

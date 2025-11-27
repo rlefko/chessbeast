@@ -2,8 +2,8 @@
  * Mock LLM/Annotator client for testing
  */
 
-import { vi } from 'vitest';
 import type { GameAnalysis } from '@chessbeast/core';
+import { vi } from 'vitest';
 
 /**
  * Annotation result from the LLM annotator
@@ -42,6 +42,7 @@ const DEFAULT_SUMMARY =
 /**
  * Create a mock LLM annotator
  */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createMockAnnotator(config: MockLlmConfig = {}) {
   const {
     annotations = new Map(),
@@ -119,6 +120,7 @@ export function createMockAnnotator(config: MockLlmConfig = {}) {
     getTokenUsage,
     // For test inspection
     _config: config,
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
     _resetTokens: () => {
       tokensUsed = 0;
     },

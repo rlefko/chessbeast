@@ -51,6 +51,7 @@ export const DEFAULT_ENGINE_EVAL: EvaluateResponse = {
 /**
  * Create a mock Stockfish client that matches the StockfishClient interface
  */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createMockEngine(config: MockEngineConfig = {}) {
   const {
     responses = new Map(),
@@ -119,6 +120,7 @@ export function createMockEngine(config: MockEngineConfig = {}) {
     // For test inspection
     _config: config,
     _calls: {
+      // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
       evaluate: () => evaluate.mock.calls,
     },
   };

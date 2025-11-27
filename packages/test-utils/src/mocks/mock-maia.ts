@@ -57,6 +57,7 @@ export const DEFAULT_MAIA_PREDICTION: PredictResponse = {
 /**
  * Create a mock Maia client that matches the MaiaClient interface
  */
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createMockMaia(config: MockMaiaConfig = {}) {
   const {
     responses = new Map(),
@@ -120,7 +121,9 @@ export function createMockMaia(config: MockMaiaConfig = {}) {
     // For test inspection
     _config: config,
     _calls: {
+      // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
       predict: () => predict.mock.calls,
+      // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
       estimateRating: () => estimateRating.mock.calls,
     },
   };

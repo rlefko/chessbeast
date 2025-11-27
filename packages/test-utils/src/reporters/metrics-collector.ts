@@ -3,6 +3,7 @@
  */
 
 import type { MoveClassification } from '@chessbeast/core';
+
 import { calculateThemeMatchRatio } from '../assertions/semantic-matcher.js';
 
 /**

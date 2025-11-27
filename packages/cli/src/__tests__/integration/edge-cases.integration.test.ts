@@ -3,15 +3,16 @@
  * Tests unusual game scenarios and boundary conditions
  */
 
-import { describe, it, expect } from 'vitest';
-import { orchestrateAnalysis } from '../../orchestrator/orchestrator.js';
-import { DEFAULT_CONFIG } from '../../config/defaults.js';
 import {
   createMockServices,
   createNullReporter,
   loadPgn,
   assertValidAnalysis,
 } from '@chessbeast/test-utils';
+import { describe, it, expect } from 'vitest';
+
+import { DEFAULT_CONFIG } from '../../config/defaults.js';
+import { orchestrateAnalysis } from '../../orchestrator/orchestrator.js';
 
 describe('Edge Cases Integration', () => {
   describe('Game Length Edge Cases', () => {

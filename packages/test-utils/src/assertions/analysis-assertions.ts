@@ -2,8 +2,8 @@
  * Custom assertions for game analysis validation
  */
 
-import { expect } from 'vitest';
 import type { GameAnalysis, MoveClassification } from '@chessbeast/core';
+import { expect } from 'vitest';
 
 /**
  * Assert that analysis contains expected number of critical moments
