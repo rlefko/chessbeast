@@ -25,7 +25,9 @@ const __dirname = path.dirname(__filename);
  * Get the path to the data directory
  */
 function getDataDir(): string {
-  return path.resolve(__dirname, '../../../../../data');
+  // Navigate from packages/database/dist/loaders/ to data/
+  // dist/loaders -> dist -> database -> packages -> chessbeast -> data
+  return path.resolve(__dirname, '../../../../data');
 }
 
 /**
