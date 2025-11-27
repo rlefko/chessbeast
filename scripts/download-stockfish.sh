@@ -113,16 +113,17 @@ main() {
   echo "Download URL: $url"
   echo ""
 
-  # Check if already exists
-  if [[ -f "$BIN_DIR/stockfish" ]]; then
-    print_warning "Stockfish already exists at $BIN_DIR/stockfish"
+  # Check if already exists (could be file or directory from older extraction)
+  local stockfish_target="$BIN_DIR/stockfish"
+  if [[ -f "$stockfish_target" ]] || [[ -d "$stockfish_target" ]]; then
+    print_warning "Stockfish already exists at $stockfish_target"
     read -p "Do you want to re-download and replace it? [y/N] " -n 1 -r
     echo ""
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
       echo "Keeping existing installation."
       exit 0
     fi
-    rm -f "$BIN_DIR/stockfish"
+    rm -rf "$stockfish_target"
   fi
 
   # Create bin directory
@@ -172,10 +173,12 @@ main() {
   if [[ "$stockfish_binary" != "$BIN_DIR/stockfish" ]]; then
     # If there's a subdirectory, move binary up and clean up
     mv "$stockfish_binary" "$BIN_DIR/stockfish"
-    # Clean up the extracted directory if it exists
-    if [[ -d "$BIN_DIR/stockfish" && "$BIN_DIR/stockfish" != "$stockfish_binary" ]]; then
-      rm -rf "$BIN_DIR/stockfish"
-    fi
+    # Clean up the extracted directory structure
+    for dir in "$BIN_DIR"/stockfish-*/; do
+      if [[ -d "$dir" ]]; then
+        rm -rf "$dir"
+      fi
+    done
   fi
 
   # Verify installation
