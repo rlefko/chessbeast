@@ -443,19 +443,19 @@
 
 ---
 
-## Milestone 10: Documentation & Polish
+## Milestone 10: Documentation & Polish ✅
 
-### 10.1 User Documentation
-- [ ] Write README with quick start
-- [ ] Document all CLI options
-- [ ] Provide example usage
-- [ ] Document configuration options
+### 10.1 User Documentation ✅
+- [x] Write README with quick start
+- [x] Document all CLI options
+- [x] Provide example usage
+- [x] Document configuration options (docs/configuration.md)
 
-### 10.2 Developer Documentation
-- [ ] Document architecture
-- [ ] Document data models
-- [ ] Document service APIs
-- [ ] Provide contribution guidelines
+### 10.2 Developer Documentation ✅
+- [x] Document architecture (docs/architecture.md)
+- [x] Document data models (docs/architecture.md)
+- [x] Document service APIs (docs/api.md)
+- [x] Provide contribution guidelines (CONTRIBUTING.md)
 
 ### 10.3 Setup Scripts ✅
 - [x] Script to download Stockfish (scripts/download-stockfish.sh)
