@@ -74,16 +74,16 @@ test-ts-watch:
 	pnpm run test:watch
 
 test-integration:  ## Run integration tests
-	pnpm vitest run --project cli --testPathPattern integration
+	cd packages/cli && pnpm vitest run integration
 
 test-golden:  ## Run golden tests
-	pnpm vitest run --project cli --testPathPattern golden
+	cd packages/cli && pnpm vitest run golden
 
 test-quality:  ## Run quality validation tests
-	pnpm vitest run --config tests/vitest.config.ts --testPathPattern quality
+	pnpm vitest run --config tests/vitest.config.ts quality
 
 test-benchmark:  ## Run performance benchmarks
-	pnpm vitest run --config tests/vitest.config.ts --testPathPattern benchmarks
+	pnpm vitest run --config tests/vitest.config.ts benchmarks
 
 test-all: test test-integration test-golden test-quality  ## Run all test suites
 	@echo "All test suites passed"

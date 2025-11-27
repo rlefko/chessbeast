@@ -457,11 +457,11 @@
 - [ ] Document service APIs
 - [ ] Provide contribution guidelines
 
-### 10.3 Setup Scripts
-- [x] Script to download Stockfish
-- [ ] Script to download Maia models
-- [ ] Script to download/setup Lichess database
-- [ ] Provide all-in-one setup command
+### 10.3 Setup Scripts ✅
+- [x] Script to download Stockfish (scripts/download-stockfish.sh)
+- [x] Script to download Maia models - Not needed (maia2 auto-downloads via pip)
+- [x] Script to download/setup Lichess database (scripts/download-lichess-elite.sh)
+- [x] Provide all-in-one setup command (make setup)
 
 ### 10.4 Final Polish (Milestone 10a) ✅
 - [x] Review and clean up code
@@ -470,7 +470,7 @@
 - [x] Add --no-color flag for piped output
 - [x] Add --dry-run flag for setup validation
 - [x] Improve CLI help text with detailed option descriptions
-- [ ] Final testing pass
+- [x] Final testing pass (unit, integration, golden tests pass; quality/benchmark tests have pre-existing data issues)
 
 ---
 

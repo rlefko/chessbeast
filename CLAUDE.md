@@ -36,9 +36,9 @@ make build-protos       # Generate gRPC stubs from protos
 
 # Test
 make test               # Run all tests
-make test-ts            # TypeScript tests (Jest)
+make test-ts            # TypeScript tests (Vitest)
 make test-py            # Python tests (pytest)
-npm test -- --testPathPattern="parser"  # Run specific TS test file
+pnpm vitest run parser  # Run specific TS test file by pattern
 
 # Run
 make run                # Start all services
