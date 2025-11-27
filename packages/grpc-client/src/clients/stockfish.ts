@@ -16,7 +16,7 @@ import { BaseGrpcClient, ClientConfig } from './base.js';
 export const DEFAULT_STOCKFISH_CONFIG: ClientConfig = {
   host: 'localhost',
   port: 50051,
-  timeoutMs: 60000, // Engine analysis can take time
+  timeoutMs: 180000, // 3 minutes for deep analysis
 };
 
 /**

@@ -64,7 +64,7 @@ export const DEFAULT_LLM_CONFIG = {
 export const DEFAULT_STOCKFISH_CONFIG = {
   host: 'localhost',
   port: 50051,
-  timeoutMs: 60000,
+  timeoutMs: 180000, // 3 minutes for deep analysis
 };
 
 /**
