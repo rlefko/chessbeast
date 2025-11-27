@@ -75,6 +75,9 @@ importers:
         specifier: ^3.22.0
         version: 3.25.76
     devDependencies:
+      '@chessbeast/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.1
@@ -148,6 +151,28 @@ importers:
       chess.js:
         specifier: ^1.0.0
         version: 1.4.0
+    devDependencies:
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.1)
+
+  packages/test-utils:
+    dependencies:
+      '@chessbeast/core':
+        specifier: workspace:*
+        version: link:../core
+      '@chessbeast/database':
+        specifier: workspace:*
+        version: link:../database
+      '@chessbeast/grpc-client':
+        specifier: workspace:*
+        version: link:../grpc-client
+      '@chessbeast/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@chessbeast/pgn':
+        specifier: workspace:*
+        version: link:../pgn
     devDependencies:
       vitest:
         specifier: ^2.1.0

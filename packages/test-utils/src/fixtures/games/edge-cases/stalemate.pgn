@@ -1,0 +1,12 @@
+[Event "Training Game"]
+[Site "Online"]
+[Date "2023.05.10"]
+[Round "?"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1/2-1/2"]
+[ECO "A00"]
+[Opening "Test Position"]
+
+1. e3 a5 2. Qh5 Ra6 3. Qxa5 h5 4. Qxc7 Rah6 5. h4 f6 6. Qxd7+ Kf7 7. Qxb7 Qd3
+8. Qxb8 Qh7 9. Qxc8 Kg6 10. Qe6 1/2-1/2

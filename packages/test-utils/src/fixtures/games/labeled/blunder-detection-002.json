@@ -1,0 +1,15 @@
+{
+  "name": "Club Player Mistakes",
+  "pgn": "[Event \"Club Championship\"]\n[Site \"Local Club\"]\n[Date \"2023.03.20\"]\n[White \"ClubMember1\"]\n[Black \"ClubMember2\"]\n[Result \"0-1\"]\n[WhiteElo \"1500\"]\n[BlackElo \"1550\"]\n\n1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Bd3 d5 6. cxd5 exd5 7. Ne2 c5 8. O-O Nc6 9. a3 Ba5 10. dxc5 Bxc3 11. bxc3 Ne4 12. Bxe4 dxe4 13. Qxd8 Rxd8 14. Rb1 b6 15. cxb6 axb6 16. Rxb6 Rd1+ 17. Nc1 Ba6 18. Re1 Rxe1+ 19. Nb3 Rxf1+ 20. Kxf1 Rd8 21. Nc5 Rd1+ 22. Ke2 Bc4+ 23. Kf3 Rf1 24. Kg4 Ne5+ 25. Kh5 g6+ 26. Kg5 Be2 27. f4 exf3 28. gxf3 Rxf3 29. Rb8+ Kg7 30. Rb7 Nd3 31. Nxd3 Rxd3 32. Ra7 Rxc3 0-1",
+  "groundTruth": {
+    "blunders": [16, 26],
+    "mistakes": [11, 20, 24],
+    "inaccuracies": [7, 14, 22],
+    "criticalMoments": [11, 16, 20, 24, 26],
+    "opening": {
+      "eco": "E32",
+      "name": "Nimzo-Indian Defense: Classical Variation"
+    }
+  },
+  "description": "A club-level game with typical mistakes including poor piece coordination and tactical oversights"
+}
