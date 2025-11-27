@@ -70,6 +70,24 @@ test-py:
 test-ts-watch:
 	pnpm run test:watch
 
+test-integration:  ## Run integration tests
+	pnpm vitest run --project cli --testPathPattern integration
+
+test-golden:  ## Run golden tests
+	pnpm vitest run --project cli --testPathPattern golden
+
+test-quality:  ## Run quality validation tests
+	pnpm vitest run --config tests/vitest.config.ts --testPathPattern quality
+
+test-benchmark:  ## Run performance benchmarks
+	pnpm vitest run --config tests/vitest.config.ts --testPathPattern benchmarks
+
+test-all: test test-integration test-golden test-quality  ## Run all test suites
+	@echo "All test suites passed"
+
+test-ci: test-all test-benchmark  ## Full CI test suite with benchmarks
+	@echo "CI tests complete"
+
 # ===========================================
 # Linting & Formatting
 # ===========================================

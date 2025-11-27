@@ -1,0 +1,15 @@
+{
+  "name": "Beginner Blunders Game",
+  "pgn": "[Event \"Training\"]\n[Site \"Local\"]\n[Date \"2023.01.15\"]\n[White \"Student1\"]\n[Black \"Student2\"]\n[Result \"1-0\"]\n[WhiteElo \"1000\"]\n[BlackElo \"950\"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5 Na5 6. Bb5+ c6 7. dxc6 bxc6 8. Be2 h6 9. Nf3 e4 10. Ne5 Qc7 11. d4 exd3 12. Nxd3 Bd6 13. O-O O-O 14. Re1 Nc4 15. Bxc4 Qxc4 16. Nc3 Re8 17. Rxe8+ Nxe8 18. Bf4 Bxf4 19. Nxf4 Nf6 20. Qd4 Qxd4 21. Nd3 Be6 22. Rd1 Qxd1+ 23. Nxd1 Bd5 24. Nf4 Bf3 25. gxf3 Kf8 1-0",
+  "groundTruth": {
+    "blunders": [5, 8, 14, 21],
+    "mistakes": [4, 12, 19],
+    "inaccuracies": [7, 16],
+    "criticalMoments": [4, 5, 8, 14, 21],
+    "opening": {
+      "eco": "C57",
+      "name": "Italian Game: Two Knights Defense"
+    }
+  },
+  "description": "A typical beginner game with several blunders including hanging pieces and missed tactics"
+}

@@ -1,25 +1,14 @@
 {
-  "name": "@chessbeast/cli",
+  "name": "@chessbeast/test-utils",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "chessbeast": "./dist/index.js"
-  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./orchestrator/*": {
-      "import": "./dist/orchestrator/*",
-      "types": "./dist/orchestrator/*"
-    },
-    "./config/*": {
-      "import": "./dist/config/*",
-      "types": "./dist/config/*"
     }
   },
   "scripts": {
@@ -35,16 +24,9 @@
     "@chessbeast/pgn": "workspace:*",
     "@chessbeast/grpc-client": "workspace:*",
     "@chessbeast/database": "workspace:*",
-    "@chessbeast/llm": "workspace:*",
-    "commander": "^12.0.0",
-    "cosmiconfig": "^9.0.0",
-    "zod": "^3.22.0",
-    "chalk": "^5.3.0",
-    "ora": "^8.0.0"
+    "@chessbeast/llm": "workspace:*"
   },
   "devDependencies": {
-    "@chessbeast/test-utils": "workspace:*",
-    "@types/node": "^22.0.0",
     "vitest": "^2.1.0"
   }
 }
