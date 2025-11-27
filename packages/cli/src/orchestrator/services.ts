@@ -233,12 +233,18 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
         'Set the OPENAI_API_KEY environment variable or use --skip-llm',
       );
     }
-    annotator = new Annotator({
+    // Build annotator config, adding token budget if specified
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const annotatorConfig: any = {
       apiKey: config.llm.apiKey,
       model: config.llm.model,
       temperature: config.llm.temperature,
       timeout: config.llm.timeout,
-    });
+    };
+    if (config.llm.tokenBudget) {
+      annotatorConfig.budget = { maxTokensPerGame: config.llm.tokenBudget };
+    }
+    annotator = new Annotator(annotatorConfig);
   }
 
   return {

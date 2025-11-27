@@ -34,6 +34,7 @@ const ENV_VAR_MAP: Record<string, string> = {
   // LLM
   CHESSBEAST_LLM_MODEL: 'llm.model',
   CHESSBEAST_LLM_TIMEOUT: 'llm.timeout',
+  CHESSBEAST_TOKEN_BUDGET: 'llm.tokenBudget',
 
   // Services
   CHESSBEAST_STOCKFISH_HOST: 'services.stockfish.host',
@@ -257,6 +258,13 @@ function mapCliToConfig(options: CliOptions): Partial<ChessBeastConfig> {
       ...config.ratings,
       targetAudienceRating: options.targetElo,
     } as ChessBeastConfig['ratings'];
+  }
+
+  if (options.tokenBudget !== undefined) {
+    config.llm = {
+      ...config.llm,
+      tokenBudget: options.tokenBudget,
+    } as ChessBeastConfig['llm'];
   }
 
   return config;

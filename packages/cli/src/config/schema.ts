@@ -63,6 +63,8 @@ export interface LLMConfigSchema {
   temperature: number;
   /** Request timeout in milliseconds */
   timeout: number;
+  /** Maximum tokens per game (default: 50000) */
+  tokenBudget?: number;
 }
 
 /**
@@ -159,4 +161,6 @@ export interface CliOptions {
   dryRun?: boolean;
   /** Annotation perspective */
   perspective?: AnnotationPerspective;
+  /** Maximum tokens per game for LLM */
+  tokenBudget?: number;
 }

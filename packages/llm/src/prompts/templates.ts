@@ -89,23 +89,33 @@ function getMateInfo(
  * - NOT include classification text when NAG present
  * - Include strict word limits
  * - Detect and mention mate situations
+ * - Provide rich context (threats, key continuation)
  */
 export function buildCriticalMomentPrompt(context: CommentContext): string {
   const { move, criticalMoment, targetRating, verbosity, legalMoves, openingName } = context;
   const parts: string[] = [];
 
-  // Position context (FEN for understanding, not for repeating)
+  // Position context (FEN for understanding)
   parts.push(`POSITION: ${move.fenBefore}`);
 
   // Mate detection - critical for user to know
   const mateInfo = getMateInfo(move.evalBefore, move.evalAfter);
   if (mateInfo) {
-    parts.push(`MATE SITUATION: ${mateInfo}`);
+    parts.push(`!! MATE SITUATION: ${mateInfo} !!`);
   }
 
-  // Best move if different from played move (without evals)
-  if (move.bestMove !== move.san) {
-    parts.push(`BETTER MOVE: ${move.bestMove}`);
+  // Best move if different from played move
+  if (move.bestMove && move.bestMove !== move.san) {
+    parts.push(`BEST MOVE: ${move.bestMove}`);
+
+    // Include the key continuation line if available
+    if (move.alternatives && move.alternatives.length > 0) {
+      const bestAlt = move.alternatives[0];
+      if (bestAlt && bestAlt.eval.pv && bestAlt.eval.pv.length > 1) {
+        const continuation = bestAlt.eval.pv.slice(0, 4).join(' ');
+        parts.push(`KEY LINE: ${continuation}`);
+      }
+    }
   }
 
   // Opening context if relevant
@@ -113,15 +123,9 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
     parts.push(`OPENING: ${openingName}`);
   }
 
-  // Critical moment context (type only, reason helps LLM focus)
+  // Critical moment context
   if (criticalMoment) {
     parts.push(`SITUATION: ${criticalMoment.reason}`);
-  }
-
-  // Alternative moves (just the moves, no evals)
-  if (move.alternatives && move.alternatives.length > 0) {
-    const alts = move.alternatives.slice(0, 2).map((a) => a.san);
-    parts.push(`OTHER OPTIONS: ${alts.join(', ')}`);
   }
 
   // Legal moves for hallucination prevention
@@ -144,11 +148,15 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
   // Word limit - strict
   const wordLimit = getWordLimit(verbosity, true);
   parts.push('');
-  parts.push(`INSTRUCTIONS: Explain WHY this move matters in UNDER ${wordLimit} WORDS.`);
-  parts.push(`- Focus on the tactic/idea, not the move quality label`);
-  parts.push(`- If mate exists, mention it with the key move`);
-  parts.push(`- NO evaluation numbers (+1.5, -0.3, etc.)`);
-  parts.push(`- NO phrases like "This is a blunder/mistake"`);
+  parts.push(`TASK: Explain WHY this position matters in UNDER ${wordLimit} WORDS.`);
+  parts.push(`FOCUS ON:`);
+  parts.push(`- What tactical/strategic idea makes this important?`);
+  parts.push(`- What threat does the best move create?`);
+  parts.push(`- If mate, show the key moves`);
+  parts.push(`DO NOT:`);
+  parts.push(`- Use evaluation numbers (+1.5, -0.3, etc.)`);
+  parts.push(`- Say "This is a blunder/mistake/good move"`);
+  parts.push(`- Use generic phrases like "improves the position"`);
 
   parts.push('');
   parts.push('Respond with JSON: { "comment": "your annotation" }');

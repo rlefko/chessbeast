@@ -13,7 +13,7 @@ import { createMockGameAnalysis } from './mocks/mock-openai.js';
 
 describe('Fallback Generator', () => {
   describe('generateFallbackComment', () => {
-    it('should generate comment for blunders', () => {
+    it('should generate NAG only for blunders without critical moment', () => {
       const move = {
         plyIndex: 10,
         moveNumber: 6,
@@ -29,14 +29,15 @@ describe('Fallback Generator', () => {
         isCriticalMoment: true,
       };
 
+      // v3 change: without a critical moment context, fallback only provides NAG
+      // The LLM is responsible for generating actual commentary
       const result = generateFallbackComment(move);
 
-      expect(result.comment).toContain('Bxf7');
-      expect(result.comment).toContain('O-O');
+      expect(result.comment).toBeUndefined();
       expect(result.nags).toContain('$4');
     });
 
-    it('should generate comment for mistakes', () => {
+    it('should generate NAG only for mistakes without critical moment', () => {
       const move = {
         plyIndex: 10,
         moveNumber: 6,
@@ -52,9 +53,10 @@ describe('Fallback Generator', () => {
         isCriticalMoment: false,
       };
 
+      // v3 change: without critical moment, fallback only provides NAG
       const result = generateFallbackComment(move);
 
-      expect(result.comment).toContain('inaccurate');
+      expect(result.comment).toBeUndefined();
       expect(result.nags).toContain('$2');
     });
 
@@ -76,7 +78,8 @@ describe('Fallback Generator', () => {
 
       const result = generateFallbackComment(move);
 
-      expect(result.comment).toContain('excellent');
+      // v3 change: brilliant moves don't get fallback comments - NAG (!) is sufficient
+      expect(result.comment).toBeUndefined();
       expect(result.nags).toContain('$3');
     });
 
@@ -98,7 +101,8 @@ describe('Fallback Generator', () => {
 
       const result = generateFallbackComment(move);
 
-      expect(result.comment).toBe('');
+      // v3 change: returns undefined instead of empty string (silence is better)
+      expect(result.comment).toBeUndefined();
       expect(result.nags).toEqual([]);
     });
 
@@ -127,7 +131,10 @@ describe('Fallback Generator', () => {
 
       const result = generateFallbackComment(move, criticalMoment);
 
-      expect(result.comment).toContain('evaluation');
+      // v3 change: fallback now suggests the better move instead of generic text
+      // cpLoss >= 100 with bestMove = "O-O was stronger."
+      expect(result.comment).toContain('O-O');
+      expect(result.comment).toContain('stronger');
     });
   });
 

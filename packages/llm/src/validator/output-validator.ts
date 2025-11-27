@@ -11,8 +11,8 @@ import { filterValidNags } from './nag-validator.js';
  * Generated comment from LLM
  */
 export interface GeneratedComment {
-  /** The annotation comment */
-  comment: string;
+  /** The annotation comment (undefined = no comment, silence is better than generic text) */
+  comment: string | undefined;
   /** NAG symbols */
   nags: string[];
 }

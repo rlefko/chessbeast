@@ -172,7 +172,8 @@ describe('Output Validator', () => {
     it('should truncate long comments', () => {
       const raw = { comment: 'x'.repeat(2500), nags: [] };
       const result = validateComment(raw, []);
-      expect(result.sanitized.comment.length).toBeLessThanOrEqual(2003); // 2000 + '...'
+      expect(result.sanitized.comment).toBeDefined();
+      expect(result.sanitized.comment!.length).toBeLessThanOrEqual(2003); // 2000 + '...'
     });
   });
 

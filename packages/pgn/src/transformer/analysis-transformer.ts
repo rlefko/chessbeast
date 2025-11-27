@@ -227,8 +227,9 @@ function transformMove(move: MoveAnalysisInput, opts: Required<TransformOptions>
     }
   }
 
-  // Add position assessment NAG (⩲, ±, +-, etc.) after move quality NAG
-  if (opts.includePositionNags) {
+  // Add position assessment NAG (⩲, ±, +-, etc.) only on significant eval changes
+  // This prevents cluttering every move with $10/$14/$15 etc.
+  if (opts.includePositionNags && isSignificantEvalChange(move)) {
     const posNag = evalToPositionNag(move.evalAfter.cp, move.evalAfter.mate, opts.targetRating);
     if (posNag) {
       moveInfo.nags = moveInfo.nags ?? [];
@@ -242,6 +243,29 @@ function transformMove(move: MoveAnalysisInput, opts: Required<TransformOptions>
   }
 
   return moveInfo;
+}
+
+/**
+ * Determine if evaluation changed significantly enough to warrant a position NAG
+ * This prevents cluttering every move with $10/$14/$15 position assessments
+ */
+function isSignificantEvalChange(move: MoveAnalysisInput): boolean {
+  // Always mark position when mate is involved
+  if (move.evalAfter.mate !== undefined || move.evalBefore.mate !== undefined) {
+    return true;
+  }
+
+  // Check if evaluation changed by at least 50 centipawns
+  const cpBefore = move.evalBefore.cp ?? 0;
+  const cpAfter = move.evalAfter.cp ?? 0;
+  const change = Math.abs(cpAfter - cpBefore);
+
+  // Also mark when position crosses a significant threshold (e.g., from equal to winning)
+  const crossedThreshold =
+    (Math.abs(cpBefore) < 100 && Math.abs(cpAfter) >= 200) ||
+    (Math.abs(cpBefore) < 200 && Math.abs(cpAfter) >= 400);
+
+  return change >= 50 || crossedThreshold;
 }
 
 /**

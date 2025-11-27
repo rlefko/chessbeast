@@ -76,12 +76,15 @@ export interface LLMConfig {
 
 /**
  * Default token budget configuration
+ *
+ * NOTE: With gpt-4o-mini (~$0.15/1M input, ~$0.60/1M output), 100k tokens costs ~$0.05
+ * So we can be very generous with the budget without significant cost impact.
  */
 export const DEFAULT_TOKEN_BUDGET: TokenBudget = {
-  maxTokensPerGame: 10000,
+  maxTokensPerGame: 100000, // Very generous - allows thorough annotation of any game
   maxTokensPerComment: 500,
   maxTokensPerSummary: 1500,
-  reserveForFallback: 0.1,
+  reserveForFallback: 0.02, // Minimal reserve - prefer LLM annotation over silence
 };
 
 /**

@@ -10,7 +10,6 @@ import type {
   MoveAnalysis,
   CriticalMoment,
   CriticalMomentType,
-  MoveClassification,
 } from '@chessbeast/core';
 
 import { classificationToNag } from '../validator/nag-validator.js';
@@ -18,30 +17,54 @@ import type { GeneratedComment, GeneratedSummary } from '../validator/output-val
 
 /**
  * Generate a fallback comment using templates
+ *
+ * IMPORTANT: We prefer silence over generic text. Only generate comments when
+ * we have specific, actionable information to share. Generic phrases like
+ * "is a strong move" or "affects the evaluation" are worse than no comment.
  */
 export function generateFallbackComment(
   move: MoveAnalysis,
   criticalMoment?: CriticalMoment,
 ): GeneratedComment {
-  let comment = '';
-
-  // Generate comment based on critical moment type
-  if (criticalMoment) {
-    comment = getCriticalMomentTemplate(criticalMoment, move);
-  }
-
-  // If no critical moment comment, generate based on classification
-  if (!comment && move.classification !== 'good' && move.classification !== 'book') {
-    comment = getClassificationTemplate(move);
-  }
-
-  // Get NAG from classification
+  // Get NAG from classification (always provide this)
   const nag = classificationToNag(move.classification);
+
+  // Only generate text for truly critical situations with specific information
+  // Otherwise, let the NAG speak for itself - silence is better than generic text
+  if (!criticalMoment) {
+    return { comment: undefined, nags: nag ? [nag] : [] };
+  }
+
+  // Only generate comment if we have something specific to say
+  const comment = getCriticalMomentTemplate(criticalMoment, move);
+
+  // If the template returns empty or generic text, skip it
+  if (!comment || isGenericText(comment)) {
+    return { comment: undefined, nags: nag ? [nag] : [] };
+  }
 
   return {
     comment,
     nags: nag ? [nag] : [],
   };
+}
+
+/**
+ * Check if text is too generic to be useful
+ */
+function isGenericText(text: string): boolean {
+  const genericPhrases = [
+    'is a strong move',
+    'is a good move',
+    'affects the position',
+    'affects the evaluation',
+    'changes the evaluation',
+    'important tactical moment',
+    'critical turning point',
+    'transitions to a new phase',
+    'An excellent find',
+  ];
+  return genericPhrases.some((phrase) => text.toLowerCase().includes(phrase.toLowerCase()));
 }
 
 /**
@@ -83,77 +106,69 @@ export function generateFallbackSummary(analysis: GameAnalysis): GeneratedSummar
 
 /**
  * Get template for critical moment types
+ *
+ * Returns empty string for generic situations - we prefer silence over vague comments.
+ * Only produces text when we have something specific to say.
  */
 function getCriticalMomentTemplate(moment: CriticalMoment, move: MoveAnalysis): string {
   const templates: Record<CriticalMomentType, (m: MoveAnalysis, cm: CriticalMoment) => string> = {
     eval_swing: (m) => {
-      const evalChange = Math.abs(m.cpLoss);
-      if (evalChange >= 200) {
-        return `${m.san} significantly changes the evaluation. ${m.bestMove} was much stronger.`;
+      // Only comment if we have a concrete better move to suggest
+      if (m.bestMove && m.cpLoss >= 100) {
+        return `${m.bestMove} was stronger.`;
       }
-      return `${m.san} affects the position's evaluation.`;
+      return ''; // Skip generic "affects evaluation" comments
     },
 
-    result_change: () => `This move shifts the expected outcome of the game.`,
+    result_change: () => '', // Too generic without context
 
     missed_win: (m) => {
-      // Note: We don't include evaluation numbers in output
-      if (m.evalBefore.mate !== undefined && m.evalBefore.mate > 0) {
-        return `Mate was available! ${m.bestMove} would have started the winning sequence.`;
+      // This is specific enough - mate was missed
+      if (m.evalBefore.mate !== undefined && m.evalBefore.mate > 0 && m.bestMove) {
+        return `Mate was available with ${m.bestMove}.`;
       }
-      return `A winning opportunity was missed. ${m.bestMove} would have maintained the advantage.`;
+      if (m.bestMove) {
+        return `${m.bestMove} wins.`;
+      }
+      return '';
     },
 
-    missed_draw: (m) => `${m.san} misses a drawing resource. ${m.bestMove} would have held.`,
+    missed_draw: (m) => {
+      if (m.bestMove) {
+        return `${m.bestMove} holds the draw.`;
+      }
+      return '';
+    },
 
-    phase_transition: () => `The game transitions to a new phase.`,
+    phase_transition: () => '', // Too generic
 
     tactical_moment: (m) => {
-      if (m.classification === 'brilliant') {
-        return `${m.san}! An excellent tactical decision.`;
+      // Only comment if we have a concrete tactical suggestion
+      if (m.classification === 'blunder' && m.bestMove) {
+        return `${m.bestMove} was winning.`;
       }
-      if (m.classification === 'blunder') {
-        return `${m.san} misses an important tactical opportunity.`;
-      }
-      return `An important tactical moment in the game.`;
+      return ''; // Skip generic "tactical moment" comments
     },
 
     turning_point: (m) => {
-      if (m.cpLoss > 0) {
-        return `${m.san} is the turning point where the advantage changes hands.`;
+      // Only if we have a concrete better move
+      if (m.bestMove && m.cpLoss >= 100) {
+        return `${m.bestMove} keeps the advantage.`;
       }
-      return `A critical turning point in the game.`;
+      return '';
     },
 
-    time_pressure: (m) => `${m.san} was played under time pressure.`,
+    time_pressure: () => '', // We don't know this without clock data
 
     blunder_recovery: (m) => {
-      if (m.cpLoss > 100) {
-        return `${m.san} fails to capitalize on the opponent's earlier mistake.`;
+      if (m.bestMove && m.cpLoss >= 100) {
+        return `${m.bestMove} capitalizes on the earlier mistake.`;
       }
-      return `The position stabilizes after the earlier inaccuracy.`;
+      return '';
     },
   };
 
-  return templates[moment.type]?.(move, moment) ?? moment.reason;
-}
-
-/**
- * Get template for move classifications
- */
-function getClassificationTemplate(move: MoveAnalysis): string {
-  const templates: Record<MoveClassification, string> = {
-    blunder: `${move.san} is a serious mistake. ${move.bestMove} was much better.`,
-    mistake: `${move.san} is inaccurate. ${move.bestMove} was preferable.`,
-    inaccuracy: `${move.san} is slightly imprecise.`,
-    brilliant: `${move.san}! An excellent find.`,
-    excellent: `${move.san} is a strong move.`,
-    good: '',
-    book: '',
-    forced: `${move.san} is essentially forced.`,
-  };
-
-  return templates[move.classification] ?? '';
+  return templates[moment.type]?.(move, moment) ?? '';
 }
 
 /**

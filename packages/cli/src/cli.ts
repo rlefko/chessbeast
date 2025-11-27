@@ -59,6 +59,7 @@ export function createProgram(): Command {
     .option('-v, --verbosity <level>', VERBOSITY_HELP, 'normal')
     .option('--perspective <side>', PERSPECTIVE_HELP, 'neutral')
     .option('--target-elo <rating>', 'Target audience rating for annotations', parseInt)
+    .option('--token-budget <tokens>', 'Max tokens per game for LLM (default: 50000)', parseInt)
     .option('--skip-maia', 'Skip Maia human-likeness analysis')
     .option('--skip-llm', 'Skip LLM annotations (template only)')
     .option('--show-config', 'Print resolved configuration and exit')
@@ -88,6 +89,7 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['perspective'] !== undefined)
     result.perspective = options['perspective'] as AnnotationPerspective;
   if (options['targetElo'] !== undefined) result.targetElo = options['targetElo'] as number;
+  if (options['tokenBudget'] !== undefined) result.tokenBudget = options['tokenBudget'] as number;
   if (options['skipMaia'] !== undefined) result.skipMaia = options['skipMaia'] as boolean;
   if (options['skipLlm'] !== undefined) result.skipLlm = options['skipLlm'] as boolean;
   if (options['showConfig'] !== undefined) result.showConfig = options['showConfig'] as boolean;
