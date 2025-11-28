@@ -171,8 +171,23 @@ export class Annotator {
 
     // Explore variations for critical moments
     if (this.variationExplorer) {
+      // Count critical positions for progress tracking
+      const criticalPositions = plan.positions.filter((p) => p.criticalMoment);
+      let explorationIndex = 0;
+
       for (const planned of plan.positions) {
         if (planned.criticalMoment) {
+          // Format move notation for progress display
+          const moveNotation = `${planned.move.moveNumber}${planned.move.isWhiteMove ? '.' : '...'} ${planned.move.san}`;
+
+          // Report exploration progress
+          onProgress?.({
+            phase: 'exploring',
+            currentMove: moveNotation,
+            currentIndex: explorationIndex,
+            totalPositions: criticalPositions.length,
+          });
+
           try {
             const exploredLines = await this.variationExplorer.explorePosition(
               planned.move.fenBefore,
@@ -203,6 +218,7 @@ export class Annotator {
             // Log but continue - exploration is optional enhancement
             console.warn(`Variation exploration failed for ply ${planned.plyIndex}:`, error);
           }
+          explorationIndex++;
         }
       }
     }
