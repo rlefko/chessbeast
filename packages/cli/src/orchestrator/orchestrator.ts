@@ -3,7 +3,18 @@
  */
 
 import { createAnalysisPipeline, type GameAnalysis, type ParsedGameInput } from '@chessbeast/core';
-import type { VerbosityLevel, AnnotationProgress } from '@chessbeast/llm';
+import {
+  OpenAIClient,
+  createLLMConfig,
+  AgenticCommentGenerator,
+  buildRichContext,
+  type VerbosityLevel,
+  type AnnotationProgress,
+  type DeepAnalysis,
+  type AgenticProgress,
+  type AgenticServices,
+  type StreamChunk,
+} from '@chessbeast/llm';
 import {
   parsePgn,
   renderPgn,
@@ -73,6 +84,166 @@ function mapVerbosity(verbosity: OutputVerbosity): VerbosityLevel {
     rich: 'detailed',
   };
   return map[verbosity];
+}
+
+/**
+ * Convert engine evaluation to DeepAnalysis format
+ */
+function toDeepAnalysis(
+  evalData: { cp?: number; mate?: number; depth: number; pv: string[] },
+  bestMove: string,
+): DeepAnalysis {
+  // Convert to centipawns - handle mate scores
+  let evaluation: number;
+  if (evalData.mate !== undefined && evalData.mate !== 0) {
+    // Mate score: use large value with sign
+    evaluation = evalData.mate > 0 ? 100000 - evalData.mate * 100 : -100000 - evalData.mate * 100;
+  } else {
+    evaluation = evalData.cp ?? 0;
+  }
+
+  return {
+    evaluation,
+    bestMove,
+    principalVariation: evalData.pv,
+    depth: evalData.depth,
+  };
+}
+
+/**
+ * Run agentic annotation with tool calling
+ */
+async function runAgenticAnnotation(
+  analysis: GameAnalysis,
+  config: ChessBeastConfig,
+  services: Services,
+  reporter: ProgressReporter,
+): Promise<number> {
+  // Build LLM config - use partial type for budget
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const llmConfigInput: any = {
+    apiKey: config.llm.apiKey!,
+    model: config.llm.model,
+    temperature: config.llm.temperature,
+    timeout: config.llm.timeout,
+    reasoningEffort: config.llm.reasoningEffort,
+  };
+  if (config.llm.tokenBudget) {
+    llmConfigInput.budget = { maxTokensPerGame: config.llm.tokenBudget };
+  }
+  const llmConfig = createLLMConfig(llmConfigInput);
+
+  // Create OpenAI client
+  const client = new OpenAIClient(llmConfig);
+
+  // Build agentic services - need raw clients, not adapters
+  if (!services.ecoClient || !services.lichessClient) {
+    throw new Error('Agentic mode requires ECO and Lichess databases to be configured');
+  }
+
+  const agenticServices: AgenticServices = {
+    stockfish: services.stockfish,
+    eco: services.ecoClient,
+    lichess: services.lichessClient,
+  };
+  // Only add maia if available (it's optional in AgenticServices)
+  if (services.maia) {
+    agenticServices.maia = services.maia;
+  }
+
+  // Create agentic generator
+  const targetRating = config.ratings.targetAudienceRating ?? config.ratings.defaultRating;
+  const generator = new AgenticCommentGenerator(client, llmConfig, agenticServices, targetRating);
+
+  // Determine which positions to annotate
+  const positionsToAnnotate: number[] = [];
+  if (config.agentic.annotateAll) {
+    // Annotate all moves
+    for (let i = 0; i < analysis.moves.length; i++) {
+      positionsToAnnotate.push(i);
+    }
+  } else {
+    // Only annotate critical moments
+    for (const cm of analysis.criticalMoments) {
+      positionsToAnnotate.push(cm.plyIndex);
+    }
+  }
+
+  const perspective = config.output.perspective as 'white' | 'black' | 'neutral';
+  let annotationCount = 0;
+
+  // Process each position
+  for (let i = 0; i < positionsToAnnotate.length; i++) {
+    const plyIndex = positionsToAnnotate[i]!;
+    const move = analysis.moves[plyIndex];
+    if (!move) continue;
+
+    const moveNotation = `${move.moveNumber}${move.isWhiteMove ? '.' : '...'} ${move.san}`;
+
+    // Report progress
+    reporter.updateMoveProgress(i + 1, positionsToAnnotate.length, moveNotation);
+
+    // Build rich context for this position
+    const currentAnalysis = toDeepAnalysis(move.evalAfter, move.bestMove);
+    const previousAnalysis =
+      plyIndex > 0
+        ? toDeepAnalysis(
+            analysis.moves[plyIndex - 1]!.evalAfter,
+            analysis.moves[plyIndex - 1]!.bestMove,
+          )
+        : undefined;
+
+    // Get interestingness score from critical moments
+    const criticalMoment = analysis.criticalMoments.find((cm) => cm.plyIndex === plyIndex);
+    const interestingnessScore = criticalMoment?.score ?? 50;
+
+    const richContext = buildRichContext(
+      move,
+      currentAnalysis,
+      previousAnalysis,
+      targetRating,
+      perspective,
+      interestingnessScore,
+      analysis.metadata.eco && analysis.metadata.openingName
+        ? { eco: analysis.metadata.eco, name: analysis.metadata.openingName }
+        : undefined,
+    );
+
+    // Create progress callback for tool calls
+    const onProgress = (progress: AgenticProgress): void => {
+      if (progress.phase === 'tool_call' && progress.toolName) {
+        reporter.displayToolCall(
+          moveNotation,
+          progress.toolName,
+          progress.iteration,
+          progress.maxIterations,
+        );
+      }
+    };
+
+    // Create streaming callback
+    const onChunk = (chunk: StreamChunk): void => {
+      if (chunk.type === 'thinking' || chunk.type === 'content') {
+        reporter.displayThinking(moveNotation, chunk.text);
+      }
+    };
+
+    // Generate comment
+    const result = await generator.generateComment(
+      richContext,
+      { maxToolCalls: config.agentic.maxToolCalls },
+      onProgress,
+      onChunk,
+    );
+
+    // Apply comment to move
+    if (result.comment.comment) {
+      move.comment = result.comment.comment;
+      annotationCount++;
+    }
+  }
+
+  return annotationCount;
 }
 
 /**
@@ -167,51 +338,69 @@ export async function orchestrateAnalysis(
     totalCriticalMoments += analysis.criticalMoments.length;
 
     // Annotate with LLM if enabled
-    if (services.annotator && !config.analysis.skipLlm) {
-      reporter.startPhase('llm_annotation');
-      try {
-        const preferredVerbosity = mapVerbosity(config.output.verbosity);
+    if (!config.analysis.skipLlm && config.llm.apiKey) {
+      // Use agentic mode if enabled, otherwise use regular annotation
+      if (config.agentic.enabled) {
+        // Agentic annotation with tool calling
+        reporter.startPhase('agentic_annotation');
+        try {
+          const annotationCount = await runAgenticAnnotation(analysis, config, services, reporter);
+          totalAnnotations += annotationCount;
+          reporter.completePhase('agentic_annotation', `${annotationCount} annotations`);
+        } catch (error) {
+          reporter.failPhase(
+            'agentic_annotation',
+            error instanceof Error ? error.message : 'unknown error',
+          );
+          // Continue without LLM annotations
+        }
+      } else if (services.annotator) {
+        // Regular LLM annotation
+        reporter.startPhase('llm_annotation');
+        try {
+          const preferredVerbosity = mapVerbosity(config.output.verbosity);
 
-        // Create progress callback for annotation updates
-        const onProgress = (progress: AnnotationProgress): void => {
-          if (progress.phase === 'exploring' && progress.currentMove) {
-            // Show exploration progress
-            reporter.updateMoveProgress(
-              progress.currentIndex + 1,
-              progress.totalPositions,
-              `Exploring ${progress.currentMove}`,
-            );
-          } else if (progress.phase === 'annotating' && progress.currentMove) {
-            // Update move progress (always shown)
-            reporter.updateMoveProgress(
-              progress.currentIndex + 1,
-              progress.totalPositions,
-              progress.currentMove,
-            );
+          // Create progress callback for annotation updates
+          const onProgress = (progress: AnnotationProgress): void => {
+            if (progress.phase === 'exploring' && progress.currentMove) {
+              // Show exploration progress
+              reporter.updateMoveProgress(
+                progress.currentIndex + 1,
+                progress.totalPositions,
+                `Exploring ${progress.currentMove}`,
+              );
+            } else if (progress.phase === 'annotating' && progress.currentMove) {
+              // Update move progress (always shown)
+              reporter.updateMoveProgress(
+                progress.currentIndex + 1,
+                progress.totalPositions,
+                progress.currentMove,
+              );
 
-            // Display streaming thinking/content
-            if (progress.thinking) {
-              reporter.displayThinking(progress.currentMove, progress.thinking);
+              // Display streaming thinking/content
+              if (progress.thinking) {
+                reporter.displayThinking(progress.currentMove, progress.thinking);
+              }
             }
-          }
-        };
+          };
 
-        const result = await services.annotator.annotate(analysis, {
-          preferredVerbosity,
-          generateSummary: config.output.includeSummary,
-          perspective: config.output.perspective as AnnotationPerspective,
-          includeNags: config.output.includeNags,
-          onProgress,
-        });
-        analysis = result.analysis;
-        totalAnnotations += result.positionsAnnotated;
-        reporter.completePhase('llm_annotation', `${result.positionsAnnotated} annotations`);
-      } catch (error) {
-        reporter.failPhase(
-          'llm_annotation',
-          error instanceof Error ? error.message : 'unknown error',
-        );
-        // Continue without LLM annotations
+          const result = await services.annotator.annotate(analysis, {
+            preferredVerbosity,
+            generateSummary: config.output.includeSummary,
+            perspective: config.output.perspective as AnnotationPerspective,
+            includeNags: config.output.includeNags,
+            onProgress,
+          });
+          analysis = result.analysis;
+          totalAnnotations += result.positionsAnnotated;
+          reporter.completePhase('llm_annotation', `${result.positionsAnnotated} annotations`);
+        } catch (error) {
+          reporter.failPhase(
+            'llm_annotation',
+            error instanceof Error ? error.message : 'unknown error',
+          );
+          // Continue without LLM annotations
+        }
       }
     }
 
