@@ -72,11 +72,13 @@ export class CommentGenerator {
    * @param context The comment context with move and position info
    * @param planned The planned annotation with token estimates
    * @param onChunk Optional streaming callback for real-time reasoning display
+   * @param onWarning Optional warning callback (defaults to console.warn)
    */
   async generateComment(
     context: CommentContext,
     planned: PlannedAnnotation,
     onChunk?: (chunk: StreamChunk) => void,
+    onWarning: (message: string) => void = console.warn,
   ): Promise<GeneratedComment> {
     const isCritical = planned.criticalMoment !== undefined;
 
@@ -100,7 +102,7 @@ export class CommentGenerator {
     // (don't produce generic fallback, just let the NAG speak for itself)
     if (!this.client.canAfford(planned.estimatedTokens)) {
       const usage = this.client.getTokenUsage();
-      console.warn(
+      onWarning(
         `[LLM] Token budget exhausted: need ~${planned.estimatedTokens}, have ${usage.remaining} remaining (${usage.used} used). Skipping this move.`,
       );
       // Return empty comment - silence is better than generic fallback
@@ -108,14 +110,14 @@ export class CommentGenerator {
     }
 
     try {
-      const comment = await this.callLLM(context, onChunk);
+      const comment = await this.callLLM(context, onChunk, onWarning);
 
       // Cache the result
       this.cache.set(cacheKey, comment);
 
       return comment;
     } catch (error) {
-      return this.handleFailure(error, planned);
+      return this.handleFailure(error, planned, onWarning);
     }
   }
 
@@ -124,11 +126,12 @@ export class CommentGenerator {
    */
   async generateBatch(
     contexts: Array<{ context: CommentContext; planned: PlannedAnnotation }>,
+    onWarning: (message: string) => void = console.warn,
   ): Promise<GeneratedComment[]> {
     const results: GeneratedComment[] = [];
 
     for (const { context, planned } of contexts) {
-      const comment = await this.generateComment(context, planned);
+      const comment = await this.generateComment(context, planned, undefined, onWarning);
       results.push(comment);
     }
 
@@ -138,6 +141,7 @@ export class CommentGenerator {
   private async callLLM(
     context: CommentContext,
     onChunk?: (chunk: StreamChunk) => void,
+    onWarning: (message: string) => void = console.warn,
   ): Promise<GeneratedComment> {
     // Choose prompt based on whether it's a critical moment
     const prompt = context.criticalMoment
@@ -166,7 +170,7 @@ export class CommentGenerator {
 
     if (!validation.valid) {
       // Log issues but use sanitized output
-      console.warn('Comment validation issues:', validation.issues);
+      onWarning(`Comment validation issues: ${validation.issues.join(', ')}`);
     }
 
     return validation.sanitized;
@@ -178,7 +182,11 @@ export class CommentGenerator {
    * IMPORTANT: We do NOT cascade failures to other moves. If this move fails,
    * we return an empty comment and let the next move try fresh.
    */
-  private handleFailure(error: unknown, _planned: PlannedAnnotation): GeneratedComment {
+  private handleFailure(
+    error: unknown,
+    _planned: PlannedAnnotation,
+    onWarning: (message: string) => void = console.warn,
+  ): GeneratedComment {
     // CircuitOpenError is expected when circuit is tripped - skip silently
     // The circuit open state is already logged once when it opens
     if (error instanceof CircuitOpenError) {
@@ -187,14 +195,14 @@ export class CommentGenerator {
 
     // Log other errors for debugging
     if (error instanceof RateLimitError) {
-      console.warn(
+      onWarning(
         `[LLM] Rate limit error after exhausting all retries. ` +
           `Consider reducing request frequency or upgrading API tier.`,
       );
     } else if (error instanceof Error) {
-      console.warn(`[LLM] Comment generation failed: ${error.constructor.name}: ${error.message}`);
+      onWarning(`[LLM] Comment generation failed: ${error.constructor.name}: ${error.message}`);
     } else {
-      console.warn(`[LLM] Comment generation failed with unknown error`);
+      onWarning(`[LLM] Comment generation failed with unknown error`);
     }
 
     // Return empty comment - silence is better than generic fallback

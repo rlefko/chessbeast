@@ -94,6 +94,7 @@ export class AgenticCommentGenerator {
    * @param onProgress Optional progress callback
    * @param onChunk Optional streaming callback for reasoning
    * @param legalMoves Legal moves in this position (for validation)
+   * @param onWarning Optional warning callback (defaults to console.warn)
    */
   async generateComment(
     context: RichPositionContext,
@@ -101,6 +102,7 @@ export class AgenticCommentGenerator {
     onProgress?: (progress: AgenticProgress) => void,
     onChunk?: (chunk: StreamChunk) => void,
     legalMoves: string[] = [],
+    onWarning: (message: string) => void = console.warn,
   ): Promise<AgenticResult> {
     const maxIterations = options.maxToolCalls ?? 5;
     let iteration = 0;
@@ -159,7 +161,7 @@ export class AgenticCommentGenerator {
           maxIterations,
         });
 
-        return this.buildResult(response, legalMoves, totalTokens, iteration);
+        return this.buildResult(response, legalMoves, totalTokens, iteration, onWarning);
       }
 
       // Execute tool calls
@@ -218,7 +220,7 @@ export class AgenticCommentGenerator {
 
     totalTokens += finalResponse.usage.totalTokens;
 
-    return this.buildResult(finalResponse, legalMoves, totalTokens, iteration);
+    return this.buildResult(finalResponse, legalMoves, totalTokens, iteration, onWarning);
   }
 
   /**
@@ -229,13 +231,14 @@ export class AgenticCommentGenerator {
     legalMoves: string[],
     totalTokens: number,
     iterations: number,
+    onWarning: (message: string) => void = console.warn,
   ): AgenticResult {
     // Parse and validate response
     const parsed = parseJsonResponse<unknown>(response.content);
     const validation = validateComment(parsed, legalMoves);
 
     if (!validation.valid) {
-      console.warn('Agentic comment validation issues:', validation.issues);
+      onWarning(`Agentic comment validation issues: ${validation.issues.join(', ')}`);
     }
 
     return {

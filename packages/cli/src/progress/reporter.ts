@@ -512,6 +512,26 @@ export class ProgressReporter {
   }
 
   /**
+   * Print a warning message safely while spinner is active.
+   * Temporarily stops the spinner, prints the warning, then restarts it.
+   * This prevents the warning from interleaving with spinner output.
+   */
+  warnSafe(message: string): void {
+    if (this.silent) return;
+
+    if (this.spinner) {
+      // Spinner is active - stop it, print warning, restart
+      const currentText = this.spinner.text;
+      this.spinner.stop();
+      console.log(this.c.yellow(`  ⚠ ${message}`));
+      this.spinner.start(currentText);
+    } else {
+      // No spinner - just print the warning
+      console.log(this.c.yellow(`  ⚠ ${message}`));
+    }
+  }
+
+  /**
    * Print an error message
    */
   printError(message: string): void {

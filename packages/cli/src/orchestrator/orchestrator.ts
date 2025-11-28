@@ -228,12 +228,19 @@ async function runAgenticAnnotation(
       }
     };
 
+    // Create warning callback that uses spinner-safe output
+    const onWarning = (message: string): void => {
+      reporter.warnSafe(message);
+    };
+
     // Generate comment
     const result = await generator.generateComment(
       richContext,
       { maxToolCalls: config.agentic.maxToolCalls },
       onProgress,
       onChunk,
+      [], // legalMoves - empty for now
+      onWarning,
     );
 
     // Apply comment to move
@@ -384,12 +391,18 @@ export async function orchestrateAnalysis(
             }
           };
 
+          // Create warning callback that uses spinner-safe output
+          const onWarning = (message: string): void => {
+            reporter.warnSafe(message);
+          };
+
           const result = await services.annotator.annotate(analysis, {
             preferredVerbosity,
             generateSummary: config.output.includeSummary,
             perspective: config.output.perspective as AnnotationPerspective,
             includeNags: config.output.includeNags,
             onProgress,
+            onWarning,
           });
           analysis = result.analysis;
           totalAnnotations += result.positionsAnnotated;

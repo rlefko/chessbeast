@@ -24,11 +24,18 @@ export class SummaryGenerator {
 
   /**
    * Generate a summary for the analyzed game
+   * @param analysis The game analysis
+   * @param targetRating Target audience rating
+   * @param onWarning Optional warning callback (defaults to console.warn)
    */
-  async generateSummary(analysis: GameAnalysis, targetRating: number): Promise<GeneratedSummary> {
+  async generateSummary(
+    analysis: GameAnalysis,
+    targetRating: number,
+    onWarning: (message: string) => void = console.warn,
+  ): Promise<GeneratedSummary> {
     // Check if we can afford the summary
     if (!this.client.canAfford(this.config.budget.maxTokensPerSummary)) {
-      console.warn('Not enough token budget for summary, using fallback');
+      onWarning('Not enough token budget for summary, using fallback');
       return generateFallbackSummary(analysis);
     }
 
@@ -50,7 +57,7 @@ export class SummaryGenerator {
       const validation = validateSummary(parsed);
 
       if (!validation.valid) {
-        console.warn('Summary validation failed, using fallback:', validation.issues);
+        onWarning(`Summary validation failed, using fallback: ${validation.issues.join(', ')}`);
         return generateFallbackSummary(analysis);
       }
 
@@ -58,7 +65,7 @@ export class SummaryGenerator {
     } catch (error) {
       // Log and return fallback
       if (error instanceof Error) {
-        console.warn(`Summary generation failed: ${error.message}`);
+        onWarning(`Summary generation failed: ${error.message}`);
       }
       return generateFallbackSummary(analysis);
     }
