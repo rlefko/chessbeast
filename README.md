@@ -69,6 +69,9 @@ chessbeast analyze --input game.pgn --token-budget 30000
 # Enable verbose mode to see LLM reasoning in real-time
 chessbeast analyze --input game.pgn --verbose
 
+# Enable debug mode for full LLM observability (FEN, eval, tool calls)
+chessbeast analyze --input game.pgn --agentic --debug 2> debug.log
+
 # Skip external services for offline analysis
 chessbeast analyze --input game.pgn --skip-maia --skip-llm
 
@@ -95,6 +98,7 @@ chessbeast analyze --show-config
 | `--skip-llm` | Skip LLM annotations (use templates only) |
 | `--reasoning-effort <level>` | LLM reasoning effort: `none`, `low`, `medium`, `high` (default: medium) |
 | `--verbose` | Enable verbose mode with real-time LLM reasoning display |
+| `--debug` | Enable debug mode with full LLM reasoning, move context, and tool call details |
 | `--agentic` | Enable agentic mode with tool calling for critical moments |
 | `--agentic-all` | Enable agentic mode for all moves (not just critical) |
 | `--max-tool-calls <n>` | Max tool calls per position in agentic mode (default: 5) |

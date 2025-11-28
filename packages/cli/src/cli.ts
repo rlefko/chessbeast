@@ -81,6 +81,10 @@ export function createProgram(): Command {
     .option('--skip-llm', 'Skip LLM annotations (template only)')
     .option('--reasoning-effort <level>', REASONING_EFFORT_HELP, 'medium')
     .option('--verbose', 'Enable verbose output with real-time LLM reasoning display')
+    .option(
+      '--debug',
+      'Enable detailed debug output with full LLM reasoning, move context, and tool call details',
+    )
     .option('--agentic', AGENTIC_HELP)
     .option('--agentic-all', 'Use agentic annotation for all moves (not just critical)')
     .option(
@@ -126,6 +130,7 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['reasoningEffort'] !== undefined)
     result.reasoningEffort = options['reasoningEffort'] as ReasoningEffort;
   if (options['verbose'] !== undefined) result.verbose = options['verbose'] as boolean;
+  if (options['debug'] !== undefined) result.debug = options['debug'] as boolean;
   if (options['agentic'] !== undefined) result.agentic = options['agentic'] as boolean;
   if (options['agenticAll'] !== undefined) result.agenticAll = options['agenticAll'] as boolean;
   if (options['maxToolCalls'] !== undefined)

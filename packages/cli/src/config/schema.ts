@@ -192,6 +192,8 @@ export interface CliOptions {
   reasoningEffort?: ReasoningEffort;
   /** Enable verbose output with real-time LLM reasoning display */
   verbose?: boolean;
+  /** Enable detailed debug output with full LLM reasoning and tool call details */
+  debug?: boolean;
   /** Enable agentic annotation with tool calling */
   agentic?: boolean;
   /** Use agentic annotation for all moves, not just critical */

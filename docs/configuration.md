@@ -168,6 +168,52 @@ output:
 
 When using reasoning models (gpt-5-codex, o1, o3), the model's thinking process can be displayed in verbose mode (`--verbose` flag). This shows real-time reasoning as each move is analyzed.
 
+### Debug Mode
+
+Use `--debug` for detailed LLM observability beyond `--verbose`. Debug mode provides:
+
+- **Move Context**: FEN, evaluation, best move, and classification for each analyzed position
+- **Full LLM Reasoning**: Complete untruncated thinking (verbose shows truncated spinner text)
+- **Tool Call Details**: Full request (name + JSON arguments) and response for agentic mode
+
+Debug output goes to stderr for clean piping:
+
+```bash
+# Pipe PGN to stdout while capturing debug logs
+chessbeast analyze --input game.pgn --agentic --debug > annotated.pgn 2> debug.log
+
+# Or view debug output live while saving PGN
+chessbeast analyze --input game.pgn --debug 2>&1 | tee analysis.log
+```
+
+**Example Debug Output:**
+
+```
+=== DEBUG: 14... Be6 ===
+FEN: r2q1rk1/pp2bppp/2n1bn2/3pp3/2PP4/2N1PN2/PP2BPPP/R1BQ1RK1 b - - 0 14
+Eval: +0.45 | Best: Nxd4
+Classification: inaccuracy (35cp loss)
+
+--- LLM Reasoning ---
+Let me analyze this position. Black played Be6 developing the bishop...
+--- End Reasoning ---
+
+[Tool Call 1/5] evaluate_position
+Arguments:
+{
+  "fen": "r2q1rk1/pp2bppp/2n1bn2/3pp3/...",
+  "depth": 20
+}
+
+[Tool Result] evaluate_position (156ms)
+{
+  "evaluation": 45,
+  "bestMove": "Nxd4"
+}
+```
+
+Note: `--debug` implies `--verbose` (debug is a superset of verbose mode).
+
 ### Agentic Settings
 
 | Option | Type | Default | Description |
