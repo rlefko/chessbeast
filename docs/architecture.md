@@ -219,15 +219,23 @@ The `VariationExplorer` (`packages/llm/src/explorer/`) implements an iterative d
 2. **Maia Prediction**: Get human-likely move at target rating
 3. **LLM Decision**: Evaluate candidates, decide exploration strategy
 4. **Depth-First**: Follow main line deep (up to 40 moves)
-5. **Human Mistakes**: Show Maia-predicted alternatives when different from best
-6. **Self-Regulation**: LLM can request more exploration within budget
+5. **Human Mistakes**: Show Maia-predicted alternatives with engine refutation
+6. **Tension Resolution**: Continue exploration until position stabilizes
+7. **Self-Regulation**: LLM can request more exploration within budget
+
+### Key Features
+
+- **`exploreMistakeLine`**: When Maia predicts a human-likely move different from best, the explorer makes that move and shows the engine's refutation (not just a stub)
+- **Tension Resolution**: Variations stop when captures and checks have resolved, not at arbitrary depth limits
+- **Position NAGs**: Position assessment NAGs ($10-$19) appear only at the END of explored variations, showing the consequence of the line
+- **Error Severity**: Inaccuracies in already-losing positions get minimal analysis; opening inaccuracies get full analysis due to butterfly effect
 
 ### Line Types
 
 | Purpose | Description |
 |---------|-------------|
 | `best` | Engine's recommended continuation |
-| `human_alternative` | Maia-predicted move (often a mistake) |
+| `human_alternative` | Maia-predicted move with engine refutation |
 | `refutation` | Line showing why an alternative fails |
 | `trap` | Deceptive line with a hidden refutation |
 | `thematic` | Illustrates an important strategic idea |
@@ -249,6 +257,7 @@ interface PlannedVariation {
   moves: string[];        // SAN moves in the variation
   purpose: LinePurpose;   // best, human_alternative, etc.
   source: LineSource;     // engine, maia, llm
+  finalEval?: EngineEvaluation; // For position NAG at end of line
 }
 ```
 

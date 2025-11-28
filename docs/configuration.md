@@ -164,10 +164,16 @@ output:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `output.verbosity` | `"summary"` \| `"normal"` \| `"rich"` | `"normal"` | Annotation verbosity level |
+| `output.verbosity` | `"ultra-brief"` \| `"brief"` \| `"normal"` \| `"detailed"` | `"normal"` | Annotation verbosity level |
 | `output.includeVariations` | boolean | true | Include alternative variations in output |
 | `output.includeNags` | boolean | true | Include NAG symbols ($1, $2, etc.) |
 | `output.includeSummary` | boolean | true | Include game summary comment |
+
+**Verbosity Levels:**
+- `ultra-brief`: 5-8 words max for critical positions, 5 for non-critical (useful for tight token budgets)
+- `brief`: 10-15 words max for critical positions, 10 for non-critical
+- `normal`: 15-25 words max for critical positions, 10 for non-critical
+- `detailed`: 25-40 words max for critical positions, 15 for non-critical
 
 ## Environment Variables
 
