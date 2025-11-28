@@ -54,8 +54,12 @@ NAG reference:
  * Progress callback for agentic annotation
  */
 export interface AgenticProgress {
-  phase: 'analyzing' | 'tool_call' | 'finalizing';
+  phase: 'analyzing' | 'tool_call' | 'tool_result' | 'finalizing';
   toolName?: string;
+  toolArgs?: Record<string, unknown>;
+  toolResult?: unknown;
+  toolError?: string;
+  toolDurationMs?: number;
   iteration: number;
   maxIterations: number;
   thinking?: string;
@@ -164,17 +168,56 @@ export class AgenticCommentGenerator {
         return this.buildResult(response, legalMoves, totalTokens, iteration, onWarning);
       }
 
-      // Execute tool calls
+      // Execute tool calls with progress tracking
+      const toolResults: Array<{
+        toolCallId: string;
+        result?: unknown;
+        error?: string;
+      }> = [];
+
       for (const toolCall of response.toolCalls) {
+        // Parse tool arguments for progress reporting
+        let toolArgs: Record<string, unknown> = {};
+        try {
+          toolArgs = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+        } catch {
+          // If parsing fails, use empty object
+        }
+
+        // Emit tool_call progress with arguments
         onProgress?.({
           phase: 'tool_call',
           toolName: toolCall.function.name,
+          toolArgs,
           iteration,
           maxIterations,
         });
-      }
 
-      const toolResults = await this.toolExecutor.executeAll(response.toolCalls);
+        // Execute individual tool with timing
+        const startTime = Date.now();
+        const results = await this.toolExecutor.executeAll([toolCall]);
+        const durationMs = Date.now() - startTime;
+        const result = results[0]!;
+
+        // Emit tool_result progress
+        // Build progress object conditionally to satisfy exactOptionalPropertyTypes
+        const toolResultProgress: AgenticProgress = {
+          phase: 'tool_result',
+          toolName: toolCall.function.name,
+          toolDurationMs: durationMs,
+          iteration,
+          maxIterations,
+        };
+        if (result.result !== undefined) {
+          toolResultProgress.toolResult = result.result;
+        }
+        if (result.error !== undefined) {
+          toolResultProgress.toolError = result.error;
+        }
+        onProgress?.(toolResultProgress);
+
+        toolResults.push(result);
+      }
 
       // Add assistant message with tool calls
       messages.push({

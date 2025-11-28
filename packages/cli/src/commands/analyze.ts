@@ -88,11 +88,14 @@ function writeOutput(output: string, outputPath: string | undefined): void {
  */
 export async function analyzeCommand(rawOptions: Record<string, unknown>): Promise<void> {
   const options = parseCliOptions(rawOptions);
-  const reporterOptions: { color: boolean; verbose?: boolean } = {
+  const reporterOptions: { color: boolean; verbose?: boolean; debug?: boolean } = {
     color: !options.noColor,
   };
   if (options.verbose !== undefined) {
     reporterOptions.verbose = options.verbose;
+  }
+  if (options.debug !== undefined) {
+    reporterOptions.debug = options.debug;
   }
   const reporter = new ProgressReporter(reporterOptions);
 

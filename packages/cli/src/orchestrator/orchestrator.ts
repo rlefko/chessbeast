@@ -209,6 +209,18 @@ async function runAgenticAnnotation(
         : undefined,
     );
 
+    // Display move context in debug mode
+    if (reporter.isDebug()) {
+      reporter.displayMoveContext({
+        moveNotation,
+        fen: move.fenBefore,
+        evaluation: currentAnalysis.evaluation,
+        bestMove: currentAnalysis.bestMove,
+        classification: move.classification,
+        cpLoss: move.cpLoss,
+      });
+    }
+
     // Create progress callback for tool calls
     const onProgress = (progress: AgenticProgress): void => {
       if (progress.phase === 'tool_call' && progress.toolName) {
@@ -218,6 +230,23 @@ async function runAgenticAnnotation(
           progress.iteration,
           progress.maxIterations,
         );
+        // Debug mode: show full tool arguments
+        if (reporter.isDebug() && progress.toolArgs) {
+          reporter.displayDebugToolCall(
+            progress.toolName,
+            progress.toolArgs,
+            progress.iteration,
+            progress.maxIterations,
+          );
+        }
+      } else if (progress.phase === 'tool_result' && progress.toolName && reporter.isDebug()) {
+        // Debug mode: show tool results
+        reporter.displayDebugToolResult(
+          progress.toolName,
+          progress.toolResult,
+          progress.toolError,
+          progress.toolDurationMs ?? 0,
+        );
       }
     };
 
@@ -225,6 +254,10 @@ async function runAgenticAnnotation(
     const onChunk = (chunk: StreamChunk): void => {
       if (chunk.type === 'thinking' || chunk.type === 'content') {
         reporter.displayThinking(moveNotation, chunk.text);
+        // Debug mode: accumulate full thinking content
+        if (reporter.isDebug()) {
+          reporter.displayDebugThinking(chunk.text, chunk.done ?? false);
+        }
       }
     };
 
