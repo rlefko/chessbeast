@@ -344,12 +344,7 @@ export async function orchestrateAnalysis(
         // Agentic annotation with tool calling
         reporter.startPhase('agentic_annotation');
         try {
-          const annotationCount = await runAgenticAnnotation(
-            analysis,
-            config,
-            services,
-            reporter,
-          );
+          const annotationCount = await runAgenticAnnotation(analysis, config, services, reporter);
           totalAnnotations += annotationCount;
           reporter.completePhase('agentic_annotation', `${annotationCount} annotations`);
         } catch (error) {
