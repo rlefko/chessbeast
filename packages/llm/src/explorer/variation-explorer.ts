@@ -496,6 +496,17 @@ export class VariationExplorer {
     mistakeMove: string,
     _probability: number,
   ): Promise<ExploredLine> {
+    // Convert mistake move to SAN if it's in UCI format
+    // Maia may return moves in either format, so we normalize to SAN for PGN output
+    const pos = new ChessPosition(fen);
+    let mistakeMoveSan: string;
+    try {
+      mistakeMoveSan = pos.uciToSan(mistakeMove);
+    } catch {
+      // Already in SAN format or move parsing failed, use as-is
+      mistakeMoveSan = mistakeMove;
+    }
+
     // 1. Make the mistake move to get resulting position
     const posAfterMistake = new ChessPosition(fen);
     let fenAfterMistake: string;
@@ -503,9 +514,9 @@ export class VariationExplorer {
       posAfterMistake.move(mistakeMove);
       fenAfterMistake = posAfterMistake.fen();
     } catch {
-      // Invalid move, return minimal line
+      // Invalid move, return minimal line with SAN notation
       return {
-        moves: [mistakeMove],
+        moves: [mistakeMoveSan],
         annotations: new Map(),
         branches: [],
         purpose: 'human_alternative',
@@ -522,9 +533,9 @@ export class VariationExplorer {
         numLines: 1,
       });
     } catch {
-      // Engine unavailable, return minimal line
+      // Engine unavailable, return minimal line with SAN notation
       return {
-        moves: [mistakeMove],
+        moves: [mistakeMoveSan],
         annotations: new Map(),
         branches: [],
         purpose: 'human_alternative',
@@ -532,8 +543,8 @@ export class VariationExplorer {
       };
     }
 
-    // 3. Build the line: mistake move + refutation continuation
-    let moves = [mistakeMove];
+    // 3. Build the line: mistake move + refutation continuation (use SAN for output)
+    let moves = [mistakeMoveSan];
     let finalEval: EngineEvaluation | undefined;
 
     if (refutation.length > 0 && refutation[0]!.pv.length > 0) {

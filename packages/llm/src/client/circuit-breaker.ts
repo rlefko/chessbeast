@@ -102,6 +102,10 @@ export class CircuitBreaker {
     this.state = 'open';
     this.openedAt = new Date();
     this.successes = 0;
+    console.warn(
+      `[LLM] Circuit breaker opened after ${this.config.failureThreshold} consecutive failures. ` +
+        `LLM calls will be skipped for ${this.config.resetTimeoutMs / 1000}s. NAGs will still be applied.`,
+    );
   }
 
   private close(): void {

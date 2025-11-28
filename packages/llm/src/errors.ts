@@ -115,7 +115,7 @@ export class CircuitOpenError extends LLMError {
     super(
       `Circuit breaker is open since ${openedAt.toISOString()}, reset in ${resetAfterMs}ms`,
       LLMErrorCode.CIRCUIT_OPEN,
-      true,
+      false, // Not retryable - retrying while circuit is open is futile
     );
     this.name = 'CircuitOpenError';
   }
