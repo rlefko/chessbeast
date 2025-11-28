@@ -81,7 +81,10 @@ export function createProgram(): Command {
     .option('--skip-llm', 'Skip LLM annotations (template only)')
     .option('--reasoning-effort <level>', REASONING_EFFORT_HELP, 'medium')
     .option('--verbose', 'Enable verbose output with real-time LLM reasoning display')
-    .option('--debug', 'Enable detailed debug output with full LLM reasoning, move context, and tool call details')
+    .option(
+      '--debug',
+      'Enable detailed debug output with full LLM reasoning, move context, and tool call details',
+    )
     .option('--agentic', AGENTIC_HELP)
     .option('--agentic-all', 'Use agentic annotation for all moves (not just critical)')
     .option(
