@@ -17,6 +17,12 @@ import { OpenAIClient } from './client/openai-client.js';
 import type { HealthStatus } from './client/types.js';
 import type { LLMConfig } from './config/llm-config.js';
 import { createLLMConfig, loadConfigFromEnv } from './config/llm-config.js';
+import {
+  VariationExplorer,
+  createVariationExplorer,
+  type EngineService,
+  type MaiaService,
+} from './explorer/index.js';
 import { CommentGenerator, DegradationLevel } from './generator/comment-generator.js';
 import { SummaryGenerator, formatSummaryAsString } from './generator/summary-generator.js';
 import {
@@ -52,6 +58,16 @@ export interface AnnotationResult {
 }
 
 /**
+ * Services for variation exploration
+ */
+export interface AnnotatorServices {
+  /** Engine service for position evaluation */
+  engine?: EngineService;
+  /** Maia service for human-like move prediction */
+  maia?: MaiaService;
+}
+
+/**
  * Main annotator class - orchestrates the annotation pipeline
  */
 export class Annotator {
@@ -59,16 +75,28 @@ export class Annotator {
   private readonly config: LLMConfig;
   private readonly commentGenerator: CommentGenerator;
   private readonly summaryGenerator: SummaryGenerator;
+  private readonly variationExplorer?: VariationExplorer;
 
   /**
    * Create a new annotator
    * @param config Configuration (apiKey required, others have defaults)
+   * @param services Optional services for variation exploration
    */
-  constructor(config: Partial<LLMConfig> & { apiKey: string }) {
+  constructor(config: Partial<LLMConfig> & { apiKey: string }, services?: AnnotatorServices) {
     this.config = createLLMConfig(config);
     this.client = new OpenAIClient(this.config);
     this.commentGenerator = new CommentGenerator(this.client, this.config);
     this.summaryGenerator = new SummaryGenerator(this.client, this.config);
+
+    // Create variation explorer if engine service is provided
+    if (services?.engine) {
+      this.variationExplorer = createVariationExplorer(
+        services.engine,
+        services.maia,
+        this.client,
+        this.config,
+      );
+    }
   }
 
   /**
@@ -116,6 +144,34 @@ export class Annotator {
     // Get perspective and includeNags from options
     const perspective = planOptions.perspective ?? 'neutral';
     const includeNags = planOptions.includeNags ?? true;
+
+    // Explore variations for critical moments
+    if (this.variationExplorer) {
+      for (const planned of plan.positions) {
+        if (planned.criticalMoment) {
+          try {
+            const exploredLines = await this.variationExplorer.explorePosition(
+              planned.move.fenBefore,
+              plan.targetRating,
+              planned.move.san,
+            );
+
+            // Store explored variations on the move for PGN rendering
+            const move = analysis.moves[planned.plyIndex];
+            if (move && exploredLines.length > 0) {
+              move.exploredVariations = exploredLines.map((line) => ({
+                moves: line.moves,
+                purpose: line.purpose,
+                source: line.source,
+              }));
+            }
+          } catch (error) {
+            // Log but continue - exploration is optional enhancement
+            console.warn(`Variation exploration failed for ply ${planned.plyIndex}:`, error);
+          }
+        }
+      }
+    }
 
     // Generate comments for each planned position
     let positionsAnnotated = 0;
@@ -251,4 +307,6 @@ export {
   type ExplorationConfig,
   type LinePurpose,
   type LineSource,
+  type EngineService,
+  type MaiaService,
 } from './explorer/index.js';

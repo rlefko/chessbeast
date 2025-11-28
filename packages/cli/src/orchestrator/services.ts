@@ -6,7 +6,12 @@ import * as fs from 'node:fs';
 
 import { EcoClient, LichessEliteClient } from '@chessbeast/database';
 import { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
-import { Annotator } from '@chessbeast/llm';
+import {
+  Annotator,
+  type AnnotatorServices,
+  type EngineService,
+  type MaiaService,
+} from '@chessbeast/llm';
 
 import type { ChessBeastConfig } from '../config/schema.js';
 import { ServiceError, createServiceError, resolveAbsolutePath } from '../errors/index.js';
@@ -244,7 +249,16 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
     if (config.llm.tokenBudget) {
       annotatorConfig.budget = { maxTokensPerGame: config.llm.tokenBudget };
     }
-    annotator = new Annotator(annotatorConfig);
+
+    // Create service adapters for variation exploration
+    const annotatorServices: AnnotatorServices = {
+      engine: createEngineAdapter(stockfish),
+    };
+    if (maia) {
+      annotatorServices.maia = createMaiaAdapter(maia);
+    }
+
+    annotator = new Annotator(annotatorConfig, annotatorServices);
   }
 
   return {
@@ -263,4 +277,96 @@ export function closeServices(_services: Services): void {
   // gRPC clients don't have explicit close methods
   // Database clients will be garbage collected
   // Nothing to do here for now
+}
+
+/**
+ * Convert EvaluateResponse to EngineEvaluation
+ */
+function toEngineEvaluation(response: {
+  cp: number;
+  mate: number;
+  depth: number;
+  bestLine: string[];
+}): { cp?: number; mate?: number; depth: number; pv: string[] } {
+  // Create base result
+  const result: { cp?: number; mate?: number; depth: number; pv: string[] } = {
+    depth: response.depth,
+    pv: response.bestLine,
+  };
+
+  // Only add cp/mate if non-zero
+  if (response.cp !== 0) {
+    result.cp = response.cp;
+  }
+  if (response.mate !== 0) {
+    result.mate = response.mate;
+  }
+
+  return result;
+}
+
+/**
+ * Create an EngineService adapter from StockfishClient
+ *
+ * Adapts the StockfishClient to the EngineService interface expected by VariationExplorer.
+ */
+function createEngineAdapter(stockfish: StockfishClient): EngineService {
+  return {
+    async evaluate(
+      fen: string,
+      depth: number,
+    ): Promise<{ cp?: number; mate?: number; depth: number; pv: string[] }> {
+      const response = await stockfish.evaluate(fen, { depth });
+      return toEngineEvaluation(response);
+    },
+
+    async evaluateMultiPv(
+      fen: string,
+      options: { depth?: number; timeLimitMs?: number; numLines?: number },
+    ): Promise<Array<{ cp?: number; mate?: number; depth: number; pv: string[] }>> {
+      const evalOptions: { depth?: number; timeLimitMs?: number; multipv?: number } = {
+        multipv: options.numLines ?? 3,
+      };
+      if (options.depth !== undefined) {
+        evalOptions.depth = options.depth;
+      }
+      if (options.timeLimitMs !== undefined) {
+        evalOptions.timeLimitMs = options.timeLimitMs;
+      }
+
+      const response = await stockfish.evaluate(fen, evalOptions);
+
+      // The main response is the first line
+      const results = [toEngineEvaluation(response)];
+
+      // Add alternatives if available
+      if (response.alternatives) {
+        for (const alt of response.alternatives) {
+          results.push(toEngineEvaluation(alt));
+        }
+      }
+
+      return results;
+    },
+  };
+}
+
+/**
+ * Create a MaiaService adapter from MaiaClient
+ *
+ * Adapts the MaiaClient to the MaiaService interface expected by VariationExplorer.
+ */
+function createMaiaAdapter(maia: MaiaClient): MaiaService {
+  return {
+    async predictMoves(
+      fen: string,
+      rating: number,
+    ): Promise<Array<{ san: string; probability: number }>> {
+      const response = await maia.predict(fen, rating);
+      return response.predictions.map((p) => ({
+        san: p.move,
+        probability: p.probability,
+      }));
+    },
+  };
 }
