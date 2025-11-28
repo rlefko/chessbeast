@@ -189,8 +189,12 @@ export class OpenAIClient {
         model: this.config.model,
         messages,
         temperature: request.temperature ?? this.config.temperature,
-        max_tokens: request.maxTokens ?? null,
       };
+
+      // Only add max_tokens if specified (SDK v6 doesn't accept null)
+      if (request.maxTokens) {
+        options.max_tokens = request.maxTokens;
+      }
 
       // Add reasoning effort for supported models (o1, o3, codex)
       const reasoningEffort = request.reasoningEffort ?? this.config.reasoningEffort;
