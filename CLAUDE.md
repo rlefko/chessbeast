@@ -107,6 +107,15 @@ Common emoji prefixes:
 - `$1` (good move) only added for critical positions
 - Max 2 consecutive position NAGs (clustering prevention)
 
+**Agentic Annotation Mode** (see `packages/llm/src/generator/agentic-generator.ts`):
+- Opt-in via `--agentic` CLI flag
+- LLM can call tools: `evaluate_position`, `predict_human_moves`, `lookup_opening`, `find_reference_games`, `make_move`
+- Tool executor in `packages/llm/src/tools/executor.ts` dispatches to services
+- Default max 5 tool calls per position (`--max-tool-calls` to override)
+- `--agentic-all` annotates all moves (not just critical moments)
+- `--show-costs` displays LLM cost summary at end
+- Cost tracking in `packages/llm/src/cost/` (model pricing per 1M tokens)
+
 ## Testing Requirements
 
 - Unit tests mock all external dependencies (Stockfish, Maia, OpenAI)

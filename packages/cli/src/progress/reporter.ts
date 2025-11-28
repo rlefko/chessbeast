@@ -20,6 +20,7 @@ export type AnalysisPhase =
   | 'deep_analysis'
   | 'maia_analysis'
   | 'llm_annotation'
+  | 'agentic_annotation'
   | 'rendering'
   | 'complete';
 
@@ -35,6 +36,7 @@ const PHASE_NAMES: Record<AnalysisPhase, string> = {
   deep_analysis: 'Deep analysis',
   maia_analysis: 'Maia analysis',
   llm_annotation: 'LLM annotation',
+  agentic_annotation: 'Agentic annotation',
   rendering: 'Rendering output',
   complete: 'Complete',
 };
@@ -365,6 +367,75 @@ export class ProgressReporter {
   }
 
   /**
+   * Print LLM cost summary
+   */
+  printCostSummary(costs: {
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    reasoningTokens?: number;
+    totalCost: number;
+    toolCalls?: number;
+    apiCalls?: number;
+  }): void {
+    if (this.silent) return;
+
+    console.log('');
+    console.log(this.c.bold('LLM Cost Summary:'));
+    console.log(`  Model: ${costs.model}`);
+    console.log(`  Input tokens: ${this.formatTokenCount(costs.inputTokens)}`);
+    console.log(`  Output tokens: ${this.formatTokenCount(costs.outputTokens)}`);
+    if (costs.reasoningTokens && costs.reasoningTokens > 0) {
+      console.log(`  Reasoning tokens: ${this.formatTokenCount(costs.reasoningTokens)}`);
+    }
+    if (costs.apiCalls !== undefined) {
+      console.log(`  API calls: ${costs.apiCalls}`);
+    }
+    if (costs.toolCalls !== undefined && costs.toolCalls > 0) {
+      console.log(`  Tool calls: ${costs.toolCalls}`);
+    }
+    console.log(`  ${this.c.bold('Estimated cost:')} ${this.formatCost(costs.totalCost)}`);
+  }
+
+  /**
+   * Display agentic tool call progress
+   */
+  displayToolCall(
+    moveNotation: string,
+    toolName: string,
+    iteration: number,
+    maxIterations: number,
+  ): void {
+    if (this.silent || !this.spinner) return;
+
+    const iterStr = `[${iteration}/${maxIterations}]`;
+    this.spinner.text = `${this.c.cyan(moveNotation)} ${iterStr} calling ${this.c.yellow(toolName)}...`;
+  }
+
+  /**
+   * Format token count for display
+   */
+  private formatTokenCount(count: number): string {
+    if (count >= 1_000_000) {
+      return `${(count / 1_000_000).toFixed(2)}M`;
+    }
+    if (count >= 1_000) {
+      return `${(count / 1_000).toFixed(1)}K`;
+    }
+    return count.toLocaleString();
+  }
+
+  /**
+   * Format cost in dollars
+   */
+  private formatCost(cost: number): string {
+    if (cost < 0.0001) {
+      return '< $0.0001';
+    }
+    return `$${cost.toFixed(4)}`;
+  }
+
+  /**
    * Print output file location
    */
   printOutputLocation(outputPath: string): void {
@@ -439,6 +510,8 @@ export function createPipelineProgressCallback(
       critical_detection: 'critical_detection',
       deep_analysis: 'deep_analysis',
       maia_analysis: 'maia_analysis',
+      llm_annotation: 'llm_annotation',
+      agentic_annotation: 'agentic_annotation',
       complete: 'complete',
     };
 

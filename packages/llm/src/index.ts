@@ -401,3 +401,47 @@ export {
   type EngineService,
   type MaiaService,
 } from './explorer/index.js';
+
+// Agentic annotation
+export {
+  AgenticCommentGenerator,
+  type AgenticProgress,
+  type AgenticResult,
+} from './generator/agentic-generator.js';
+
+export {
+  formatRichContext,
+  buildRichContext,
+  type RichPositionContext,
+  type DeepAnalysis,
+} from './prompts/rich-context.js';
+
+// Tools
+export {
+  ToolExecutor,
+  AGENTIC_TOOLS,
+  TOOL_NAMES,
+  type ToolName,
+  type AgenticServices,
+  type AgenticOptions,
+  type ToolCall,
+  type ToolResult,
+  type ToolExecutionStats,
+  type OpenAITool,
+} from './tools/index.js';
+
+// Cost tracking
+export {
+  CostTracker,
+  formatCost,
+  formatTokens,
+  formatCostStats,
+  getModelPricing,
+  calculateCost,
+  MODEL_PRICING,
+  DEFAULT_PRICING,
+  type ModelPricing,
+  type CostBreakdown,
+  type CostStats,
+  type FormatOptions,
+} from './cost/index.js';

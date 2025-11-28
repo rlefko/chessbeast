@@ -48,6 +48,13 @@ const REASONING_EFFORT_HELP = `LLM reasoning effort (for gpt-5-codex, o1, o3):
     high   - Maximum reasoning for complex positions`;
 
 /**
+ * Agentic mode descriptions for help text
+ */
+const AGENTIC_HELP = `Enable agentic annotation mode with tool calling.
+    The LLM can query Stockfish, Maia, and game databases
+    to generate richer, more insightful annotations.`;
+
+/**
  * Create and configure the CLI program
  */
 export function createProgram(): Command {
@@ -74,6 +81,14 @@ export function createProgram(): Command {
     .option('--skip-llm', 'Skip LLM annotations (template only)')
     .option('--reasoning-effort <level>', REASONING_EFFORT_HELP, 'medium')
     .option('--verbose', 'Enable verbose output with real-time LLM reasoning display')
+    .option('--agentic', AGENTIC_HELP)
+    .option('--agentic-all', 'Use agentic annotation for all moves (not just critical)')
+    .option(
+      '--max-tool-calls <count>',
+      'Max tool calls per position in agentic mode (default: 5)',
+      parseInt,
+    )
+    .option('--show-costs', 'Show LLM cost summary at end of analysis')
     .option('--show-config', 'Print resolved configuration and exit')
     .option('--no-color', 'Disable colored output (useful for piping)')
     .option('--dry-run', 'Validate setup and configuration without running analysis')
@@ -111,6 +126,11 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['reasoningEffort'] !== undefined)
     result.reasoningEffort = options['reasoningEffort'] as ReasoningEffort;
   if (options['verbose'] !== undefined) result.verbose = options['verbose'] as boolean;
+  if (options['agentic'] !== undefined) result.agentic = options['agentic'] as boolean;
+  if (options['agenticAll'] !== undefined) result.agenticAll = options['agenticAll'] as boolean;
+  if (options['maxToolCalls'] !== undefined)
+    result.maxToolCalls = options['maxToolCalls'] as number;
+  if (options['showCosts'] !== undefined) result.showCosts = options['showCosts'] as boolean;
 
   return result;
 }

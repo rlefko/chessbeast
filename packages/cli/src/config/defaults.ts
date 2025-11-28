@@ -69,6 +69,16 @@ export const DEFAULT_LLM_CONFIG = {
 };
 
 /**
+ * Default agentic annotation configuration
+ */
+export const DEFAULT_AGENTIC_CONFIG = {
+  enabled: false,
+  annotateAll: false,
+  maxToolCalls: 5,
+  showCosts: true,
+};
+
+/**
  * Default Stockfish service configuration
  */
 export const DEFAULT_STOCKFISH_CONFIG = {
@@ -112,6 +122,7 @@ export const DEFAULT_CONFIG: ChessBeastConfig = {
   analysis: DEFAULT_ANALYSIS_CONFIG,
   ratings: DEFAULT_RATINGS_CONFIG,
   llm: DEFAULT_LLM_CONFIG,
+  agentic: DEFAULT_AGENTIC_CONFIG,
   services: {
     stockfish: DEFAULT_STOCKFISH_CONFIG,
     maia: DEFAULT_MAIA_CONFIG,

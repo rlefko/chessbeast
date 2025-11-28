@@ -95,6 +95,10 @@ chessbeast analyze --show-config
 | `--skip-llm` | Skip LLM annotations (use templates only) |
 | `--reasoning-effort <level>` | LLM reasoning effort: `none`, `low`, `medium`, `high` (default: medium) |
 | `--verbose` | Enable verbose mode with real-time LLM reasoning display |
+| `--agentic` | Enable agentic mode with tool calling for critical moments |
+| `--agentic-all` | Enable agentic mode for all moves (not just critical) |
+| `--max-tool-calls <n>` | Max tool calls per position in agentic mode (default: 5) |
+| `--show-costs` | Display LLM cost summary after analysis |
 | `--show-config` | Print resolved configuration and exit |
 | `--no-color` | Disable colored output (useful for piping) |
 | `--dry-run` | Validate setup and configuration without running analysis |
@@ -128,6 +132,36 @@ Control whose point of view the annotations use:
 | `black` | From Black's point of view | "They gain a tempo" |
 
 This is useful when analyzing your own games - set `--perspective white` if you played White to get personalized "we/they" commentary.
+
+### Agentic Mode
+
+Agentic mode enables the LLM to query external services using OpenAI function calling for deeper analysis:
+
+```bash
+# Enable agentic mode for critical moments
+chessbeast analyze --input game.pgn --agentic
+
+# Enable agentic mode for all moves (more thorough, higher cost)
+chessbeast analyze --input game.pgn --agentic-all
+
+# Limit tool calls per position
+chessbeast analyze --input game.pgn --agentic --max-tool-calls 3
+
+# Show cost summary after analysis
+chessbeast analyze --input game.pgn --agentic --show-costs
+```
+
+**Available Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `evaluate_position` | Get Stockfish evaluation for a position |
+| `predict_human_moves` | Get Maia predictions for human-likely moves |
+| `lookup_opening` | Query ECO database for opening name |
+| `find_reference_games` | Search Lichess Elite games database |
+| `make_move` | Apply a move and get resulting position |
+
+Agentic mode produces richer annotations by allowing the LLM to explore positions dynamically.
 
 ### Configuration
 

@@ -48,6 +48,12 @@ You can also specify a config file explicitly with the `--config` flag.
     "reasoningEffort": "medium",
     "streaming": true
   },
+  "agentic": {
+    "enabled": false,
+    "annotateAll": false,
+    "maxToolCalls": 5,
+    "showCosts": true
+  },
   "services": {
     "stockfish": {
       "host": "localhost",
@@ -94,6 +100,12 @@ llm:
   timeout: 30000
   reasoningEffort: medium
   streaming: true
+
+agentic:
+  enabled: false
+  annotateAll: false
+  maxToolCalls: 5
+  showCosts: true
 
 services:
   stockfish:
@@ -156,6 +168,23 @@ output:
 
 When using reasoning models (gpt-5-codex, o1, o3), the model's thinking process can be displayed in verbose mode (`--verbose` flag). This shows real-time reasoning as each move is analyzed.
 
+### Agentic Settings
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `agentic.enabled` | boolean | false | Enable agentic mode with tool calling |
+| `agentic.annotateAll` | boolean | false | Annotate all moves (not just critical moments) |
+| `agentic.maxToolCalls` | number | 5 | Maximum tool calls per position |
+| `agentic.showCosts` | boolean | true | Display LLM cost summary after analysis |
+
+**Agentic Mode:**
+When enabled, the LLM can query external services using OpenAI function calling:
+- `evaluate_position`: Get Stockfish evaluation
+- `predict_human_moves`: Get Maia predictions for human-likely moves
+- `lookup_opening`: Query ECO database
+- `find_reference_games`: Search Lichess Elite games
+- `make_move`: Apply a move and get resulting position
+
 ### Service Settings
 
 | Option | Type | Default | Description |
@@ -216,8 +245,17 @@ All configuration options can be set via environment variables:
 |----------|-------------|
 | `CHESSBEAST_LLM_MODEL` | `llm.model` |
 | `CHESSBEAST_LLM_TIMEOUT` | `llm.timeout` |
+| `CHESSBEAST_TOKEN_BUDGET` | `llm.tokenBudget` |
 | `LLM_REASONING_EFFORT` | `llm.reasoningEffort` |
 | `LLM_STREAMING` | `llm.streaming` |
+
+### Agentic
+| Variable | Config Path |
+|----------|-------------|
+| `CHESSBEAST_AGENTIC` | `agentic.enabled` |
+| `CHESSBEAST_AGENTIC_ALL` | `agentic.annotateAll` |
+| `CHESSBEAST_MAX_TOOL_CALLS` | `agentic.maxToolCalls` |
+| `CHESSBEAST_SHOW_COSTS` | `agentic.showCosts` |
 
 ### Services
 | Variable | Config Path |

@@ -60,6 +60,16 @@ export interface LLMConfigSchema {
 }
 
 /**
+ * Agentic annotation configuration
+ */
+export interface AgenticConfigSchema {
+  enabled: boolean;
+  annotateAll: boolean;
+  maxToolCalls: number;
+  showCosts: boolean;
+}
+
+/**
  * Service endpoint configuration
  */
 export interface ServiceEndpoint {
@@ -102,6 +112,7 @@ export interface ChessBeastConfig {
   analysis: AnalysisConfigSchema;
   ratings: RatingsConfigSchema;
   llm: LLMConfigSchema;
+  agentic: AgenticConfigSchema;
   services: ServicesConfigSchema;
   databases: DatabasesConfigSchema;
   output: OutputConfigSchema;
@@ -161,6 +172,12 @@ const DEFAULT_CONFIG: ChessBeastConfig = {
     timeout: 30000,
     reasoningEffort: 'medium',
     streaming: true,
+  },
+  agentic: {
+    enabled: false,
+    annotateAll: false,
+    maxToolCalls: 5,
+    showCosts: true,
   },
   services: {
     stockfish: {
@@ -315,6 +332,30 @@ export class ConfigBuilder {
    */
   withStreaming(enabled: boolean): this {
     this.config.llm.streaming = enabled;
+    return this;
+  }
+
+  /**
+   * Configure agentic annotation options
+   */
+  withAgentic(options: {
+    enabled?: boolean;
+    annotateAll?: boolean;
+    maxToolCalls?: number;
+    showCosts?: boolean;
+  }): this {
+    if (options.enabled !== undefined) {
+      this.config.agentic.enabled = options.enabled;
+    }
+    if (options.annotateAll !== undefined) {
+      this.config.agentic.annotateAll = options.annotateAll;
+    }
+    if (options.maxToolCalls !== undefined) {
+      this.config.agentic.maxToolCalls = options.maxToolCalls;
+    }
+    if (options.showCosts !== undefined) {
+      this.config.agentic.showCosts = options.showCosts;
+    }
     return this;
   }
 

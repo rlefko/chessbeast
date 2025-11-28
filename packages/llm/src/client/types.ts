@@ -3,22 +3,25 @@
  */
 
 import type { ReasoningEffort } from '../config/llm-config.js';
+import type { OpenAITool, ToolCall } from '../tools/types.js';
 
 /**
  * Message role in conversation
  */
-export type MessageRole = 'system' | 'user' | 'assistant';
+export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
 
 /**
  * Streaming chunk from LLM
  */
 export interface StreamChunk {
   /** Type of content: 'thinking' for reasoning, 'content' for response */
-  type: 'thinking' | 'content';
+  type: 'thinking' | 'content' | 'tool_call';
   /** Text content of this chunk */
   text: string;
   /** Whether this is the final chunk */
   done: boolean;
+  /** Tool call info (when type is 'tool_call') */
+  toolCall?: Partial<ToolCall>;
 }
 
 /**
@@ -27,7 +30,20 @@ export interface StreamChunk {
 export interface ChatMessage {
   role: MessageRole;
   content: string;
+  /** Tool calls made by assistant (when role is 'assistant') */
+  toolCalls?: ToolCall[];
+  /** Tool call ID this message responds to (when role is 'tool') */
+  toolCallId?: string;
 }
+
+/**
+ * Tool choice for function calling
+ */
+export type ToolChoice =
+  | 'auto' // Let model decide
+  | 'none' // Disable tools
+  | 'required' // Force tool use
+  | { type: 'function'; function: { name: string } }; // Force specific tool
 
 /**
  * Request to the LLM
@@ -45,6 +61,10 @@ export interface LLMRequest {
   reasoningEffort?: ReasoningEffort;
   /** Streaming callback for real-time response chunks */
   onChunk?: (chunk: StreamChunk) => void;
+  /** Tools available for function calling */
+  tools?: OpenAITool[];
+  /** Tool choice strategy */
+  toolChoice?: ToolChoice;
 }
 
 /**
@@ -54,11 +74,13 @@ export interface LLMResponse {
   /** Generated content */
   content: string;
   /** Finish reason */
-  finishReason: 'stop' | 'length' | 'content_filter';
+  finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls';
   /** Token usage */
   usage: TokenUsage;
   /** Reasoning/thinking content from reasoning models (if any) */
   thinkingContent?: string;
+  /** Tool calls requested by the model */
+  toolCalls?: ToolCall[];
 }
 
 /**

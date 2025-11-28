@@ -154,10 +154,34 @@ export class OpenAIClient {
 
   private async doChat(request: LLMRequest): Promise<LLMResponse> {
     try {
-      const messages = request.messages.map((m) => ({
-        role: m.role as 'system' | 'user' | 'assistant',
-        content: m.content,
-      }));
+      // Convert messages to OpenAI format, handling tool messages
+      const messages = request.messages.map((m) => {
+        if (m.role === 'tool') {
+          return {
+            role: 'tool' as const,
+            content: m.content,
+            tool_call_id: m.toolCallId!,
+          };
+        }
+        if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+          return {
+            role: 'assistant' as const,
+            content: m.content || null,
+            tool_calls: m.toolCalls.map((tc) => ({
+              id: tc.id,
+              type: 'function' as const,
+              function: {
+                name: tc.function.name,
+                arguments: tc.function.arguments,
+              },
+            })),
+          };
+        }
+        return {
+          role: m.role as 'system' | 'user' | 'assistant',
+          content: m.content,
+        };
+      });
 
       // Build request options
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,6 +201,15 @@ export class OpenAIClient {
       // Add JSON format if requested
       if (request.responseFormat === 'json') {
         options.response_format = { type: 'json_object' };
+      }
+
+      // Add tools if provided
+      if (request.tools && request.tools.length > 0) {
+        options.tools = request.tools;
+        // Set tool choice
+        if (request.toolChoice) {
+          options.tool_choice = request.toolChoice;
+        }
       }
 
       // Use streaming if callback provided and streaming is enabled
@@ -208,12 +241,30 @@ export class OpenAIClient {
       // Track token usage
       this.tokenTracker.spend(usage.totalTokens);
 
-      return {
+      // Build response
+      const result: LLMResponse = {
         content: choice.message.content ?? '',
         finishReason: this.mapFinishReason(choice.finish_reason),
         usage,
-        thinkingContent,
       };
+
+      if (thinkingContent) {
+        result.thinkingContent = thinkingContent;
+      }
+
+      // Extract tool calls if present
+      if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
+        result.toolCalls = choice.message.tool_calls.map((tc) => ({
+          id: tc.id,
+          type: 'function' as const,
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          },
+        }));
+      }
+
+      return result;
     } catch (error) {
       throw this.mapError(error);
     }
@@ -240,7 +291,10 @@ export class OpenAIClient {
     let content = '';
     let thinkingContent = '';
     let usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-    let finishReason: 'stop' | 'length' | 'content_filter' = 'stop';
+    let finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls' = 'stop';
+
+    // Accumulate tool calls from streaming
+    const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>();
 
     // Stream is an async iterable
     for await (const chunk of stream) {
@@ -258,6 +312,32 @@ export class OpenAIClient {
       if (delta?.content) {
         content += delta.content;
         onChunk({ type: 'content', text: delta.content, done: false });
+      }
+
+      // Handle tool calls in streaming
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          const index = tc.index ?? 0;
+          const existing = toolCallsMap.get(index) ?? { id: '', name: '', arguments: '' };
+
+          if (tc.id) {
+            existing.id = tc.id;
+          }
+          if (tc.function?.name) {
+            existing.name = tc.function.name;
+            onChunk({
+              type: 'tool_call',
+              text: tc.function.name,
+              done: false,
+              toolCall: { id: existing.id, function: { name: tc.function.name, arguments: '' } },
+            });
+          }
+          if (tc.function?.arguments) {
+            existing.arguments += tc.function.arguments;
+          }
+
+          toolCallsMap.set(index, existing);
+        }
       }
 
       // Capture finish reason
@@ -291,6 +371,18 @@ export class OpenAIClient {
     };
     if (thinkingContent) {
       response.thinkingContent = thinkingContent;
+    }
+
+    // Add tool calls if any were received
+    if (toolCallsMap.size > 0) {
+      response.toolCalls = Array.from(toolCallsMap.values()).map((tc) => ({
+        id: tc.id,
+        type: 'function' as const,
+        function: {
+          name: tc.name,
+          arguments: tc.arguments,
+        },
+      }));
     }
 
     return response;
@@ -391,7 +483,9 @@ export class OpenAIClient {
     return 5000;
   }
 
-  private mapFinishReason(reason: string | null): 'stop' | 'length' | 'content_filter' {
+  private mapFinishReason(
+    reason: string | null,
+  ): 'stop' | 'length' | 'content_filter' | 'tool_calls' {
     switch (reason) {
       case 'stop':
         return 'stop';
@@ -399,6 +493,8 @@ export class OpenAIClient {
         return 'length';
       case 'content_filter':
         return 'content_filter';
+      case 'tool_calls':
+        return 'tool_calls';
       default:
         return 'stop';
     }

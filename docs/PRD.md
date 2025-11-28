@@ -134,6 +134,13 @@ The following technology choices have been made for v1:
 	•	Stream reasoning thoughts in real-time during annotation (verbose mode).
 	•	Track thinking tokens separately for cost visibility.
 	•	Reasoning effort levels: none, low, medium (default), high.
+	•	FR17: Agentic annotation mode:
+	•	Opt-in mode where the LLM can query external services using OpenAI function calling.
+	•	Available tools: evaluate_position, predict_human_moves, lookup_opening, find_reference_games, make_move.
+	•	Allows LLM to explore positions dynamically for richer annotations.
+	•	Configurable max tool calls per position (default: 5).
+	•	Cost tracking with model-specific pricing.
+	•	By default applies to critical moments only; --agentic-all for all moves.
 
 5.3 Output
 	•	FR13: Return a valid, standards-compliant annotated PGN:

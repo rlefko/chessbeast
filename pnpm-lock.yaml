@@ -132,6 +132,12 @@ importers:
       '@chessbeast/core':
         specifier: workspace:*
         version: link:../core
+      '@chessbeast/database':
+        specifier: workspace:*
+        version: link:../database
+      '@chessbeast/grpc-client':
+        specifier: workspace:*
+        version: link:../grpc-client
       '@chessbeast/pgn':
         specifier: workspace:*
         version: link:../pgn
