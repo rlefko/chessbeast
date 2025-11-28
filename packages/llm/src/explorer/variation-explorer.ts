@@ -10,6 +10,8 @@
  * - Self-regulating: LLM assesses if more exploration needed
  */
 
+import { ChessPosition } from '@chessbeast/pgn';
+
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { LLMConfig } from '../config/llm-config.js';
 import { CHESS_ANNOTATOR_SYSTEM } from '../prompts/system-prompts.js';
@@ -372,8 +374,17 @@ export class VariationExplorer {
     purpose: LinePurpose,
     source: LineSource,
   ): Promise<ExploredLine> {
+    // Convert UCI moves to SAN using the session's position
+    let sanMoves: string[];
+    try {
+      sanMoves = ChessPosition.convertPvToSan(moves, session.position);
+    } catch {
+      // If conversion fails, return empty line
+      sanMoves = [];
+    }
+
     const line: ExploredLine = {
-      moves: moves.slice(0, session.maxDepth),
+      moves: sanMoves.slice(0, session.maxDepth),
       annotations: new Map(),
       branches: [],
       purpose,
@@ -381,8 +392,8 @@ export class VariationExplorer {
     };
 
     // For long tactical lines, ask LLM to identify key moves to annotate
-    if (moves.length > 4 && session.llmCallCount < session.softCallCap) {
-      const keyMoves = await this.identifyKeyMoves(session, moves);
+    if (sanMoves.length > 4 && session.llmCallCount < session.softCallCap) {
+      const keyMoves = await this.identifyKeyMoves(session, sanMoves);
       for (const km of keyMoves) {
         if (km.moveIndex < line.moves.length) {
           line.annotations.set(km.moveIndex, km.explanation);
