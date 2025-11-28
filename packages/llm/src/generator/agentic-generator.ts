@@ -8,7 +8,7 @@ import type { LLMConfig } from '../config/llm-config.js';
 import type { RichPositionContext } from '../prompts/rich-context.js';
 import { formatRichContext } from '../prompts/rich-context.js';
 import { AGENTIC_TOOLS, ToolExecutor } from '../tools/index.js';
-import type { AgenticServices, AgenticOptions } from '../tools/types.js';
+import type { AgenticServices, AgenticOptions, ToolExecutionStats } from '../tools/types.js';
 import type { GeneratedComment } from '../validator/output-validator.js';
 import { parseJsonResponse, validateComment } from '../validator/output-validator.js';
 
@@ -248,7 +248,7 @@ export class AgenticCommentGenerator {
   /**
    * Get execution statistics from last run
    */
-  getStats() {
+  getStats(): ToolExecutionStats[] {
     return this.toolExecutor.getStats();
   }
 }

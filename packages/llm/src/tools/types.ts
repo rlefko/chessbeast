@@ -2,8 +2,8 @@
  * Types for agentic tool calling
  */
 
-import type { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
 import type { EcoClient, LichessEliteClient } from '@chessbeast/database';
+import type { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
 
 /**
  * JSON Schema type for OpenAI function parameters
