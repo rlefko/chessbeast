@@ -247,7 +247,8 @@ export class Annotator {
         totalPositions: plan.positions.length,
       });
 
-      // Create streaming callback that forwards thinking to progress
+      // Create streaming callback that forwards chunks to progress
+      // Forward both thinking and content chunks so the progress timer stays alive
       const onChunk: ((chunk: StreamChunk) => void) | undefined = onProgress
         ? (chunk: StreamChunk): void => {
             if (chunk.type === 'thinking') {
@@ -257,6 +258,14 @@ export class Annotator {
                 currentIndex: i,
                 totalPositions: plan.positions.length,
                 thinking: chunk.text,
+              });
+            } else if (chunk.type === 'content') {
+              // Forward content chunks without thinking text to keep progress alive
+              onProgress({
+                phase: 'annotating',
+                currentMove: moveNotation,
+                currentIndex: i,
+                totalPositions: plan.positions.length,
               });
             }
           }

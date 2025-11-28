@@ -133,7 +133,8 @@ export class AgenticCommentGenerator {
         temperature: this.config.temperature,
         reasoningEffort: this.config.reasoningEffort,
         onChunk: (chunk) => {
-          if (chunk.type === 'thinking' && onChunk) {
+          // Forward both thinking and content chunks for progress feedback
+          if ((chunk.type === 'thinking' || chunk.type === 'content') && onChunk) {
             onChunk(chunk);
           }
           if (chunk.type === 'tool_call') {
