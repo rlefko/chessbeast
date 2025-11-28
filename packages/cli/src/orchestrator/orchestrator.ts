@@ -182,7 +182,7 @@ export async function orchestrateAnalysis(
               progress.currentMove,
             );
 
-            // Display thinking (only in verbose mode - handled by reporter)
+            // Display streaming thinking/content
             if (progress.thinking) {
               reporter.displayThinking(progress.currentMove, progress.thinking);
             }

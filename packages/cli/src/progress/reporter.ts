@@ -289,11 +289,10 @@ export class ProgressReporter {
 
   /**
    * Display streaming reasoning/thinking content
-   * Only shown when verbose mode is enabled
+   * Shows real-time LLM activity during annotation
    */
   displayThinking(moveNotation: string, thought: string): void {
-    // Only display thinking in verbose mode
-    if (this.silent || !this.verbose || !this.spinner) return;
+    if (this.silent || !this.spinner) return;
 
     // Stop the waiting timer - we're now receiving streaming content
     this.stopLlmWaitingTimer();

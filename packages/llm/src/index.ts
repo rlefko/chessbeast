@@ -260,12 +260,13 @@ export class Annotator {
                 thinking: chunk.text,
               });
             } else if (chunk.type === 'content') {
-              // Forward content chunks without thinking text to keep progress alive
+              // Forward content chunks with text so displayThinking() is called
               onProgress({
                 phase: 'annotating',
                 currentMove: moveNotation,
                 currentIndex: i,
                 totalPositions: plan.positions.length,
+                thinking: chunk.text,
               });
             }
           }
