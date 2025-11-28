@@ -56,6 +56,15 @@ chessbeast analyze \
   --verbosity rich \
   --target-elo 1600
 
+# Analyze from White's perspective (uses "we" and "they" language)
+chessbeast analyze --input game.pgn --perspective white
+
+# Analyze from Black's perspective
+chessbeast analyze --input game.pgn --perspective black
+
+# Limit LLM token usage for cost control
+chessbeast analyze --input game.pgn --token-budget 30000
+
 # Skip external services for offline analysis
 chessbeast analyze --input game.pgn --skip-maia --skip-llm
 
@@ -75,7 +84,9 @@ chessbeast analyze --show-config
 | `-c, --config <file>` | Path to configuration file |
 | `-p, --profile <profile>` | Analysis profile: `quick`, `standard`, `deep` (default: standard) |
 | `-v, --verbosity <level>` | Output verbosity: `summary`, `normal`, `rich` (default: normal) |
+| `--perspective <side>` | Annotation perspective: `neutral`, `white`, `black` (default: neutral) |
 | `--target-elo <rating>` | Target audience rating for explanations |
+| `--token-budget <tokens>` | Max tokens per game for LLM (default: 50000) |
 | `--skip-maia` | Skip Maia human-likeness analysis |
 | `--skip-llm` | Skip LLM annotations (use templates only) |
 | `--show-config` | Print resolved configuration and exit |
@@ -99,6 +110,18 @@ chessbeast analyze --show-config
 | `summary` | Game overview and key moments only |
 | `normal` | Standard annotations with key lines (default) |
 | `rich` | Detailed explanations with alternative variations |
+
+### Perspective
+
+Control whose point of view the annotations use:
+
+| Perspective | Description | Example |
+|-------------|-------------|---------|
+| `neutral` | Objective third-person (default) | "White gains a tempo" |
+| `white` | From White's point of view | "We gain a tempo" |
+| `black` | From Black's point of view | "They gain a tempo" |
+
+This is useful when analyzing your own games - set `--perspective white` if you played White to get personalized "we/they" commentary.
 
 ### Configuration
 
