@@ -478,6 +478,49 @@ interface LLMConfig {
 - Shows model's step-by-step analysis of each position
 - Helps users understand how annotations were generated
 
+### 3.7.2 Agentic Annotation Mode
+
+The LLM can optionally use OpenAI function calling to query external services for richer annotations.
+
+**Key interfaces:**
+- `AgenticServices`: Connection to Stockfish, Maia, ECO database, Lichess Elite database
+- `ToolExecutor`: Dispatches tool calls to appropriate services
+- `AgenticGenerator`: Manages the agentic loop (prompt → tool calls → tool results → response)
+
+**Available tools:**
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `evaluate_position` | `fen`, `depth?`, `multipv?` | Get Stockfish evaluation |
+| `predict_human_moves` | `fen`, `rating?` | Get Maia predictions for human-likely moves |
+| `lookup_opening` | `fen` | Query ECO database for opening name |
+| `find_reference_games` | `fen`, `limit?` | Search Lichess Elite games database |
+| `make_move` | `fen`, `move` | Apply a move and get resulting position |
+
+**Agentic loop flow:**
+1. Format rich context with position details, game info, and previous analysis
+2. Send prompt with tool definitions to LLM
+3. If LLM requests tool calls, execute them via `ToolExecutor`
+4. Return tool results to LLM
+5. Repeat until LLM provides final annotation or max tool calls reached
+
+**Configuration:**
+
+```typescript
+interface AgenticConfig {
+  enabled: boolean;          // Default: false
+  annotateAll: boolean;      // Default: false (critical moments only)
+  maxToolCalls: number;      // Default: 5
+  showCosts: boolean;        // Default: true
+}
+```
+
+**Cost tracking:**
+- `CostTracker`: Accumulates token usage across API calls
+- `MODEL_PRICING`: Per-model pricing (input, output, reasoning tokens per 1M)
+- Supports GPT-4o, GPT-4o-mini, o1, gpt-5-codex models
+- Cost summary displayed with `--show-costs` flag
+
 3.8 PGN Renderer
 	•	Merge:
 	•	Original game moves.
