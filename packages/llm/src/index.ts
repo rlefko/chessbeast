@@ -293,7 +293,12 @@ export class Annotator {
         : undefined;
 
       // Generate comment
-      const comment = await this.commentGenerator.generateComment(context, planned, onChunk, onWarning);
+      const comment = await this.commentGenerator.generateComment(
+        context,
+        planned,
+        onChunk,
+        onWarning,
+      );
 
       // Apply to analysis
       if (move && comment.comment) {
@@ -312,7 +317,11 @@ export class Annotator {
         totalPositions: plan.positions.length,
       });
 
-      const summary = await this.summaryGenerator.generateSummary(analysis, plan.targetRating, onWarning);
+      const summary = await this.summaryGenerator.generateSummary(
+        analysis,
+        plan.targetRating,
+        onWarning,
+      );
       analysis.summary = formatSummaryAsString(summary);
       summaryGenerated = true;
     }
