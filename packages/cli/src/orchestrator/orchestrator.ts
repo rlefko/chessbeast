@@ -174,7 +174,14 @@ export async function orchestrateAnalysis(
 
         // Create progress callback for annotation updates
         const onProgress = (progress: AnnotationProgress): void => {
-          if (progress.phase === 'annotating' && progress.currentMove) {
+          if (progress.phase === 'exploring' && progress.currentMove) {
+            // Show exploration progress
+            reporter.updateMoveProgress(
+              progress.currentIndex + 1,
+              progress.totalPositions,
+              `Exploring ${progress.currentMove}`,
+            );
+          } else if (progress.phase === 'annotating' && progress.currentMove) {
             // Update move progress (always shown)
             reporter.updateMoveProgress(
               progress.currentIndex + 1,
