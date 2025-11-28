@@ -111,9 +111,7 @@ describe('Blunder Detection Quality', () => {
         collector.recordBlunderDetection(predictedBlunders, game.groundTruth.blunders);
 
         // Individual game assertions (with tolerance)
-        const intersection = predictedBlunders.filter((p) =>
-          game.groundTruth.blunders.includes(p),
-        );
+        const intersection = predictedBlunders.filter((p) => game.groundTruth.blunders.includes(p));
 
         // At least 70% of ground truth blunders should be detected
         if (game.groundTruth.blunders.length > 0) {
@@ -129,7 +127,9 @@ describe('Blunder Detection Quality', () => {
 
   describe('Move Classification Distribution', () => {
     it('should produce reasonable classification distribution', async () => {
-      const pgn = labeledGames[0]?.pgn ?? `[Event "Test"]
+      const pgn =
+        labeledGames[0]?.pgn ??
+        `[Event "Test"]
 [White "A"]
 [Black "B"]
 [Result "*"]
@@ -170,11 +170,15 @@ describe('Blunder Detection Quality', () => {
         engine: {
           responses: new Map([
             // Position before blunder: even
-            ['rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
-             { cp: 0, depth: 20, pv: ['Nf3'] }],
+            [
+              'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+              { cp: 0, depth: 20, pv: ['Nf3'] },
+            ],
             // Position after blunder: losing 300cp
-            ['rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
-             { cp: -300, depth: 20, pv: [] }],
+            [
+              'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
+              { cp: -300, depth: 20, pv: [] },
+            ],
           ]),
         },
       });
@@ -204,7 +208,9 @@ describe('Blunder Detection Quality', () => {
 
   describe('Blunder Detection Consistency', () => {
     it('should produce consistent blunder detection across runs', async () => {
-      const pgn = labeledGames[0]?.pgn ?? `[Event "Test"]
+      const pgn =
+        labeledGames[0]?.pgn ??
+        `[Event "Test"]
 [White "A"]
 [Black "B"]
 [Result "1-0"]
@@ -218,13 +224,15 @@ describe('Blunder Detection Quality', () => {
       const result1 = await orchestrateAnalysis(pgn, DEFAULT_CONFIG, services, reporter);
       const result2 = await orchestrateAnalysis(pgn, DEFAULT_CONFIG, services, reporter);
 
-      const blunders1 = result1.results[0]!.analysis.moves
-        .filter((m) => m.classification === 'blunder')
+      const blunders1 = result1.results[0]!.analysis.moves.filter(
+        (m) => m.classification === 'blunder',
+      )
         .map((m) => m.plyIndex)
         .sort((a, b) => a - b);
 
-      const blunders2 = result2.results[0]!.analysis.moves
-        .filter((m) => m.classification === 'blunder')
+      const blunders2 = result2.results[0]!.analysis.moves.filter(
+        (m) => m.classification === 'blunder',
+      )
         .map((m) => m.plyIndex)
         .sort((a, b) => a - b);
 

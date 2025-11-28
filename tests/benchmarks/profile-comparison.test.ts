@@ -227,10 +227,7 @@ describe('Performance Benchmarks', () => {
         const growth = (final - baseline) / (1024 * 1024); // MB
 
         // Memory growth should be reasonable (< 50MB for test data)
-        expect(
-          growth,
-          `Memory growth ${growth.toFixed(2)}MB is too high`,
-        ).toBeLessThan(50);
+        expect(growth, `Memory growth ${growth.toFixed(2)}MB is too high`).toBeLessThan(50);
       }
     });
   });
@@ -257,10 +254,7 @@ describe('Performance Benchmarks', () => {
       const cv = stdDev / mean;
 
       // CV should be reasonable (< 50% variation)
-      expect(
-        cv,
-        `Timing variation too high: CV = ${(cv * 100).toFixed(1)}%`,
-      ).toBeLessThan(0.5);
+      expect(cv, `Timing variation too high: CV = ${(cv * 100).toFixed(1)}%`).toBeLessThan(0.5);
     });
   });
 });

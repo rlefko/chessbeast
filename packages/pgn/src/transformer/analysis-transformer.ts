@@ -226,10 +226,7 @@ function transformMetadata(
  * @param move - The move analysis to transform
  * @param opts - Transformation options
  */
-function transformMove(
-  move: MoveAnalysisInput,
-  opts: Required<TransformOptions>,
-): MoveInfo {
+function transformMove(move: MoveAnalysisInput, opts: Required<TransformOptions>): MoveInfo {
   const moveInfo: MoveInfo = {
     moveNumber: move.moveNumber,
     san: move.san,

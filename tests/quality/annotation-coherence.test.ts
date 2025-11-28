@@ -69,7 +69,10 @@ describe('Annotation Coherence Quality', () => {
       // At least 80% should have proper structure
       if (annotatedMoves.length > 0) {
         const ratio = properStructure / annotatedMoves.length;
-        expect(ratio, 'Most annotations should have proper sentence structure').toBeGreaterThanOrEqual(0.8);
+        expect(
+          ratio,
+          'Most annotations should have proper sentence structure',
+        ).toBeGreaterThanOrEqual(0.8);
       }
     });
   });
@@ -94,8 +97,8 @@ describe('Annotation Coherence Quality', () => {
         for (const ref of references) {
           // Move references should either be in the game or valid algebraic notation
           const isInGame = gameMoves.has(ref);
-          const isValidNotation = /^[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?$/.test(ref) ||
-                                   /^O-O(?:-O)?$/.test(ref);
+          const isValidNotation =
+            /^[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?$/.test(ref) || /^O-O(?:-O)?$/.test(ref);
 
           expect(
             isInGame || isValidNotation,
@@ -121,12 +124,23 @@ describe('Annotation Coherence Quality', () => {
         if (!blunder.comment) continue;
 
         // Blunder annotations should mention error-related themes
-        const errorThemes = ['mistake', 'error', 'blunder', 'loses', 'bad', 'wrong', 'damages', 'worsens'];
+        const errorThemes = [
+          'mistake',
+          'error',
+          'blunder',
+          'loses',
+          'bad',
+          'wrong',
+          'damages',
+          'worsens',
+        ];
         const hasErrorTheme = errorThemes.some((theme) => matchesTheme(blunder.comment!, theme));
 
         // At least log if no error theme found
         if (!hasErrorTheme) {
-          console.warn(`Blunder at ply ${blunder.plyIndex} may not mention error: "${blunder.comment}"`);
+          console.warn(
+            `Blunder at ply ${blunder.plyIndex} may not mention error: "${blunder.comment}"`,
+          );
         }
       }
     });
@@ -145,11 +159,21 @@ describe('Annotation Coherence Quality', () => {
         if (!move.comment) continue;
 
         // Brilliant move annotations should mention positive themes
-        const positiveThemes = ['brilliant', 'excellent', 'strong', 'good', 'best', 'improves', 'stunning'];
+        const positiveThemes = [
+          'brilliant',
+          'excellent',
+          'strong',
+          'good',
+          'best',
+          'improves',
+          'stunning',
+        ];
         const hasPositiveTheme = positiveThemes.some((theme) => matchesTheme(move.comment!, theme));
 
         if (!hasPositiveTheme) {
-          console.warn(`Brilliant move at ply ${move.plyIndex} may not sound positive: "${move.comment}"`);
+          console.warn(
+            `Brilliant move at ply ${move.plyIndex} may not sound positive: "${move.comment}"`,
+          );
         }
       }
     });
