@@ -172,4 +172,8 @@ export interface CliOptions {
   perspective?: AnnotationPerspective;
   /** Maximum tokens per game for LLM */
   tokenBudget?: number;
+  /** Reasoning effort for LLM (none, low, medium, high) */
+  reasoningEffort?: ReasoningEffort;
+  /** Enable verbose output with real-time LLM reasoning display */
+  verbose?: boolean;
 }

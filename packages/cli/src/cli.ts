@@ -9,6 +9,7 @@ import type {
   AnalysisProfile,
   OutputVerbosity,
   AnnotationPerspective,
+  ReasoningEffort,
 } from './config/schema.js';
 
 export const VERSION = '0.1.0';
@@ -38,6 +39,15 @@ const PERSPECTIVE_HELP = `Annotation perspective:
     black   - From Black's point of view (we/they)`;
 
 /**
+ * Reasoning effort descriptions for help text
+ */
+const REASONING_EFFORT_HELP = `LLM reasoning effort (for gpt-5-codex, o1, o3):
+    none   - Disable reasoning (standard completion)
+    low    - Minimal reasoning for faster responses
+    medium - Balanced reasoning for quality analysis [default]
+    high   - Maximum reasoning for complex positions`;
+
+/**
  * Create and configure the CLI program
  */
 export function createProgram(): Command {
@@ -62,6 +72,8 @@ export function createProgram(): Command {
     .option('--token-budget <tokens>', 'Max tokens per game for LLM (default: 50000)', parseInt)
     .option('--skip-maia', 'Skip Maia human-likeness analysis')
     .option('--skip-llm', 'Skip LLM annotations (template only)')
+    .option('--reasoning-effort <level>', REASONING_EFFORT_HELP, 'medium')
+    .option('--verbose', 'Enable verbose output with real-time LLM reasoning display')
     .option('--show-config', 'Print resolved configuration and exit')
     .option('--no-color', 'Disable colored output (useful for piping)')
     .option('--dry-run', 'Validate setup and configuration without running analysis')
@@ -96,6 +108,9 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   // Note: Commander.js uses 'color' (negated) when --no-color is used
   if (options['color'] === false) result.noColor = true;
   if (options['dryRun'] !== undefined) result.dryRun = options['dryRun'] as boolean;
+  if (options['reasoningEffort'] !== undefined)
+    result.reasoningEffort = options['reasoningEffort'] as ReasoningEffort;
+  if (options['verbose'] !== undefined) result.verbose = options['verbose'] as boolean;
 
   return result;
 }
