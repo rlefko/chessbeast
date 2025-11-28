@@ -118,7 +118,7 @@ export const DEFAULT_CACHE_CONFIG: CacheConfig = {
  * Default LLM configuration (requires apiKey to be provided)
  */
 export const DEFAULT_LLM_CONFIG: Omit<LLMConfig, 'apiKey'> = {
-  model: process.env['OPENAI_MODEL'] ?? 'gpt-5.1',
+  model: process.env['OPENAI_MODEL'] ?? 'gpt-5-codex',
   temperature: 0.7,
   timeout: parseInt(process.env['LLM_TIMEOUT_MS'] ?? '30000', 10),
   budget: DEFAULT_TOKEN_BUDGET,

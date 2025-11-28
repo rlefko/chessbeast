@@ -42,7 +42,7 @@ You can also specify a config file explicitly with the `--config` flag.
     "targetAudienceRating": 1600
   },
   "llm": {
-    "model": "gpt-4o",
+    "model": "gpt-5-codex",
     "temperature": 0.7,
     "timeout": 30000
   },
@@ -87,7 +87,7 @@ ratings:
   targetAudienceRating: 1600
 
 llm:
-  model: gpt-4o
+  model: gpt-5-codex
   temperature: 0.7
   timeout: 30000
 
@@ -138,7 +138,7 @@ output:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `llm.apiKey` | string | — | OpenAI API key (prefer `OPENAI_API_KEY` env var) |
-| `llm.model` | string | `"gpt-4o"` | OpenAI model to use |
+| `llm.model` | string | `"gpt-5-codex"` | OpenAI model to use |
 | `llm.temperature` | number | 0.7 | Model temperature (0.0-2.0) |
 | `llm.timeout` | number | 30000 | Request timeout in milliseconds |
 

@@ -149,7 +149,7 @@ const DEFAULT_CONFIG: ChessBeastConfig = {
     defaultRating: 1500,
   },
   llm: {
-    model: 'gpt-4o',
+    model: 'gpt-5-codex',
     temperature: 0.7,
     timeout: 30000,
   },
