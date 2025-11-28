@@ -31,7 +31,7 @@ PGN → Parser → Positions → Engine + Maia + DB → Critical Moments → Ann
 | Maia Service | Python 3.10+ + gRPC | Maia2 PyTorch model serving (`pip install maia2`) |
 | Inter-service Comm | gRPC + Protobuf | Efficient binary protocol |
 | Database | SQLite | ECO openings + Lichess Elite games |
-| LLM | OpenAI API (GPT-5-codex) | Reasoning model with streaming support |
+| LLM | OpenAI API (GPT-5) | Reasoning model with streaming support |
 
 ⸻
 
@@ -447,7 +447,7 @@ Implementation:
 
 ### 3.7.1 Reasoning Model Support
 
-The LLM client supports OpenAI reasoning models (gpt-5-codex, o1, o3) with configurable reasoning effort:
+The LLM client supports OpenAI reasoning models (gpt-5, o1, o3) with configurable reasoning effort:
 
 **Key interfaces:**
 - `ReasoningEffort`: 'none' | 'low' | 'medium' | 'high' - controls depth of model reasoning
@@ -458,7 +458,7 @@ The LLM client supports OpenAI reasoning models (gpt-5-codex, o1, o3) with confi
 
 ```typescript
 interface LLMConfig {
-  model: string;              // e.g., "gpt-5-codex"
+  model: string;              // e.g., "gpt-5"
   reasoningEffort: ReasoningEffort; // Default: "medium"
   streaming: boolean;         // Default: true
   temperature: number;
@@ -518,7 +518,7 @@ interface AgenticConfig {
 **Cost tracking:**
 - `CostTracker`: Accumulates token usage across API calls
 - `MODEL_PRICING`: Per-model pricing (input, output, reasoning tokens per 1M)
-- Supports GPT-4o, GPT-4o-mini, o1, gpt-5-codex models
+- Supports GPT-4o, GPT-4o-mini, o1, gpt-5 models
 - Cost summary displayed with `--show-costs` flag
 
 3.8 PGN Renderer

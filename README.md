@@ -9,7 +9,7 @@ An AI-powered chess game annotator that produces human-friendly analysis. ChessB
 - **Critical Moment Detection**: Identifies key turning points, blunders, and missed opportunities
 - **Opening Recognition**: ECO classification and reference to master games
 - **Standards-Compliant Output**: Produces valid annotated PGN loadable in any chess GUI
-- **Advanced Reasoning Models**: Supports OpenAI reasoning models (gpt-5-codex, o1, o3) with configurable reasoning effort and real-time thought streaming
+- **Advanced Reasoning Models**: Supports OpenAI reasoning models (gpt-5, o1, o3) with configurable reasoning effort and real-time thought streaming
 
 ## Installation
 
