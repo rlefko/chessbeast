@@ -188,17 +188,25 @@ export class OpenAIClient {
       const options: any = {
         model: this.config.model,
         messages,
-        temperature: request.temperature ?? this.config.temperature,
       };
+
+      // GPT-5 and reasoning models don't support custom temperature (only default 1)
+      const isReasoningModel =
+        this.config.model.startsWith('gpt-5') ||
+        this.config.model.startsWith('o1') ||
+        this.config.model.startsWith('o3');
+      if (!isReasoningModel) {
+        options.temperature = request.temperature ?? this.config.temperature;
+      }
 
       // Only add max_tokens if specified (SDK v6 doesn't accept null)
       if (request.maxTokens) {
         options.max_tokens = request.maxTokens;
       }
 
-      // Add reasoning effort for supported models (o1, o3, codex)
+      // Add reasoning effort for supported models (gpt-5, o1, o3)
       const reasoningEffort = request.reasoningEffort ?? this.config.reasoningEffort;
-      if (reasoningEffort && reasoningEffort !== 'none') {
+      if (isReasoningModel && reasoningEffort && reasoningEffort !== 'none') {
         options.reasoning_effort = reasoningEffort;
       }
 
