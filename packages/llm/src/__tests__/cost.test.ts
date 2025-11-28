@@ -4,18 +4,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import {
-  MODEL_PRICING,
-  DEFAULT_PRICING,
-  getModelPricing,
-  calculateCost,
-} from '../cost/pricing.js';
-import {
-  CostTracker,
-  formatCost,
-  formatTokens,
-  formatCostStats,
-} from '../cost/tracker.js';
+import { MODEL_PRICING, DEFAULT_PRICING, getModelPricing, calculateCost } from '../cost/pricing.js';
+import { CostTracker, formatCost, formatTokens, formatCostStats } from '../cost/tracker.js';
 
 describe('Model Pricing', () => {
   describe('MODEL_PRICING', () => {
@@ -56,9 +46,7 @@ describe('Model Pricing', () => {
       const pricing = getModelPricing('unknown-model-xyz');
       expect(pricing).toEqual(DEFAULT_PRICING);
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Unknown model'),
-      );
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown model'));
 
       warnSpy.mockRestore();
     });

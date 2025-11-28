@@ -131,9 +131,10 @@ export class ToolExecutor {
     });
 
     // Convert UCI PV to SAN notation
-    const pvSan = response.bestLine.length > 0
-      ? ChessPosition.convertPvToSan(response.bestLine, params.fen)
-      : [];
+    const pvSan =
+      response.bestLine.length > 0
+        ? ChessPosition.convertPvToSan(response.bestLine, params.fen)
+        : [];
 
     const result: EvaluatePositionResult = {
       evaluation: response.cp,
@@ -149,23 +150,24 @@ export class ToolExecutor {
 
     // Process alternative lines if multipv > 1
     if (multipv > 1 && response.alternatives && response.alternatives.length > 0) {
-      result.alternatives = response.alternatives.map((alt: { cp: number; mate: number; bestLine: string[] }) => {
-        const altPvSan = alt.bestLine.length > 0
-          ? ChessPosition.convertPvToSan(alt.bestLine, params.fen)
-          : [];
+      result.alternatives = response.alternatives.map(
+        (alt: { cp: number; mate: number; bestLine: string[] }) => {
+          const altPvSan =
+            alt.bestLine.length > 0 ? ChessPosition.convertPvToSan(alt.bestLine, params.fen) : [];
 
-        const altResult: NonNullable<EvaluatePositionResult['alternatives']>[number] = {
-          evaluation: alt.cp,
-          isMate: alt.mate !== 0,
-          principalVariation: altPvSan,
-        };
+          const altResult: NonNullable<EvaluatePositionResult['alternatives']>[number] = {
+            evaluation: alt.cp,
+            isMate: alt.mate !== 0,
+            principalVariation: altPvSan,
+          };
 
-        if (alt.mate !== 0) {
-          altResult.mateIn = alt.mate;
-        }
+          if (alt.mate !== 0) {
+            altResult.mateIn = alt.mate;
+          }
 
-        return altResult;
-      });
+          return altResult;
+        },
+      );
     }
 
     return result;

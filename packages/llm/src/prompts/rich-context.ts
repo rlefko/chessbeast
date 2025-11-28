@@ -169,7 +169,9 @@ export function formatRichContext(ctx: RichPositionContext): string {
     'Analyze this position and generate a helpful annotation. You can use the available tools to:',
   );
   sections.push('- `evaluate_position`: Explore alternative lines or verify your analysis');
-  sections.push('- `predict_human_moves`: Check what moves humans at various ratings would consider');
+  sections.push(
+    '- `predict_human_moves`: Check what moves humans at various ratings would consider',
+  );
   sections.push('- `find_reference_games`: Find how master players handled this position');
   sections.push('- `make_move`: Test "what if" scenarios');
   sections.push('');

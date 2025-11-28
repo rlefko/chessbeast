@@ -400,7 +400,12 @@ export class ProgressReporter {
   /**
    * Display agentic tool call progress
    */
-  displayToolCall(moveNotation: string, toolName: string, iteration: number, maxIterations: number): void {
+  displayToolCall(
+    moveNotation: string,
+    toolName: string,
+    iteration: number,
+    maxIterations: number,
+  ): void {
     if (this.silent || !this.spinner) return;
 
     const iterStr = `[${iteration}/${maxIterations}]`;

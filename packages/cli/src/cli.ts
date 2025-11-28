@@ -83,7 +83,11 @@ export function createProgram(): Command {
     .option('--verbose', 'Enable verbose output with real-time LLM reasoning display')
     .option('--agentic', AGENTIC_HELP)
     .option('--agentic-all', 'Use agentic annotation for all moves (not just critical)')
-    .option('--max-tool-calls <count>', 'Max tool calls per position in agentic mode (default: 5)', parseInt)
+    .option(
+      '--max-tool-calls <count>',
+      'Max tool calls per position in agentic mode (default: 5)',
+      parseInt,
+    )
     .option('--show-costs', 'Show LLM cost summary at end of analysis')
     .option('--show-config', 'Print resolved configuration and exit')
     .option('--no-color', 'Disable colored output (useful for piping)')
@@ -124,7 +128,8 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['verbose'] !== undefined) result.verbose = options['verbose'] as boolean;
   if (options['agentic'] !== undefined) result.agentic = options['agentic'] as boolean;
   if (options['agenticAll'] !== undefined) result.agenticAll = options['agenticAll'] as boolean;
-  if (options['maxToolCalls'] !== undefined) result.maxToolCalls = options['maxToolCalls'] as number;
+  if (options['maxToolCalls'] !== undefined)
+    result.maxToolCalls = options['maxToolCalls'] as number;
   if (options['showCosts'] !== undefined) result.showCosts = options['showCosts'] as boolean;
 
   return result;

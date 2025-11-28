@@ -294,10 +294,7 @@ export class OpenAIClient {
     let finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls' = 'stop';
 
     // Accumulate tool calls from streaming
-    const toolCallsMap = new Map<
-      number,
-      { id: string; name: string; arguments: string }
-    >();
+    const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>();
 
     // Stream is an async iterable
     for await (const chunk of stream) {

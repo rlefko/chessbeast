@@ -48,7 +48,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-3.5-turbo-16k': { input: 3.0, output: 4.0 },
 
   // Reasoning models
-  'o1': { input: 15.0, output: 60.0, reasoning: 60.0 },
+  o1: { input: 15.0, output: 60.0, reasoning: 60.0 },
   'o1-preview': { input: 15.0, output: 60.0, reasoning: 60.0 },
   'o1-mini': { input: 3.0, output: 12.0, reasoning: 12.0 },
   'o3-mini': { input: 1.1, output: 4.4, reasoning: 4.4 },
@@ -99,9 +99,7 @@ export function calculateCost(
 ): { inputCost: number; outputCost: number; reasoningCost: number; totalCost: number } {
   const inputCost = (inputTokens / 1_000_000) * pricing.input;
   const outputCost = (outputTokens / 1_000_000) * pricing.output;
-  const reasoningCost = pricing.reasoning
-    ? (reasoningTokens / 1_000_000) * pricing.reasoning
-    : 0;
+  const reasoningCost = pricing.reasoning ? (reasoningTokens / 1_000_000) * pricing.reasoning : 0;
 
   return {
     inputCost,
