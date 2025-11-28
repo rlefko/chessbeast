@@ -41,6 +41,11 @@ ChessBeast is a hybrid TypeScript + Python monorepo that combines multiple analy
 │  Generate: OpenAI API calls with chess context                       │
 │  Validate: Check NAGs and move references                            │
 │  Fallback: Template-based comments if API fails                      │
+│                                                                       │
+│  Variation Explorer: Iterative engine/Maia/LLM dialogue              │
+│    ├─ Engine: Best line analysis (depth 22, up to 40 moves)          │
+│    ├─ Maia: Human-likely alternative suggestions                     │
+│    └─ LLM: Exploration strategy, key move identification             │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │
                            ▼
@@ -67,7 +72,7 @@ ChessBeast is a hybrid TypeScript + Python monorepo that combines multiple analy
 | **pgn** | PGN parsing and rendering | `PgnParser`, `PgnRenderer`, `ParsedGame` |
 | **grpc-client** | gRPC clients for Python services | `StockfishClient`, `MaiaClient` |
 | **database** | SQLite database clients | `EcoClient`, `LichessEliteClient` |
-| **llm** | OpenAI integration, annotation generation | `CommentGenerator`, `AnnotationPlanner` |
+| **llm** | OpenAI integration, annotation generation, variation exploration | `CommentGenerator`, `AnnotationPlanner`, `VariationExplorer` |
 | **test-utils** | Shared test utilities and mocks | Test fixtures, mock services |
 
 ### Python Services (`services/`)
@@ -203,6 +208,51 @@ Critical moments are identified based on:
 | `blunder_recovery` | Recovery from a previous mistake |
 
 Moments are scored by "interestingness" (0-100) and capped at `maxCriticalRatio` of total moves.
+
+## Variation Exploration
+
+The `VariationExplorer` (`packages/llm/src/explorer/`) implements an iterative dialogue between engine, Maia, and LLM:
+
+### Exploration Flow
+
+1. **Engine Analysis**: Get best line with MultiPV=3
+2. **Maia Prediction**: Get human-likely move at target rating
+3. **LLM Decision**: Evaluate candidates, decide exploration strategy
+4. **Depth-First**: Follow main line deep (up to 40 moves)
+5. **Human Mistakes**: Show Maia-predicted alternatives when different from best
+6. **Self-Regulation**: LLM can request more exploration within budget
+
+### Line Types
+
+| Purpose | Description |
+|---------|-------------|
+| `best` | Engine's recommended continuation |
+| `human_alternative` | Maia-predicted move (often a mistake) |
+| `refutation` | Line showing why an alternative fails |
+| `trap` | Deceptive line with a hidden refutation |
+| `thematic` | Illustrates an important strategic idea |
+
+### Budget Management
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `softCallCap` | 15 | Target LLM calls per position |
+| `hardCallCap` | 22 | Maximum LLM calls (1.5x soft cap) |
+| `maxDepth` | 40 | Maximum variation depth in moves |
+
+### PlannedVariation Interface
+
+Ensures LLM commentary references actual PGN output:
+
+```typescript
+interface PlannedVariation {
+  moves: string[];        // SAN moves in the variation
+  purpose: LinePurpose;   // best, human_alternative, etc.
+  source: LineSource;     // engine, maia, llm
+}
+```
+
+Prompts include these variations so LLM can reference specific lines.
 
 ## Move Classification Thresholds
 

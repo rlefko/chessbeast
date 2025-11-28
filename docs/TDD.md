@@ -390,6 +390,33 @@ Steps:
 
 This plan is the main structured input to the LLM.
 
+### 3.6.1 Variation Explorer
+
+The annotation planner integrates with a `VariationExplorer` that iteratively builds deep variations:
+
+**Key interfaces:**
+- `ExplorationSession`: Tracks position, explored lines, LLM call count, budget caps
+- `ExploredLine`: Moves, annotations, branches, purpose (best/human_alternative/refutation/trap), source (engine/maia)
+
+**Exploration flow:**
+1. Engine provides best line, Maia suggests human-likely alternative
+2. LLM decides exploration strategy via `ExplorationDecision`
+3. Depth-first: Follow main line deep (up to 40 moves)
+4. Show human mistakes when instructive
+5. Self-regulating budget: 15-20 soft cap, can extend to 22 if LLM requests more
+
+**Configuration:**
+
+```typescript
+interface ExplorationConfig {
+  maxDepth?: number;        // Default: 40
+  softCallCap?: number;     // Default: 15
+  hardCallCap?: number;     // Default: 22
+  engineDepth?: number;     // Default: 22
+  engineTimeLimitMs?: number; // Default: 5000
+}
+```
+
 3.7 LLM Annotation Generator
 
 Interface:
@@ -462,8 +489,13 @@ Thresholds depend on estimated Elo R. Example (rough):
 	•	blunder: ≥180 cp
 
 These can be linear interpolations between bands. Additional rules:
-	•	“Only move”: if only one move keeps result (win/draw/loss) and played that, label as forced $1.
+	•	"Only move": if only one move keeps result (win/draw/loss) and played that, label as forced $1.
 	•	"Brilliant": if played move is low-probability from Maia2 but engine-best and tactically striking (e.g., sacrifice, big eval increase).
+
+**NAG Insertion Rules:**
+- Position NAGs (`$10`-`$19`) only added for significant eval changes (≥150cp threshold)
+- Move quality NAG `$1` (good move) only added for critical positions
+- Maximum 2 consecutive position NAGs allowed (clustering prevention, except for errors/brilliancies)
 
 4.2 Depth Control
 	•	Pass 1 (shallow):

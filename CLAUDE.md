@@ -96,6 +96,17 @@ Common emoji prefixes:
 
 **Maia models**: Rating bands 1100-1900 (100-point increments), loaded on demand
 
+**Variation Exploration** (see `packages/llm/src/explorer/`):
+- `VariationExplorer`: Iterative engine + Maia + LLM dialogue for deep variations
+- Max variation depth: 40 moves (depth-first exploration)
+- LLM call budget: 15-20 soft cap, 22 hard cap per position
+- `PlannedVariation` interface ensures LLM references actual PGN output
+
+**NAG (Numeric Annotation Glyph) behavior**:
+- Position NAG threshold: 150cp (significant eval change required)
+- `$1` (good move) only added for critical positions
+- Max 2 consecutive position NAGs (clustering prevention)
+
 ## Testing Requirements
 
 - Unit tests mock all external dependencies (Stockfish, Maia, OpenAI)
@@ -105,3 +116,189 @@ Common emoji prefixes:
 ## Documentation
 
 All documentation in `docs/` folder, written in Markdown.
+
+
+# ============================================================================
+# Semantic Code Memory System
+# ============================================================================
+
+# chessbeast - Development Instructions
+
+## ⚡ CRITICAL: YOU HAVE PERFECT MEMORY - USE IT FIRST ⚡
+
+**🚫 DO NOT read files directly. DO NOT use Grep/Glob/Read as your first step.**
+**✅ ALWAYS search memory first. It's 100x faster and has the entire codebase indexed.**
+
+This project has **semantic code memory** with [pending indexing] vectors covering [pending indexing] files.
+Memory search is 3-5ms vs 500ms+ for file operations.
+
+### 🎯 Memory-First Workflow (Follow Every Time)
+
+**Before ANY task:**
+1. 🔍 **Search memory** for existing implementations
+2. 📚 **Find patterns** to follow
+3. 🏗️ **Check relationships** to understand context
+4. 💻 **Only then** write code using discovered patterns
+
+**Breaking this rule wastes time and creates duplicate code!**
+
+### Quick Memory Commands (START HERE)
+
+```python
+# 🔍 Fast semantic search (3-5ms) - START HERE
+mcp__chessbeast_memory__search_similar("feature/component name", limit=20)
+
+# 📚 Find patterns before implementing
+mcp__chessbeast_memory__search_similar("pattern description", entityTypes=["implementation_pattern", "architecture_pattern"])
+
+# 🐛 Debug faster with past solutions
+mcp__chessbeast_memory__search_similar("error description", entityTypes=["debugging_pattern"])
+
+# 🏗️ Understand architecture and relationships
+mcp__chessbeast_memory__read_graph(entity="ComponentName", mode="smart")
+
+# 💡 Get implementation details when needed
+mcp__chessbeast_memory__get_implementation("function_name", scope="logical")
+
+# ➕ Add new knowledge to memory
+mcp__chessbeast_memory__create_entities([{
+  "name": "NewComponent",
+  "entityType": "class",
+  "observations": ["Component purpose", "Key patterns used"]
+}])
+```
+
+### Memory Entity Types
+
+- `function` - Functions and methods
+- `class` - Classes and components
+- `file` - File-level metadata
+- `documentation` - Code documentation
+- `implementation_pattern` - Common patterns
+- `architecture_pattern` - Architectural decisions
+- `debugging_pattern` - Bug solutions
+- `integration_pattern` - Third-party integrations
+- `metadata` - General project info
+
+### MCP Server Configuration
+
+The semantic memory is powered by an MCP (Model Context Protocol) server configured in `.mcp.json`:
+
+**📍 Location:** `.mcp.json` in project root (git-ignored, contains API keys)
+
+**🔒 Security:** This file contains API keys and is automatically added to `.gitignore` during setup
+
+**👥 Team Workflow:** Use `.mcp.json.example` as a template:
+```bash
+# Team members can set up their own .mcp.json
+cp .mcp.json.example .mcp.json
+# Edit .mcp.json with your API keys and paths
+# Note: .mcp.json is git-ignored, so your keys stay private
+```
+
+**🔄 Restart Required:** After setup or changes, restart Claude Code to load the MCP server
+
+### Memory Guard Protection (Optional)
+
+Memory Guard hooks provide additional code quality protection but are **not configured automatically**.
+
+**Manual Setup (Optional):**
+- Add UserPromptSubmit hooks for semantic command detection
+- Add PreToolUse hooks for duplicate code prevention
+- See main project documentation for hook configuration
+
+**Benefits when configured:**
+- Prevent duplicate code creation
+- Catch missing error handling patterns
+- Block breaking API changes
+- Protect functionality during refactoring
+
+---
+
+## ⚠️ Important Notes - Memory-First Development
+
+1. **🚫 NEVER skip memory search** - Search memory BEFORE using Grep/Glob/Read tools
+   - Memory: 3-5ms, 100% coverage, semantic understanding
+   - File tools: 500ms+, requires exact patterns, no context
+
+2. **✅ Always follow this order:**
+   - Step 1: `search_similar()` to find existing code
+   - Step 2: `read_graph()` to understand relationships
+   - Step 3: `get_implementation()` for detailed code
+   - Step 4: Only then use Read/Grep if needed for verification
+
+3. **📚 Check existing patterns** - Memory has all architectural decisions and best practices indexed
+
+4. **💾 Document new patterns** - Add important discoveries to memory with `create_entities()`
+
+---
+
+## 🎯 Custom Exclusions (.claudeignore)
+
+Control what gets indexed without modifying .gitignore:
+
+**When to use .claudeignore:**
+- Personal notes and TODOs (e.g., `*-notes.md`, `TODO-*.md`)
+- Test outputs and coverage reports
+- Debug artifacts and temporary files
+- Large data files not caught by .gitignore
+
+**Multi-Layer Exclusion System:**
+1. **Universal Defaults** - Binaries, archives, OS artifacts (always applied)
+2. **.gitignore** - Version control ignores (auto-detected)
+3. **.claudeignore** - Custom indexing exclusions (project-specific)
+4. **Binary Detection** - Executables detected via magic numbers
+
+**Example .claudeignore:**
+```
+# Personal development
+*-notes.md
+TODO-*.md
+scratch.*
+
+# Test artifacts
+test-results/
+.coverage
+htmlcov/
+
+# Debug output
+debug-*.log
+*.dump
+```
+
+**.claudeignore uses same syntax as .gitignore** - patterns, wildcards, directory markers.
+
+---
+
+## 🔧 Memory System Maintenance
+
+### Automatic Updates
+Memory is automatically updated via git hooks:
+- **pre-commit**: Indexes changed files before commit
+- **post-merge**: Updates index after `git pull`
+- **post-checkout**: Updates index after branch switch
+
+### Manual Re-index (if needed)
+```bash
+# From memory project directory
+source .venv/bin/activate
+claude-indexer index -p /Users/ryanlefkowitz/projects/chess/chessbeast -c chessbeast
+```
+
+### Check Memory Status
+```bash
+# View collection statistics
+python utils/qdrant_stats.py -c chessbeast
+```
+
+---
+
+## 📚 Additional Project Information
+
+Add your project-specific documentation below this section.
+
+---
+
+*Memory system automatically configured by setup.sh*
+*Collection: chessbeast*
+*Generated: 2025-11-27 16:24:14*

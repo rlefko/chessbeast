@@ -134,7 +134,7 @@ ChessBeast uses a hybrid TypeScript + Python architecture:
 - **gRPC**: Inter-service communication
 
 ```
-PGN Input → Parser → Engine + Maia2 → Critical Moments → LLM → Annotated PGN
+PGN Input → Parser → Engine + Maia2 → Critical Moments → Variation Explorer → LLM → Annotated PGN
 ```
 
 ### Maia2 Integration
