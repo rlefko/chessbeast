@@ -164,6 +164,15 @@ export class Annotator {
                 annotations: Object.fromEntries(line.annotations),
                 purpose: line.purpose,
                 source: line.source,
+                // Include finalEval for position NAG at end of variation
+                finalEval: line.finalEval
+                  ? {
+                      cp: line.finalEval.cp,
+                      mate: line.finalEval.mate,
+                      depth: line.finalEval.depth,
+                      pv: line.finalEval.pv,
+                    }
+                  : undefined,
               }));
             }
           } catch (error) {
@@ -266,9 +275,14 @@ export type {
   AnnotationPlan,
   PlannedAnnotation,
   PlanOptions,
+  AnalysisDepth,
 } from './planner/annotation-planner.js';
-export { createAnnotationPlan, buildCommentContext } from './planner/annotation-planner.js';
-export { calculateVerbosity, shouldAnnotate } from './planner/verbosity.js';
+export {
+  createAnnotationPlan,
+  buildCommentContext,
+  getAnalysisDepth,
+} from './planner/annotation-planner.js';
+export { calculateVerbosity, shouldAnnotate, WORD_LIMITS } from './planner/verbosity.js';
 
 export { CommentGenerator, DegradationLevel } from './generator/comment-generator.js';
 export { SummaryGenerator, formatSummaryAsString } from './generator/summary-generator.js';
@@ -281,6 +295,7 @@ export type {
   GeneratedComment,
   GeneratedSummary,
   ValidationResult,
+  CommentValidationContext,
 } from './validator/output-validator.js';
 export {
   validateComment,

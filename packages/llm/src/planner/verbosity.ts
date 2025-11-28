@@ -8,17 +8,32 @@ import type { VerbosityLevel } from '../prompts/templates.js';
  * Estimated TOTAL tokens per verbosity level (prompt + completion)
  *
  * Breakdown:
- * - System prompt: ~400 tokens
+ * - System prompt: ~200 tokens (simplified)
  * - User prompt (FEN, moves, context): ~200-400 tokens
- * - Completion: ~100-300 tokens
+ * - Completion: ~50-300 tokens
  *
  * These estimates are intentionally generous to avoid budget exhaustion issues.
  * Actual usage may be lower, which just means we can annotate more moves.
  */
 export const TOKENS_BY_VERBOSITY: Record<VerbosityLevel, number> = {
-  brief: 700, // ~600 prompt + ~100 completion
-  normal: 900, // ~600 prompt + ~300 completion
-  detailed: 1200, // ~700 prompt + ~500 completion
+  'ultra-brief': 400, // ~300 prompt + ~50 completion (5-8 words)
+  brief: 600, // ~400 prompt + ~100 completion
+  normal: 800, // ~500 prompt + ~300 completion
+  detailed: 1100, // ~600 prompt + ~500 completion
+};
+
+/**
+ * Word limits by verbosity level
+ * - ultra-brief: Maximum 8 words for critical, 5 for non-critical
+ * - brief: Maximum 15 words for critical, 10 for non-critical
+ * - normal: Maximum 25 words for critical, 10 for non-critical
+ * - detailed: Maximum 40 words for critical, 15 for non-critical
+ */
+export const WORD_LIMITS: Record<VerbosityLevel, { critical: number; nonCritical: number }> = {
+  'ultra-brief': { critical: 8, nonCritical: 5 },
+  brief: { critical: 15, nonCritical: 10 },
+  normal: { critical: 25, nonCritical: 10 },
+  detailed: { critical: 40, nonCritical: 15 },
 };
 
 /**
@@ -30,16 +45,16 @@ export function calculateVerbosity(
   isCritical: boolean,
   userPreference: VerbosityLevel,
 ): VerbosityLevel {
-  if (remainingPositions === 0) return 'brief';
+  if (remainingPositions === 0) return 'ultra-brief';
 
   const avgBudgetPerPosition = remainingBudget / remainingPositions;
 
-  // If severely budget-constrained, always use brief
-  if (avgBudgetPerPosition < 100) {
-    return 'brief';
+  // If severely budget-constrained, use ultra-brief
+  if (avgBudgetPerPosition < 200) {
+    return 'ultra-brief';
   }
 
-  // Critical moments get at least normal verbosity if budget allows
+  // Critical moments get at least brief verbosity if budget allows
   if (isCritical) {
     if (avgBudgetPerPosition >= TOKENS_BY_VERBOSITY.detailed) {
       return userPreference === 'detailed' ? 'detailed' : 'normal';
@@ -47,16 +62,26 @@ export function calculateVerbosity(
     if (avgBudgetPerPosition >= TOKENS_BY_VERBOSITY.normal) {
       return 'normal';
     }
-    return 'brief';
+    if (avgBudgetPerPosition >= TOKENS_BY_VERBOSITY.brief) {
+      return 'brief';
+    }
+    return 'ultra-brief';
   }
 
   // Non-critical positions follow user preference with budget constraints
   if (userPreference === 'detailed' && avgBudgetPerPosition < TOKENS_BY_VERBOSITY.detailed) {
-    return avgBudgetPerPosition >= TOKENS_BY_VERBOSITY.normal ? 'normal' : 'brief';
+    if (avgBudgetPerPosition >= TOKENS_BY_VERBOSITY.normal) return 'normal';
+    if (avgBudgetPerPosition >= TOKENS_BY_VERBOSITY.brief) return 'brief';
+    return 'ultra-brief';
   }
 
   if (userPreference === 'normal' && avgBudgetPerPosition < TOKENS_BY_VERBOSITY.normal) {
-    return 'brief';
+    if (avgBudgetPerPosition >= TOKENS_BY_VERBOSITY.brief) return 'brief';
+    return 'ultra-brief';
+  }
+
+  if (userPreference === 'brief' && avgBudgetPerPosition < TOKENS_BY_VERBOSITY.brief) {
+    return 'ultra-brief';
   }
 
   return userPreference;

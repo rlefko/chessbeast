@@ -17,9 +17,9 @@ import { createMockGameAnalysis } from './mocks/mock-openai.js';
 
 describe('Verbosity Calculator', () => {
   describe('calculateVerbosity', () => {
-    it('should return brief when budget is very low', () => {
+    it('should return ultra-brief when budget is very low', () => {
       const result = calculateVerbosity(50, 5, false, 'detailed');
-      expect(result).toBe('brief');
+      expect(result).toBe('ultra-brief');
     });
 
     it('should prioritize critical moments for verbosity', () => {

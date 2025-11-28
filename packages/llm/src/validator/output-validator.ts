@@ -82,11 +82,55 @@ export function parseJsonResponse<T>(response: string): T {
 }
 
 /**
+ * Context for move notation stripping
+ */
+export interface CommentValidationContext {
+  /** The move notation being commented on (e.g., "Nf3", "e4") */
+  moveNotation?: string;
+}
+
+/**
+ * Strip move notation repetition from comment
+ *
+ * LLMs often repeat the move notation in their comments like:
+ * "Nf3 develops the knight" - we want just "Develops the knight"
+ *
+ * Also strips verbose patterns like "The move Nf3" or "a7a6"
+ */
+function stripMoveRepetition(comment: string, moveNotation?: string): string {
+  if (!moveNotation || !comment) return comment;
+
+  // Strip exact move notation at start of comment
+  const startPattern = new RegExp(`^${escapeRegex(moveNotation)}\\s*`, 'i');
+  comment = comment.replace(startPattern, '');
+
+  // Strip "The move X" pattern
+  const themovePattern = new RegExp(`\\bthe move ${escapeRegex(moveNotation)}\\b`, 'gi');
+  comment = comment.replace(themovePattern, '');
+
+  // Strip redundant move references like "a7a6" (wrong notation style)
+  // This catches when LLM uses long algebraic instead of SAN
+  const longAlgPattern = /\b[a-h][1-8][a-h][1-8]\b/gi;
+  comment = comment.replace(longAlgPattern, '');
+
+  // Clean up any double spaces or leading/trailing spaces
+  return comment.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Validate and sanitize a generated comment
  */
 export function validateComment(
   raw: unknown,
   legalMoves: string[],
+  context?: CommentValidationContext,
 ): ValidationResult<GeneratedComment> {
   const issues: ValidationIssue[] = [];
   const obj = raw as Record<string, unknown>;
@@ -114,6 +158,19 @@ export function validateComment(
       issues.push({
         field: 'nags',
         message: `Filtered ${rawNags.length - nags.length} invalid NAG(s)`,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Strip move notation repetition from comment
+  if (comment && context?.moveNotation) {
+    const originalLength = comment.length;
+    comment = stripMoveRepetition(comment, context.moveNotation);
+    if (comment.length !== originalLength) {
+      issues.push({
+        field: 'comment',
+        message: 'Stripped repeated move notation from comment',
         severity: 'warning',
       });
     }
