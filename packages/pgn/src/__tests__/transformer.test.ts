@@ -468,8 +468,9 @@ describe('Analysis Transformer', () => {
       });
       const counts = countAnnotations(game);
 
-      // Blunder NAG + position NAG (White winning: $18)
-      expect(counts.nags).toBe(2);
+      // Only blunder NAG ($4) - position NAGs are now only at end of explored variations
+      // This prevents cluttered output like: 1. e4 $4 $18 (blunder AND position assessment)
+      expect(counts.nags).toBe(1);
     });
   });
 

@@ -212,7 +212,13 @@ export class VariationExplorer {
 
     // Explore the best line if LLM says so (depth-first)
     if (decision.exploreBestLine && engineBest.pv.length > 0) {
-      const bestLine = await this.exploreLineDeep(session, engineBest.pv, 'best', 'engine');
+      const bestLine = await this.exploreLineDeep(
+        session,
+        engineBest.pv,
+        'best',
+        'engine',
+        engineBest,
+      );
       if (decision.bestLineExplanation) {
         bestLine.annotations.set(0, decision.bestLineExplanation);
       }
@@ -249,7 +255,13 @@ export class VariationExplorer {
       if (engineEvals.length > session.exploredLines.length) {
         const nextEval = engineEvals[session.exploredLines.length];
         if (nextEval && nextEval.pv.length > 0) {
-          const altLine = await this.exploreLineDeep(session, nextEval.pv, 'thematic', 'engine');
+          const altLine = await this.exploreLineDeep(
+            session,
+            nextEval.pv,
+            'thematic',
+            'engine',
+            nextEval,
+          );
           session.exploredLines.push(altLine);
         }
       } else {
@@ -367,12 +379,16 @@ export class VariationExplorer {
 
   /**
    * Explore a line depth-first
+   *
+   * Converts UCI moves to SAN and determines appropriate line length
+   * based on position characteristics (tension resolution).
    */
   private async exploreLineDeep(
     session: ExplorationSession,
     moves: string[],
     purpose: LinePurpose,
     source: LineSource,
+    initialEval?: EngineEvaluation,
   ): Promise<ExploredLine> {
     // Convert UCI moves to SAN using the session's position
     let sanMoves: string[];
@@ -383,17 +399,25 @@ export class VariationExplorer {
       sanMoves = [];
     }
 
+    // Determine how many moves to include based on tension resolution
+    const lineMoves = this.determineLineLength(session.position, sanMoves, session.maxDepth);
+
     const line: ExploredLine = {
-      moves: sanMoves.slice(0, session.maxDepth),
+      moves: lineMoves,
       annotations: new Map(),
       branches: [],
       purpose,
       source,
     };
 
+    // Only set finalEval if we have one (for end-of-line position NAG)
+    if (initialEval) {
+      line.finalEval = initialEval;
+    }
+
     // For long tactical lines, ask LLM to identify key moves to annotate
-    if (sanMoves.length > 4 && session.llmCallCount < session.softCallCap) {
-      const keyMoves = await this.identifyKeyMoves(session, sanMoves);
+    if (lineMoves.length > 4 && session.llmCallCount < session.softCallCap) {
+      const keyMoves = await this.identifyKeyMoves(session, lineMoves);
       for (const km of keyMoves) {
         if (km.moveIndex < line.moves.length) {
           line.annotations.set(km.moveIndex, km.explanation);
@@ -405,35 +429,137 @@ export class VariationExplorer {
   }
 
   /**
+   * Determine line length using tension resolution principles
+   *
+   * Stop exploring when:
+   * 1. We've shown enough moves to demonstrate the concept (min 4)
+   * 2. Position has stabilized (no hanging pieces, no immediate tactics)
+   * 3. We reach the max depth
+   */
+  private determineLineLength(startFen: string, moves: string[], maxDepth: number): string[] {
+    const minMoves = 4;
+    const maxMoves = Math.min(moves.length, maxDepth, 15);
+
+    if (moves.length <= minMoves) {
+      return moves;
+    }
+
+    // Play through the moves and check for tension resolution
+    const pos = new ChessPosition(startFen);
+    let lastCaptureIndex = -1;
+    let lastCheckIndex = -1;
+
+    for (let i = 0; i < maxMoves; i++) {
+      const san = moves[i];
+      if (!san) break;
+
+      // Track captures (indicated by 'x' in SAN)
+      if (san.includes('x')) {
+        lastCaptureIndex = i;
+      }
+
+      // Track checks (indicated by '+' or '#' in SAN)
+      if (san.includes('+') || san.includes('#')) {
+        lastCheckIndex = i;
+      }
+
+      try {
+        pos.move(san);
+      } catch {
+        // Invalid move, stop here
+        return moves.slice(0, i);
+      }
+    }
+
+    // Tension resolves when:
+    // 1. We've passed the last capture by at least 2 moves
+    // 2. We've passed the last check by at least 2 moves
+    // 3. We've shown at least minMoves
+    const tensionResolvedAt = Math.max(lastCaptureIndex + 3, lastCheckIndex + 2, minMoves);
+
+    // Return moves up to tension resolution, but at least minMoves
+    const stopAt = Math.min(tensionResolvedAt, maxMoves);
+    return moves.slice(0, Math.max(stopAt, minMoves));
+  }
+
+  /**
    * Explore a mistake line (human-likely move that's suboptimal)
+   *
+   * This explores what happens when a human plays a suboptimal move:
+   * 1. Make the mistake move to get the resulting position
+   * 2. Get engine's refutation (best response to the mistake)
+   * 3. Build the line showing the consequence of the mistake
    */
   private async exploreMistakeLine(
-    _session: ExplorationSession,
-    _fen: string,
+    session: ExplorationSession,
+    fen: string,
     mistakeMove: string,
-    probability: number,
+    _probability: number,
   ): Promise<ExploredLine> {
-    // Get engine refutation of the mistake
-    // Note: We'd need to make the move first to get the refutation PV
-    // For now, just create a stub line
+    // 1. Make the mistake move to get resulting position
+    const posAfterMistake = new ChessPosition(fen);
+    let fenAfterMistake: string;
+    try {
+      posAfterMistake.move(mistakeMove);
+      fenAfterMistake = posAfterMistake.fen();
+    } catch {
+      // Invalid move, return minimal line
+      return {
+        moves: [mistakeMove],
+        annotations: new Map(),
+        branches: [],
+        purpose: 'human_alternative',
+        source: 'maia',
+      };
+    }
+
+    // 2. Get engine's refutation (best response to the mistake)
+    let refutation: EngineEvaluation[];
+    try {
+      refutation = await this.engine.evaluateMultiPv(fenAfterMistake, {
+        depth: this.config.engineDepth,
+        timeLimitMs: this.config.engineTimeLimitMs,
+        numLines: 1,
+      });
+    } catch {
+      // Engine unavailable, return minimal line
+      return {
+        moves: [mistakeMove],
+        annotations: new Map(),
+        branches: [],
+        purpose: 'human_alternative',
+        source: 'maia',
+      };
+    }
+
+    // 3. Build the line: mistake move + refutation continuation
+    let moves = [mistakeMove];
+    let finalEval: EngineEvaluation | undefined;
+
+    if (refutation.length > 0 && refutation[0]!.pv.length > 0) {
+      // Convert UCI moves to SAN
+      try {
+        const refutationSan = ChessPosition.convertPvToSan(refutation[0]!.pv, fenAfterMistake);
+        // Limit to reasonable depth but show enough to demonstrate the refutation
+        const maxRefutationMoves = Math.min(refutationSan.length, session.maxDepth - 1, 8);
+        moves = moves.concat(refutationSan.slice(0, maxRefutationMoves));
+        finalEval = refutation[0];
+      } catch {
+        // Conversion failed, use just the mistake move
+      }
+    }
+
     const line: ExploredLine = {
-      moves: [mistakeMove],
+      moves,
       annotations: new Map(),
       branches: [],
       purpose: 'human_alternative',
       source: 'maia',
     };
 
-    // Try to get engine's refutation
-    try {
-      // This would require making the move and then evaluating
-      // For simplicity, we'll annotate that this is a human-likely move
-      line.annotations.set(
-        0,
-        `Human players at this level choose this move ${Math.round(probability * 100)}% of the time.`,
-      );
-    } catch {
-      // Skip refutation
+    // Only set finalEval if we have one (for end-of-line position NAG)
+    if (finalEval) {
+      line.finalEval = finalEval;
     }
 
     return line;

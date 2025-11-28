@@ -30,6 +30,7 @@ import {
   buildCommentContext,
   type PlanOptions,
 } from './planner/annotation-planner.js';
+import type { PlannedVariation } from './prompts/templates.js';
 
 /**
  * Options for annotation
@@ -164,6 +165,15 @@ export class Annotator {
                 annotations: Object.fromEntries(line.annotations),
                 purpose: line.purpose,
                 source: line.source,
+                // Include finalEval for position NAG at end of variation
+                finalEval: line.finalEval
+                  ? {
+                      cp: line.finalEval.cp,
+                      mate: line.finalEval.mate,
+                      depth: line.finalEval.depth,
+                      pv: line.finalEval.pv,
+                    }
+                  : undefined,
               }));
             }
           } catch (error) {
@@ -180,7 +190,18 @@ export class Annotator {
       // Get legal moves for validation (placeholder - would need chess library)
       const legalMoves = this.getLegalMoves(planned.move.fenBefore);
 
-      // Build context with perspective and NAG awareness
+      // Get explored variations if available (for coherent commentary)
+      // This allows the LLM to know what variations will appear in PGN output
+      const move = analysis.moves[planned.plyIndex];
+      const exploredVariations: PlannedVariation[] | undefined = move?.exploredVariations?.map(
+        (v) => ({
+          moves: v.moves,
+          purpose: v.purpose as 'best' | 'human_alternative' | 'refutation' | 'trap' | 'thematic',
+          source: v.source as 'engine' | 'maia' | 'llm',
+        }),
+      );
+
+      // Build context with perspective, NAG awareness, and explored variations
       const context = buildCommentContext(
         planned,
         plan.targetRating,
@@ -188,13 +209,13 @@ export class Annotator {
         plan.openingName,
         perspective,
         includeNags,
+        exploredVariations,
       );
 
       // Generate comment
       const comment = await this.commentGenerator.generateComment(context, planned);
 
       // Apply to analysis
-      const move = analysis.moves[planned.plyIndex];
       if (move && comment.comment) {
         move.comment = comment.comment;
         positionsAnnotated++;
@@ -266,9 +287,14 @@ export type {
   AnnotationPlan,
   PlannedAnnotation,
   PlanOptions,
+  AnalysisDepth,
 } from './planner/annotation-planner.js';
-export { createAnnotationPlan, buildCommentContext } from './planner/annotation-planner.js';
-export { calculateVerbosity, shouldAnnotate } from './planner/verbosity.js';
+export {
+  createAnnotationPlan,
+  buildCommentContext,
+  getAnalysisDepth,
+} from './planner/annotation-planner.js';
+export { calculateVerbosity, shouldAnnotate, WORD_LIMITS } from './planner/verbosity.js';
 
 export { CommentGenerator, DegradationLevel } from './generator/comment-generator.js';
 export { SummaryGenerator, formatSummaryAsString } from './generator/summary-generator.js';
@@ -281,6 +307,7 @@ export type {
   GeneratedComment,
   GeneratedSummary,
   ValidationResult,
+  CommentValidationContext,
 } from './validator/output-validator.js';
 export {
   validateComment,

@@ -74,10 +74,9 @@ describe('Opening Identification Quality', () => {
           const actualFamily = analysis.metadata.eco[0];
 
           // At minimum, should be in same ECO family
-          expect(
-            actualFamily,
-            `Expected ECO family ${expectedFamily}, got ${actualFamily}`,
-          ).toBe(expectedFamily);
+          expect(actualFamily, `Expected ECO family ${expectedFamily}, got ${actualFamily}`).toBe(
+            expectedFamily,
+          );
         }
       });
     }
@@ -101,8 +100,7 @@ describe('Opening Identification Quality', () => {
           const expectedLower = testCase.expectedName.toLowerCase();
 
           // Name should contain expected keyword
-          const nameMatch =
-            nameLower.includes(expectedLower) || expectedLower.includes(nameLower);
+          const nameMatch = nameLower.includes(expectedLower) || expectedLower.includes(nameLower);
 
           if (!nameMatch) {
             console.warn(
@@ -245,9 +243,7 @@ describe('Opening Identification Quality', () => {
       const analysis = result.results[0]!.analysis;
 
       // Should have middlegame phase
-      const hasMiddlegame = analysis.stats.phaseTransitions.some(
-        (pt) => pt.phase === 'middlegame',
-      );
+      const hasMiddlegame = analysis.stats.phaseTransitions.some((pt) => pt.phase === 'middlegame');
 
       expect(hasMiddlegame, 'Should identify middlegame transition').toBe(true);
     });

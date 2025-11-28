@@ -9,6 +9,7 @@ import type {
   VerbosityLevel,
   CommentContext,
   AnnotationPerspective,
+  PlannedVariation,
 } from '../prompts/templates.js';
 
 import { estimateTokens, shouldAnnotate } from './verbosity.js';
@@ -171,6 +172,85 @@ function getTargetRating(analysis: GameAnalysis): number {
 }
 
 /**
+ * Analysis depth based on error severity and position context
+ */
+export type AnalysisDepth = 'full' | 'brief' | 'minimal';
+
+/**
+ * Get subjective position assessment from centipawn value
+ * Used to detect when evaluation crosses meaningful thresholds
+ */
+function getSubjectiveAssessment(cp: number): string {
+  const absCp = Math.abs(cp);
+  const side = cp >= 0 ? 'white' : 'black';
+
+  if (absCp < 30) return 'equal';
+  if (absCp < 100) return `${side}_slight`;
+  if (absCp < 200) return `${side}_advantage`;
+  if (absCp < 400) return `${side}_winning`;
+  return `${side}_decisive`;
+}
+
+/**
+ * Determine analysis depth based on error severity and position context
+ *
+ * Key principles:
+ * - Blunders/mistakes: Full analysis - explain why wrong, show refutation
+ * - Inaccuracies in losing positions: Minimal if eval doesn't change subjectively
+ * - Inaccuracies that swing eval: Full analysis if crosses threshold
+ * - Opening inaccuracies: Full analysis due to butterfly effect (small errors compound)
+ */
+export function getAnalysisDepth(
+  classification: string,
+  evalBefore: number,
+  evalAfter: number,
+  plyIndex: number,
+): AnalysisDepth {
+  const isOpening = plyIndex < 20; // Roughly first 10 moves
+
+  // Blunders/mistakes always get full analysis
+  if (classification === 'blunder' || classification === 'mistake') {
+    return 'full';
+  }
+
+  // Inaccuracies depend on context
+  if (classification === 'inaccuracy') {
+    const wasLosing = evalBefore < -200;
+    const stillLosing = evalAfter < -200;
+    const wasWinning = evalBefore > 200;
+    const stillWinning = evalAfter > 200;
+
+    const subjBefore = getSubjectiveAssessment(evalBefore);
+    const subjAfter = getSubjectiveAssessment(evalAfter);
+    const subjEvalChanged = subjBefore !== subjAfter;
+
+    // In losing/winning position with no subjective change: minimal
+    // "Slightly speeds up the loss" or "Still winning" doesn't need explanation
+    if (
+      (wasLosing && stillLosing && !subjEvalChanged) ||
+      (wasWinning && stillWinning && !subjEvalChanged)
+    ) {
+      return 'minimal';
+    }
+
+    // Subjective change (e.g., losing → lost, equal → slight): full analysis
+    if (subjEvalChanged) {
+      return 'full';
+    }
+
+    // Opening inaccuracies get full analysis due to butterfly effect
+    // A 20cp loss in move 5 compounds more than a 20cp loss in move 30
+    if (isOpening) {
+      return 'full';
+    }
+
+    return 'brief';
+  }
+
+  return 'minimal';
+}
+
+/**
  * Calculate priority score for a position
  */
 function calculatePriority(move: MoveAnalysis, criticalMoment?: CriticalMoment): number {
@@ -181,7 +261,12 @@ function calculatePriority(move: MoveAnalysis, criticalMoment?: CriticalMoment):
     priority += criticalMoment.score;
   }
 
-  // Classification bonus
+  // Get analysis depth to adjust priority
+  const evalBefore = move.evalBefore?.cp ?? 0;
+  const evalAfter = move.evalAfter?.cp ?? 0;
+  const analysisDepth = getAnalysisDepth(move.classification, evalBefore, evalAfter, move.plyIndex);
+
+  // Classification bonus (adjusted by analysis depth)
   const classificationBonus: Record<string, number> = {
     blunder: 80,
     mistake: 50,
@@ -192,7 +277,14 @@ function calculatePriority(move: MoveAnalysis, criticalMoment?: CriticalMoment):
     book: 0,
     forced: 10,
   };
-  priority += classificationBonus[move.classification] ?? 0;
+  let classBonus = classificationBonus[move.classification] ?? 0;
+
+  // Reduce priority for minimal-depth inaccuracies (already losing/winning)
+  if (move.classification === 'inaccuracy' && analysisDepth === 'minimal') {
+    classBonus = 5; // Treat like a "good" move - low priority
+  }
+
+  priority += classBonus;
 
   // Centipawn loss bonus (higher loss = more interesting)
   if (move.cpLoss > 0) {
@@ -286,11 +378,12 @@ export function buildCommentContext(
   openingName?: string,
   perspective: AnnotationPerspective = 'neutral',
   includeNags: boolean = true,
+  exploredVariations?: PlannedVariation[],
 ): CommentContext {
   const { move, criticalMoment, verbosity } = planned;
   const moveNotation = `${move.moveNumber}${move.isWhiteMove ? '.' : '...'} ${move.san}`;
 
-  return {
+  const context: CommentContext = {
     move,
     criticalMoment,
     targetRating,
@@ -301,4 +394,11 @@ export function buildCommentContext(
     perspective,
     hasNag: includeNags && classificationHasNag(move.classification),
   };
+
+  // Only set plannedVariations if defined (exactOptionalPropertyTypes compatibility)
+  if (exploredVariations) {
+    context.plannedVariations = exploredVariations;
+  }
+
+  return context;
 }
