@@ -226,8 +226,10 @@ export function getAnalysisDepth(
 
     // In losing/winning position with no subjective change: minimal
     // "Slightly speeds up the loss" or "Still winning" doesn't need explanation
-    if ((wasLosing && stillLosing && !subjEvalChanged) ||
-        (wasWinning && stillWinning && !subjEvalChanged)) {
+    if (
+      (wasLosing && stillLosing && !subjEvalChanged) ||
+      (wasWinning && stillWinning && !subjEvalChanged)
+    ) {
       return 'minimal';
     }
 
