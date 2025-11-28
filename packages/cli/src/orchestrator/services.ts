@@ -6,7 +6,12 @@ import * as fs from 'node:fs';
 
 import { EcoClient, LichessEliteClient } from '@chessbeast/database';
 import { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
-import { Annotator, type AnnotatorServices, type EngineService, type MaiaService } from '@chessbeast/llm';
+import {
+  Annotator,
+  type AnnotatorServices,
+  type EngineService,
+  type MaiaService,
+} from '@chessbeast/llm';
 
 import type { ChessBeastConfig } from '../config/schema.js';
 import { ServiceError, createServiceError, resolveAbsolutePath } from '../errors/index.js';

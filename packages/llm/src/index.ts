@@ -82,10 +82,7 @@ export class Annotator {
    * @param config Configuration (apiKey required, others have defaults)
    * @param services Optional services for variation exploration
    */
-  constructor(
-    config: Partial<LLMConfig> & { apiKey: string },
-    services?: AnnotatorServices,
-  ) {
+  constructor(config: Partial<LLMConfig> & { apiKey: string }, services?: AnnotatorServices) {
     this.config = createLLMConfig(config);
     this.client = new OpenAIClient(this.config);
     this.commentGenerator = new CommentGenerator(this.client, this.config);
