@@ -241,3 +241,14 @@ export {
 } from './cache/response-cache.js';
 
 export * from './errors.js';
+
+// Variation exploration
+export {
+  VariationExplorer,
+  createVariationExplorer,
+  type ExploredLine,
+  type ExplorationSession,
+  type ExplorationConfig,
+  type LinePurpose,
+  type LineSource,
+} from './explorer/index.js';

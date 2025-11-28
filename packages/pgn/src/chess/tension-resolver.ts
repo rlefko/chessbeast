@@ -22,7 +22,7 @@ export interface TensionConfig {
 }
 
 const DEFAULT_TENSION_CONFIG: TensionConfig = {
-  maxMoves: 15,
+  maxMoves: 40, // Increased from 15 to allow deep variations like human annotations
   resolveChecks: true,
   resolveCaptures: true,
   requireDevelopment: true,
@@ -187,6 +187,13 @@ export function resolveVariationLength(
 
     // In opening, continue until development is reasonable
     if (cfg.requireDevelopment && i < 6 && isOpeningPhase(pos.fen())) {
+      continue;
+    }
+
+    // Minimum depth enforcement: require at least 4 moves (2 full moves each side)
+    // to show the idea properly. Previous behavior stopped after 1-2 moves.
+    const MINIMUM_VARIATION_DEPTH = 4;
+    if (i < MINIMUM_VARIATION_DEPTH - 1) {
       continue;
     }
 

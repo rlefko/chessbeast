@@ -119,9 +119,9 @@ const DEFAULT_OPTIONS: Required<TransformOptions> = {
   includePositionNags: true,
   targetRating: 1500,
   includeSummary: true,
-  maxVariationDepth: 1,
+  maxVariationDepth: 3, // Increased from 1 to allow nested variations
   includeAnalysisMetadata: false,
-  maxVariationMoves: 15,
+  maxVariationMoves: 40, // Increased from 15 to allow deep variations
   useTensionResolution: true,
 };
 
@@ -143,8 +143,19 @@ export function transformAnalysisToGame(
   // Transform metadata
   const metadata = transformMetadata(analysis.metadata, analysisMetadata, opts);
 
-  // Transform moves
-  const moves = analysis.moves.map((move) => transformMove(move, opts));
+  // Transform moves with NAG clustering prevention
+  // Track consecutive NAGs to prevent cluttering output
+  let consecutiveNagCount = 0;
+  const moves = analysis.moves.map((move) => {
+    const result = transformMove(move, opts, consecutiveNagCount);
+    // Update consecutive NAG count based on result
+    if (result.nags && result.nags.length > 0) {
+      consecutiveNagCount++;
+    } else {
+      consecutiveNagCount = 0;
+    }
+    return result;
+  });
 
   // Build the game
   const game: ParsedGame = {
@@ -204,8 +215,16 @@ function transformMetadata(
 
 /**
  * Transform a single move analysis to MoveInfo
+ *
+ * @param move - The move analysis to transform
+ * @param opts - Transformation options
+ * @param consecutiveNagCount - Number of consecutive moves with NAGs (for clustering prevention)
  */
-function transformMove(move: MoveAnalysisInput, opts: Required<TransformOptions>): MoveInfo {
+function transformMove(
+  move: MoveAnalysisInput,
+  opts: Required<TransformOptions>,
+  consecutiveNagCount: number = 0,
+): MoveInfo {
   const moveInfo: MoveInfo = {
     moveNumber: move.moveNumber,
     san: move.san,
@@ -219,17 +238,32 @@ function transformMove(move: MoveAnalysisInput, opts: Required<TransformOptions>
     moveInfo.commentAfter = move.comment;
   }
 
+  // NAG clustering prevention: skip position NAGs if we've had 2+ consecutive NAGs
+  // This prevents output like: 1. e4 $1 $10 c6 $1 $10 2. d4 $1 $10
+  // Exceptions - always show NAGs for:
+  // - Errors (blunders, mistakes, inaccuracies) and brilliancies
+  // - Critical moments (the position truly matters)
+  const isErrorOrBrilliant = ['blunder', 'mistake', 'inaccuracy', 'brilliant'].includes(
+    move.classification,
+  );
+  const isTrulyCritical = move.isCriticalMoment || isErrorOrBrilliant;
+  const shouldSuppressPositionNag = consecutiveNagCount >= 2 && !isTrulyCritical;
+
   // Add NAG based on classification if enabled
+  // Only add move quality NAGs for notable moves (not routine "good" moves)
   if (opts.includeNags) {
     const nag = classificationToNag(move.classification);
-    if (nag) {
+    // Skip $1 (good/excellent move) NAG for non-critical positions - it adds no information
+    const skipGoodMoveNag = nag === '$1' && !move.isCriticalMoment;
+    if (nag && !skipGoodMoveNag) {
       moveInfo.nags = [nag];
     }
   }
 
   // Add position assessment NAG (⩲, ±, +-, etc.) only on significant eval changes
   // This prevents cluttering every move with $10/$14/$15 etc.
-  if (opts.includePositionNags && isSignificantEvalChange(move)) {
+  // Also skip if we're suppressing due to NAG clustering
+  if (opts.includePositionNags && !shouldSuppressPositionNag && isSignificantEvalChange(move)) {
     const posNag = evalToPositionNag(move.evalAfter.cp, move.evalAfter.mate, opts.targetRating);
     if (posNag) {
       moveInfo.nags = moveInfo.nags ?? [];
@@ -255,17 +289,19 @@ function isSignificantEvalChange(move: MoveAnalysisInput): boolean {
     return true;
   }
 
-  // Check if evaluation changed by at least 50 centipawns
+  // Check if evaluation changed by at least 150 centipawns (significant swing)
+  // Previously 50cp was too sensitive - almost every move triggered position NAGs
   const cpBefore = move.evalBefore.cp ?? 0;
   const cpAfter = move.evalAfter.cp ?? 0;
   const change = Math.abs(cpAfter - cpBefore);
 
-  // Also mark when position crosses a significant threshold (e.g., from equal to winning)
+  // Mark when position crosses a significant threshold (e.g., from equal to winning)
+  // Tightened thresholds: require more extreme swings to trigger
   const crossedThreshold =
-    (Math.abs(cpBefore) < 100 && Math.abs(cpAfter) >= 200) ||
-    (Math.abs(cpBefore) < 200 && Math.abs(cpAfter) >= 400);
+    (Math.abs(cpBefore) < 50 && Math.abs(cpAfter) >= 200) ||
+    (Math.abs(cpBefore) < 150 && Math.abs(cpAfter) >= 400);
 
-  return change >= 50 || crossedThreshold;
+  return change >= 150 || crossedThreshold;
 }
 
 /**
@@ -303,8 +339,9 @@ function filterAlternatives(move: MoveAnalysisInput): AlternativeMove[] {
     return bScore - aScore; // Higher is better
   });
 
-  // Max 2 variations per critical moment
-  return sorted.slice(0, 2);
+  // Max 3 variations per critical moment (matches engine multiPvCount)
+  // The iterative exploration system may provide more dynamically
+  return sorted.slice(0, 3);
 }
 
 /**
