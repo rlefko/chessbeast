@@ -62,6 +62,8 @@ export interface AlternativeMove {
  */
 export interface ExploredVariation {
   moves: string[];
+  /** Inline annotations for specific moves (move index -> comment) */
+  annotations?: Record<number, string>;
   purpose: 'best' | 'human_alternative' | 'refutation' | 'trap' | 'thematic';
   source: 'engine' | 'maia' | 'llm';
 }
@@ -534,13 +536,21 @@ function transformExploredVariations(
         break;
       }
 
-      variationMoves.push({
+      const moveInfo: MoveInfo = {
         moveNumber: currentMoveNumber,
         san,
         isWhiteMove,
         fenBefore,
         fenAfter,
-      });
+      };
+
+      // Attach annotation as comment if present for this move index
+      const annotation = explored.annotations?.[i];
+      if (annotation) {
+        moveInfo.commentAfter = annotation;
+      }
+
+      variationMoves.push(moveInfo);
 
       // Advance move number after Black's move
       if (!isWhiteMove) {

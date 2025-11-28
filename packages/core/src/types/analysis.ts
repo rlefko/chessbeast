@@ -94,6 +94,8 @@ export interface MoveAnalysis {
   /** Deep explored variations from VariationExplorer (for critical moments) */
   exploredVariations?: Array<{
     moves: string[];
+    /** Inline annotations for specific moves (move index -> comment) */
+    annotations?: Record<number, string>;
     purpose: 'best' | 'human_alternative' | 'refutation' | 'trap' | 'thematic';
     source: 'engine' | 'maia' | 'llm';
   }>;

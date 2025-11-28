@@ -161,6 +161,7 @@ export class Annotator {
             if (move && exploredLines.length > 0) {
               move.exploredVariations = exploredLines.map((line) => ({
                 moves: line.moves,
+                annotations: Object.fromEntries(line.annotations),
                 purpose: line.purpose,
                 source: line.source,
               }));
