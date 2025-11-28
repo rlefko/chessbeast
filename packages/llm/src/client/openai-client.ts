@@ -252,16 +252,19 @@ export class OpenAIClient {
         result.thinkingContent = thinkingContent;
       }
 
-      // Extract tool calls if present
+      // Extract tool calls if present (filter for function type only)
       if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
-        result.toolCalls = choice.message.tool_calls.map((tc) => ({
-          id: tc.id,
-          type: 'function' as const,
-          function: {
-            name: tc.function.name,
-            arguments: tc.function.arguments,
-          },
-        }));
+        result.toolCalls = choice.message.tool_calls
+          .filter((tc) => tc.type === 'function')
+          .map((tc) => ({
+            id: tc.id,
+            type: 'function' as const,
+            function: {
+              name: (tc as { function: { name: string; arguments: string } }).function.name,
+              arguments: (tc as { function: { name: string; arguments: string } }).function
+                .arguments,
+            },
+          }));
       }
 
       return result;
@@ -404,6 +407,7 @@ export class OpenAIClient {
 
         // Check if error is retryable
         if (error instanceof LLMError && !error.retryable) {
+          console.error(`[LLM] API error: ${error.message}`);
           throw error;
         }
 
