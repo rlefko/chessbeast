@@ -91,6 +91,12 @@ export interface MoveAnalysis {
   humanProbability?: number;
   /** Alternative moves considered (for critical moments) */
   alternatives?: AlternativeMove[];
+  /** Deep explored variations from VariationExplorer (for critical moments) */
+  exploredVariations?: Array<{
+    moves: string[];
+    purpose: 'best' | 'human_alternative' | 'refutation' | 'trap' | 'thematic';
+    source: 'engine' | 'maia' | 'llm';
+  }>;
   /** Whether this is a critical moment */
   isCriticalMoment: boolean;
   /** Generated annotation comment (filled in by LLM later) */

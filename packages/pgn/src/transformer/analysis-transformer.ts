@@ -57,6 +57,18 @@ export interface AlternativeMove {
 /**
  * Move analysis result (compatible with @chessbeast/core MoveAnalysis)
  */
+/**
+ * Explored variation from VariationExplorer
+ */
+export interface ExploredVariation {
+  moves: string[];
+  purpose: 'best' | 'human_alternative' | 'refutation' | 'trap' | 'thematic';
+  source: 'engine' | 'maia' | 'llm';
+}
+
+/**
+ * Move analysis result (compatible with @chessbeast/core MoveAnalysis)
+ */
 export interface MoveAnalysisInput {
   plyIndex: number;
   moveNumber: number;
@@ -71,6 +83,8 @@ export interface MoveAnalysisInput {
   classification: MoveClassification;
   humanProbability?: number;
   alternatives?: AlternativeMove[];
+  /** Deep explored variations from VariationExplorer */
+  exploredVariations?: ExploredVariation[];
   isCriticalMoment: boolean;
   comment?: string;
 }
@@ -271,9 +285,14 @@ function transformMove(
     }
   }
 
-  // Add variations from alternatives if enabled
-  if (opts.includeVariations && move.alternatives && move.alternatives.length > 0) {
-    moveInfo.variations = transformAlternatives(move, opts);
+  // Add variations from explored variations (preferred) or alternatives
+  if (opts.includeVariations) {
+    // Prefer explored variations from VariationExplorer (deep, LLM-guided)
+    if (move.exploredVariations && move.exploredVariations.length > 0) {
+      moveInfo.variations = transformExploredVariations(move, opts);
+    } else if (move.alternatives && move.alternatives.length > 0) {
+      moveInfo.variations = transformAlternatives(move, opts);
+    }
   }
 
   return moveInfo;
@@ -471,6 +490,68 @@ function buildPvMoves(
 // NOTE: formatEvaluation() function was removed.
 // Engine evaluation numbers should not appear in PGN output.
 // Position assessment NAGs (⩲, ±, +-, etc.) indicate who stands better instead.
+
+/**
+ * Transform explored variations from VariationExplorer into MoveInfo arrays
+ *
+ * Explored variations are deep, LLM-guided lines (10-40 moves) that are more
+ * instructive than shallow MultiPV alternatives.
+ */
+function transformExploredVariations(
+  move: MoveAnalysisInput,
+  opts: Required<TransformOptions>,
+): MoveInfo[][] {
+  if (!move.exploredVariations || move.exploredVariations.length === 0) {
+    return [];
+  }
+
+  // Limit to 2 explored variations per position (quality over quantity)
+  const variationsToShow = move.exploredVariations.slice(0, 2);
+
+  return variationsToShow.map((explored) => {
+    const variationMoves: MoveInfo[] = [];
+    let currentMoveNumber = move.moveNumber;
+    let isWhiteMove = move.isWhiteMove;
+
+    // Track position for FEN generation
+    const pos = new ChessPosition(move.fenBefore);
+
+    // Limit to maxVariationMoves
+    const maxMoves = Math.min(explored.moves.length, opts.maxVariationMoves);
+
+    for (let i = 0; i < maxMoves; i++) {
+      const san = explored.moves[i];
+      if (!san) continue;
+
+      const fenBefore = pos.fen();
+      let fenAfter = '';
+
+      try {
+        pos.move(san);
+        fenAfter = pos.fen();
+      } catch {
+        // Invalid move, stop here
+        break;
+      }
+
+      variationMoves.push({
+        moveNumber: currentMoveNumber,
+        san,
+        isWhiteMove,
+        fenBefore,
+        fenAfter,
+      });
+
+      // Advance move number after Black's move
+      if (!isWhiteMove) {
+        currentMoveNumber++;
+      }
+      isWhiteMove = !isWhiteMove;
+    }
+
+    return variationMoves;
+  });
+}
 
 /**
  * Check if the transformation resulted in any annotations
