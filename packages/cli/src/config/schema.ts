@@ -18,6 +18,11 @@ export type OutputVerbosity = 'summary' | 'normal' | 'rich';
 export type AnnotationPerspective = 'white' | 'black' | 'neutral';
 
 /**
+ * Reasoning effort level for OpenAI reasoning models (o1, o3, codex)
+ */
+export type ReasoningEffort = 'low' | 'medium' | 'high' | 'none';
+
+/**
  * Analysis configuration
  */
 export interface AnalysisConfigSchema {
@@ -65,6 +70,10 @@ export interface LLMConfigSchema {
   timeout: number;
   /** Maximum tokens per game (default: 50000) */
   tokenBudget?: number;
+  /** Reasoning effort for o1/o3/codex models (default: 'medium') */
+  reasoningEffort?: ReasoningEffort;
+  /** Enable streaming for real-time thought display (default: true) */
+  streaming?: boolean;
 }
 
 /**

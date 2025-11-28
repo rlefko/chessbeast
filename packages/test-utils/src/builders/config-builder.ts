@@ -43,6 +43,11 @@ export interface RatingsConfigSchema {
 }
 
 /**
+ * Reasoning effort level for OpenAI reasoning models
+ */
+export type ReasoningEffort = 'low' | 'medium' | 'high' | 'none';
+
+/**
  * LLM configuration
  */
 export interface LLMConfigSchema {
@@ -50,6 +55,8 @@ export interface LLMConfigSchema {
   model: string;
   temperature: number;
   timeout: number;
+  reasoningEffort?: ReasoningEffort;
+  streaming?: boolean;
 }
 
 /**
@@ -152,6 +159,8 @@ const DEFAULT_CONFIG: ChessBeastConfig = {
     model: 'gpt-5-codex',
     temperature: 0.7,
     timeout: 30000,
+    reasoningEffort: 'medium',
+    streaming: true,
   },
   services: {
     stockfish: {
@@ -290,6 +299,22 @@ export class ConfigBuilder {
    */
   withLlmTemperature(temperature: number): this {
     this.config.llm.temperature = temperature;
+    return this;
+  }
+
+  /**
+   * Set LLM reasoning effort
+   */
+  withReasoningEffort(effort: ReasoningEffort): this {
+    this.config.llm.reasoningEffort = effort;
+    return this;
+  }
+
+  /**
+   * Set LLM streaming enabled/disabled
+   */
+  withStreaming(enabled: boolean): this {
+    this.config.llm.streaming = enabled;
     return this;
   }
 

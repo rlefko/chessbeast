@@ -3,6 +3,15 @@
  */
 
 /**
+ * Reasoning effort level for OpenAI reasoning models (o1, o3, codex)
+ * - 'none': Disable reasoning (standard completion)
+ * - 'low': Minimal reasoning for faster responses
+ * - 'medium': Balanced reasoning (default)
+ * - 'high': Maximum reasoning for complex analysis
+ */
+export type ReasoningEffort = 'low' | 'medium' | 'high' | 'none';
+
+/**
  * Token budget configuration
  */
 export interface TokenBudget {
@@ -58,12 +67,16 @@ export interface CacheConfig {
 export interface LLMConfig {
   /** OpenAI API key (required) */
   apiKey: string;
-  /** Model to use (default: 'gpt-5.1') */
+  /** Model to use (default: 'gpt-5-codex') */
   model: string;
   /** Temperature for generation (default: 0.7) */
   temperature: number;
   /** Request timeout in milliseconds (default: 30000) */
   timeout: number;
+  /** Reasoning effort for o1/o3/codex models (default: 'medium') */
+  reasoningEffort: ReasoningEffort;
+  /** Enable streaming for real-time thought display (default: true) */
+  streaming: boolean;
   /** Token budget settings */
   budget: TokenBudget;
   /** Retry settings */
@@ -121,6 +134,8 @@ export const DEFAULT_LLM_CONFIG: Omit<LLMConfig, 'apiKey'> = {
   model: process.env['OPENAI_MODEL'] ?? 'gpt-5-codex',
   temperature: 0.7,
   timeout: parseInt(process.env['LLM_TIMEOUT_MS'] ?? '30000', 10),
+  reasoningEffort: 'medium',
+  streaming: true,
   budget: DEFAULT_TOKEN_BUDGET,
   retry: DEFAULT_RETRY_CONFIG,
   circuitBreaker: DEFAULT_CIRCUIT_BREAKER_CONFIG,
@@ -157,6 +172,17 @@ export function loadConfigFromEnv(): Partial<LLMConfig> {
 
   if (process.env['LLM_TIMEOUT_MS']) {
     config.timeout = parseInt(process.env['LLM_TIMEOUT_MS'], 10);
+  }
+
+  if (process.env['LLM_REASONING_EFFORT']) {
+    const effort = process.env['LLM_REASONING_EFFORT'] as ReasoningEffort;
+    if (['low', 'medium', 'high', 'none'].includes(effort)) {
+      config.reasoningEffort = effort;
+    }
+  }
+
+  if (process.env['LLM_STREAMING']) {
+    config.streaming = process.env['LLM_STREAMING'] === 'true';
   }
 
   if (process.env['LLM_MAX_TOKENS_PER_GAME']) {

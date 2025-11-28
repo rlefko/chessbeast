@@ -4,6 +4,7 @@
 
 import { ResponseCache, generatePositionCacheKey } from '../cache/response-cache.js';
 import type { OpenAIClient } from '../client/openai-client.js';
+import type { StreamChunk } from '../client/types.js';
 import type { LLMConfig } from '../config/llm-config.js';
 import { RateLimitError } from '../errors.js';
 import type { PlannedAnnotation } from '../planner/annotation-planner.js';
@@ -67,10 +68,15 @@ export class CommentGenerator {
    *
    * Each move is evaluated independently. Failures don't cascade to other moves.
    * If we can't generate a good comment, we return empty (let the NAG speak).
+   *
+   * @param context The comment context with move and position info
+   * @param planned The planned annotation with token estimates
+   * @param onChunk Optional streaming callback for real-time reasoning display
    */
   async generateComment(
     context: CommentContext,
     planned: PlannedAnnotation,
+    onChunk?: (chunk: StreamChunk) => void,
   ): Promise<GeneratedComment> {
     const isCritical = planned.criticalMoment !== undefined;
 
@@ -102,7 +108,7 @@ export class CommentGenerator {
     }
 
     try {
-      const comment = await this.callLLM(context);
+      const comment = await this.callLLM(context, onChunk);
 
       // Cache the result
       this.cache.set(cacheKey, comment);
@@ -129,20 +135,30 @@ export class CommentGenerator {
     return results;
   }
 
-  private async callLLM(context: CommentContext): Promise<GeneratedComment> {
+  private async callLLM(
+    context: CommentContext,
+    onChunk?: (chunk: StreamChunk) => void,
+  ): Promise<GeneratedComment> {
     // Choose prompt based on whether it's a critical moment
     const prompt = context.criticalMoment
       ? buildCriticalMomentPrompt(context)
       : buildBriefMovePrompt(context);
 
-    const response = await this.client.chat({
+    // Build request with optional streaming callback (avoid undefined for exactOptionalPropertyTypes)
+    const request: Parameters<typeof this.client.chat>[0] = {
       messages: [
         { role: 'system', content: CHESS_ANNOTATOR_SYSTEM },
         { role: 'user', content: prompt },
       ],
       temperature: this.config.temperature,
       responseFormat: 'json',
-    });
+      reasoningEffort: this.config.reasoningEffort,
+    };
+    if (onChunk) {
+      request.onChunk = onChunk;
+    }
+
+    const response = await this.client.chat(request);
 
     // Parse and validate response
     const parsed = parseJsonResponse<unknown>(response.content);

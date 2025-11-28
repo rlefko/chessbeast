@@ -14,7 +14,7 @@
 import type { GameAnalysis } from '@chessbeast/core';
 
 import { OpenAIClient } from './client/openai-client.js';
-import type { HealthStatus } from './client/types.js';
+import type { HealthStatus, StreamChunk } from './client/types.js';
 import type { LLMConfig } from './config/llm-config.js';
 import { createLLMConfig, loadConfigFromEnv } from './config/llm-config.js';
 import {
@@ -33,6 +33,22 @@ import {
 import type { PlannedVariation } from './prompts/templates.js';
 
 /**
+ * Progress information during annotation
+ */
+export interface AnnotationProgress {
+  /** Current phase of annotation */
+  phase: 'exploring' | 'annotating' | 'summarizing';
+  /** Current move being analyzed (e.g., "14... Be6") */
+  currentMove?: string;
+  /** Index of current position in plan (0-based) */
+  currentIndex: number;
+  /** Total number of positions to annotate */
+  totalPositions: number;
+  /** Current reasoning/thinking chunk (if streaming) */
+  thinking?: string;
+}
+
+/**
  * Options for annotation
  */
 export interface AnnotationOptions extends PlanOptions {
@@ -40,6 +56,8 @@ export interface AnnotationOptions extends PlanOptions {
   generateSummary?: boolean;
   /** Skip annotation entirely if circuit breaker is open (default: false) */
   skipOnCircuitOpen?: boolean;
+  /** Progress callback for real-time status updates */
+  onProgress?: (progress: AnnotationProgress) => void;
 }
 
 /**
@@ -122,7 +140,12 @@ export class Annotator {
     analysis: GameAnalysis,
     options: AnnotationOptions = {},
   ): Promise<AnnotationResult> {
-    const { generateSummary = true, skipOnCircuitOpen = false, ...planOptions } = options;
+    const {
+      generateSummary = true,
+      skipOnCircuitOpen = false,
+      onProgress,
+      ...planOptions
+    } = options;
 
     // Reset client for new game
     this.client.resetForNewGame();
@@ -186,7 +209,8 @@ export class Annotator {
 
     // Generate comments for each planned position
     let positionsAnnotated = 0;
-    for (const planned of plan.positions) {
+    for (let i = 0; i < plan.positions.length; i++) {
+      const planned = plan.positions[i]!;
       // Get legal moves for validation (placeholder - would need chess library)
       const legalMoves = this.getLegalMoves(planned.move.fenBefore);
 
@@ -212,8 +236,34 @@ export class Annotator {
         exploredVariations,
       );
 
+      // Format move notation for progress
+      const moveNotation = `${planned.move.moveNumber}${planned.move.isWhiteMove ? '.' : '...'} ${planned.move.san}`;
+
+      // Report progress - starting this move
+      onProgress?.({
+        phase: 'annotating',
+        currentMove: moveNotation,
+        currentIndex: i,
+        totalPositions: plan.positions.length,
+      });
+
+      // Create streaming callback that forwards thinking to progress
+      const onChunk: ((chunk: StreamChunk) => void) | undefined = onProgress
+        ? (chunk: StreamChunk): void => {
+            if (chunk.type === 'thinking') {
+              onProgress({
+                phase: 'annotating',
+                currentMove: moveNotation,
+                currentIndex: i,
+                totalPositions: plan.positions.length,
+                thinking: chunk.text,
+              });
+            }
+          }
+        : undefined;
+
       // Generate comment
-      const comment = await this.commentGenerator.generateComment(context, planned);
+      const comment = await this.commentGenerator.generateComment(context, planned, onChunk);
 
       // Apply to analysis
       if (move && comment.comment) {
@@ -225,6 +275,13 @@ export class Annotator {
     // Generate game summary
     let summaryGenerated = false;
     if (generateSummary && plan.generateSummary) {
+      // Report progress - starting summary
+      onProgress?.({
+        phase: 'summarizing',
+        currentIndex: plan.positions.length,
+        totalPositions: plan.positions.length,
+      });
+
       const summary = await this.summaryGenerator.generateSummary(analysis, plan.targetRating);
       analysis.summary = formatSummaryAsString(summary);
       summaryGenerated = true;
@@ -272,10 +329,16 @@ export class Annotator {
 }
 
 // Re-export types and utilities
-export type { LLMConfig, TokenBudget, RetryConfig, CacheConfig } from './config/llm-config.js';
+export type {
+  LLMConfig,
+  TokenBudget,
+  RetryConfig,
+  CacheConfig,
+  ReasoningEffort,
+} from './config/llm-config.js';
 export { createLLMConfig, loadConfigFromEnv, DEFAULT_LLM_CONFIG } from './config/llm-config.js';
 
-export type { HealthStatus, TokenUsage, CircuitState } from './client/types.js';
+export type { HealthStatus, TokenUsage, CircuitState, StreamChunk } from './client/types.js';
 export { OpenAIClient, TokenTracker } from './client/openai-client.js';
 export { CircuitBreaker } from './client/circuit-breaker.js';
 
