@@ -110,6 +110,10 @@ export class ProgressReporter {
   private currentPhaseName: string = '';
   private thinkingBuffer: string = '';
 
+  // LLM waiting timer - shows elapsed time while waiting for response
+  private llmWaitingTimer: NodeJS.Timeout | null = null;
+  private llmWaitingStartTime: number = 0;
+
   // Color functions
   private c: ReturnType<typeof createColorFns>;
 
@@ -231,10 +235,14 @@ export class ProgressReporter {
 
   /**
    * Update progress for move annotation with move notation
-   * Shows "Analyzing 14... Be6 (3/8)" in the spinner
+   * Shows "Analyzing 14... Be6 (3/8)" in the spinner, then starts
+   * a timer that shows elapsed time while waiting for LLM response.
    */
   updateMoveProgress(current: number, total: number, moveNotation: string): void {
     if (this.silent || !this.spinner) return;
+
+    // Stop any existing waiting timer from previous move
+    this.stopLlmWaitingTimer();
 
     // Reset thinking buffer when starting a new move
     this.thinkingBuffer = '';
@@ -250,6 +258,33 @@ export class ProgressReporter {
     const progressStr = `(${current}/${total})`;
 
     this.spinner.text = `Analyzing ${this.c.cyan(moveNotation)} ${progressStr}${etaStr}`;
+
+    // Start timer to show elapsed time while waiting for LLM response
+    this.startLlmWaitingTimer(moveNotation, progressStr);
+  }
+
+  /**
+   * Start the LLM waiting timer that updates spinner with elapsed time
+   */
+  private startLlmWaitingTimer(moveNotation: string, progressStr: string): void {
+    this.llmWaitingStartTime = Date.now();
+
+    // Update every second to show elapsed time
+    this.llmWaitingTimer = setInterval(() => {
+      if (!this.spinner) return;
+      const elapsed = Math.floor((Date.now() - this.llmWaitingStartTime) / 1000);
+      this.spinner.text = `Analyzing ${this.c.cyan(moveNotation)} ${progressStr} ${this.c.dim(`(${elapsed}s...)`)}`;
+    }, 1000);
+  }
+
+  /**
+   * Stop the LLM waiting timer
+   */
+  private stopLlmWaitingTimer(): void {
+    if (this.llmWaitingTimer) {
+      clearInterval(this.llmWaitingTimer);
+      this.llmWaitingTimer = null;
+    }
   }
 
   /**
@@ -259,6 +294,9 @@ export class ProgressReporter {
   displayThinking(moveNotation: string, thought: string): void {
     // Only display thinking in verbose mode
     if (this.silent || !this.verbose || !this.spinner) return;
+
+    // Stop the waiting timer - we're now receiving streaming content
+    this.stopLlmWaitingTimer();
 
     // Accumulate thinking content
     this.thinkingBuffer += thought;
@@ -297,6 +335,9 @@ export class ProgressReporter {
   completePhase(phase: AnalysisPhase, detail?: string): void {
     if (this.silent) return;
 
+    // Stop any running LLM waiting timer
+    this.stopLlmWaitingTimer();
+
     const duration = Date.now() - this.phaseStartTime;
     const phaseName = PHASE_NAMES[phase];
     const durationStr = duration > 1000 ? this.c.dim(` (${(duration / 1000).toFixed(1)}s)`) : '';
@@ -315,6 +356,9 @@ export class ProgressReporter {
    */
   failPhase(phase: AnalysisPhase, error: string): void {
     if (this.silent) return;
+
+    // Stop any running LLM waiting timer
+    this.stopLlmWaitingTimer();
 
     const phaseName = PHASE_NAMES[phase];
 
@@ -480,6 +524,9 @@ export class ProgressReporter {
    * Stop any running spinner
    */
   stop(): void {
+    // Stop any running LLM waiting timer
+    this.stopLlmWaitingTimer();
+
     if (this.spinner) {
       this.spinner.stop();
       this.spinner = null;

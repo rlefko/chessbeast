@@ -6,7 +6,7 @@ import { ResponseCache, generatePositionCacheKey } from '../cache/response-cache
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { StreamChunk } from '../client/types.js';
 import type { LLMConfig } from '../config/llm-config.js';
-import { RateLimitError } from '../errors.js';
+import { CircuitOpenError, RateLimitError } from '../errors.js';
 import type { PlannedAnnotation } from '../planner/annotation-planner.js';
 import { CHESS_ANNOTATOR_SYSTEM } from '../prompts/system-prompts.js';
 import type { CommentContext } from '../prompts/templates.js';
@@ -179,7 +179,13 @@ export class CommentGenerator {
    * we return an empty comment and let the next move try fresh.
    */
   private handleFailure(error: unknown, _planned: PlannedAnnotation): GeneratedComment {
-    // Log the error for debugging
+    // CircuitOpenError is expected when circuit is tripped - skip silently
+    // The circuit open state is already logged once when it opens
+    if (error instanceof CircuitOpenError) {
+      return { comment: undefined, nags: [] };
+    }
+
+    // Log other errors for debugging
     if (error instanceof RateLimitError) {
       console.warn(
         `[LLM] Rate limit error after exhausting all retries. ` +
