@@ -77,6 +77,20 @@ export interface LLMConfigSchema {
 }
 
 /**
+ * Agentic annotation configuration
+ */
+export interface AgenticConfigSchema {
+  /** Enable agentic annotation mode (default: false) */
+  enabled: boolean;
+  /** Annotate all moves, not just critical (default: false) */
+  annotateAll: boolean;
+  /** Maximum tool calls per position (default: 5) */
+  maxToolCalls: number;
+  /** Show cost summary at end (default: true) */
+  showCosts: boolean;
+}
+
+/**
  * Service endpoint configuration
  */
 export interface ServiceEndpoint {
@@ -134,6 +148,8 @@ export interface ChessBeastConfig {
   ratings: RatingsConfigSchema;
   /** LLM settings */
   llm: LLMConfigSchema;
+  /** Agentic annotation settings */
+  agentic: AgenticConfigSchema;
   /** Service endpoints */
   services: ServicesConfigSchema;
   /** Database paths */
@@ -176,4 +192,12 @@ export interface CliOptions {
   reasoningEffort?: ReasoningEffort;
   /** Enable verbose output with real-time LLM reasoning display */
   verbose?: boolean;
+  /** Enable agentic annotation with tool calling */
+  agentic?: boolean;
+  /** Use agentic annotation for all moves, not just critical */
+  agenticAll?: boolean;
+  /** Maximum tool calls per position in agentic mode */
+  maxToolCalls?: number;
+  /** Show cost summary at end of analysis */
+  showCosts?: boolean;
 }

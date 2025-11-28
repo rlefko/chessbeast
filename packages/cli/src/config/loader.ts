@@ -39,6 +39,12 @@ const ENV_VAR_MAP: Record<string, string> = {
   LLM_REASONING_EFFORT: 'llm.reasoningEffort',
   LLM_STREAMING: 'llm.streaming',
 
+  // Agentic
+  CHESSBEAST_AGENTIC: 'agentic.enabled',
+  CHESSBEAST_AGENTIC_ALL: 'agentic.annotateAll',
+  CHESSBEAST_MAX_TOOL_CALLS: 'agentic.maxToolCalls',
+  CHESSBEAST_SHOW_COSTS: 'agentic.showCosts',
+
   // Services
   CHESSBEAST_STOCKFISH_HOST: 'services.stockfish.host',
   CHESSBEAST_STOCKFISH_PORT: 'services.stockfish.port',
@@ -81,6 +87,11 @@ function deepMerge(target: ChessBeastConfig, source: Partial<ChessBeastConfig>):
   // Merge llm
   if (source.llm) {
     result.llm = { ...result.llm, ...source.llm };
+  }
+
+  // Merge agentic
+  if (source.agentic) {
+    result.agentic = { ...result.agentic, ...source.agentic };
   }
 
   // Merge services
@@ -130,7 +141,13 @@ function setNestedProperty(obj: Record<string, unknown>, path: string, value: un
  */
 function parseEnvValue(value: string, path: string): unknown {
   // Boolean values
-  if (path.includes('skip') || path.includes('include')) {
+  if (
+    path.includes('skip') ||
+    path.includes('include') ||
+    path.includes('enabled') ||
+    path.includes('annotateAll') ||
+    path.includes('showCosts')
+  ) {
     return value.toLowerCase() === 'true' || value === '1';
   }
 
@@ -142,7 +159,8 @@ function parseEnvValue(value: string, path: string): unknown {
     path.includes('Rating') ||
     path.includes('Depth') ||
     path.includes('Count') ||
-    path.includes('Ratio')
+    path.includes('Ratio') ||
+    path.includes('maxToolCalls')
   ) {
     const num = parseFloat(value);
     return isNaN(num) ? value : num;
@@ -281,6 +299,37 @@ function mapCliToConfig(options: CliOptions): Partial<ChessBeastConfig> {
       ...config.llm,
       reasoningEffort: effortMap[options.reasoningEffort],
     } as ChessBeastConfig['llm'];
+  }
+
+  // Agentic options
+  if (options.agentic !== undefined) {
+    config.agentic = {
+      ...config.agentic,
+      enabled: options.agentic,
+    } as ChessBeastConfig['agentic'];
+  }
+
+  if (options.agenticAll !== undefined) {
+    config.agentic = {
+      ...config.agentic,
+      annotateAll: options.agenticAll,
+      // If --agentic-all is set, implicitly enable agentic mode
+      enabled: options.agenticAll ? true : config.agentic?.enabled,
+    } as ChessBeastConfig['agentic'];
+  }
+
+  if (options.maxToolCalls !== undefined) {
+    config.agentic = {
+      ...config.agentic,
+      maxToolCalls: options.maxToolCalls,
+    } as ChessBeastConfig['agentic'];
+  }
+
+  if (options.showCosts !== undefined) {
+    config.agentic = {
+      ...config.agentic,
+      showCosts: options.showCosts,
+    } as ChessBeastConfig['agentic'];
   }
 
   return config;
