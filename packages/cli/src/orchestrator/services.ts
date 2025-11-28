@@ -307,7 +307,10 @@ function toEngineEvaluation(response: {
  */
 function createEngineAdapter(stockfish: StockfishClient): EngineService {
   return {
-    async evaluate(fen: string, depth: number) {
+    async evaluate(
+      fen: string,
+      depth: number,
+    ): Promise<{ cp?: number; mate?: number; depth: number; pv: string[] }> {
       const response = await stockfish.evaluate(fen, { depth });
       return toEngineEvaluation(response);
     },
@@ -315,7 +318,7 @@ function createEngineAdapter(stockfish: StockfishClient): EngineService {
     async evaluateMultiPv(
       fen: string,
       options: { depth?: number; timeLimitMs?: number; numLines?: number },
-    ) {
+    ): Promise<Array<{ cp?: number; mate?: number; depth: number; pv: string[] }>> {
       const evalOptions: { depth?: number; timeLimitMs?: number; multipv?: number } = {
         multipv: options.numLines ?? 3,
       };
@@ -350,7 +353,10 @@ function createEngineAdapter(stockfish: StockfishClient): EngineService {
  */
 function createMaiaAdapter(maia: MaiaClient): MaiaService {
   return {
-    async predictMoves(fen: string, rating: number) {
+    async predictMoves(
+      fen: string,
+      rating: number,
+    ): Promise<Array<{ san: string; probability: number }>> {
       const response = await maia.predict(fen, rating);
       return response.predictions.map((p) => ({
         san: p.move,

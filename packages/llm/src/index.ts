@@ -17,6 +17,12 @@ import { OpenAIClient } from './client/openai-client.js';
 import type { HealthStatus } from './client/types.js';
 import type { LLMConfig } from './config/llm-config.js';
 import { createLLMConfig, loadConfigFromEnv } from './config/llm-config.js';
+import {
+  VariationExplorer,
+  createVariationExplorer,
+  type EngineService,
+  type MaiaService,
+} from './explorer/index.js';
 import { CommentGenerator, DegradationLevel } from './generator/comment-generator.js';
 import { SummaryGenerator, formatSummaryAsString } from './generator/summary-generator.js';
 import {
@@ -24,12 +30,6 @@ import {
   buildCommentContext,
   type PlanOptions,
 } from './planner/annotation-planner.js';
-import {
-  VariationExplorer,
-  createVariationExplorer,
-  type EngineService,
-  type MaiaService,
-} from './explorer/index.js';
 
 /**
  * Options for annotation
