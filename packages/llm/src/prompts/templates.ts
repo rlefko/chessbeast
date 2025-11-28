@@ -179,15 +179,31 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
   // Word limit - strict
   const wordLimit = getWordLimit(verbosity, true);
   parts.push('');
-  parts.push(`TASK: Explain WHY this position matters in UNDER ${wordLimit} WORDS.`);
-  parts.push(`FOCUS ON:`);
-  parts.push(`- What tactical/strategic idea makes this important?`);
-  parts.push(`- What threat does the best move create?`);
-  parts.push(`- If mate, show the key moves`);
-  parts.push(`DO NOT:`);
-  parts.push(`- Use evaluation numbers (+1.5, -0.3, etc.)`);
-  parts.push(`- Say "This is a blunder/mistake/good move"`);
-  parts.push(`- Use generic phrases like "improves the position"`);
+
+  // When variations are present, the comment should explain WHY the move is wrong
+  // since the variations will show WHAT to play instead
+  if (context.plannedVariations && context.plannedVariations.length > 0) {
+    parts.push(`TASK: Explain WHY this move is problematic in UNDER ${wordLimit} WORDS.`);
+    parts.push(`FOCUS ON:`);
+    parts.push(`- What threat/tactic does it miss?`);
+    parts.push(`- What weakness does it create?`);
+    parts.push(`- What principle does it violate?`);
+    parts.push(`DO NOT:`);
+    parts.push(`- Describe alternative moves (they're shown in variations)`);
+    parts.push(`- Say "instead play X" or "better was Y" (variations show this)`);
+    parts.push(`- Use evaluation numbers (+1.5, -0.3, etc.)`);
+    parts.push(`- Say "This is a blunder/mistake" (NAG shows this)`);
+  } else {
+    parts.push(`TASK: Explain WHY this position matters in UNDER ${wordLimit} WORDS.`);
+    parts.push(`FOCUS ON:`);
+    parts.push(`- What tactical/strategic idea makes this important?`);
+    parts.push(`- What threat does the best move create?`);
+    parts.push(`- If mate, show the key moves`);
+    parts.push(`DO NOT:`);
+    parts.push(`- Use evaluation numbers (+1.5, -0.3, etc.)`);
+    parts.push(`- Say "This is a blunder/mistake/good move"`);
+    parts.push(`- Use generic phrases like "improves the position"`);
+  }
 
   parts.push('');
   parts.push('Respond with JSON: { "comment": "your annotation" }');

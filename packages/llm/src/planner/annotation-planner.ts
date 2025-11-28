@@ -9,6 +9,7 @@ import type {
   VerbosityLevel,
   CommentContext,
   AnnotationPerspective,
+  PlannedVariation,
 } from '../prompts/templates.js';
 
 import { estimateTokens, shouldAnnotate } from './verbosity.js';
@@ -375,11 +376,12 @@ export function buildCommentContext(
   openingName?: string,
   perspective: AnnotationPerspective = 'neutral',
   includeNags: boolean = true,
+  exploredVariations?: PlannedVariation[],
 ): CommentContext {
   const { move, criticalMoment, verbosity } = planned;
   const moveNotation = `${move.moveNumber}${move.isWhiteMove ? '.' : '...'} ${move.san}`;
 
-  return {
+  const context: CommentContext = {
     move,
     criticalMoment,
     targetRating,
@@ -390,4 +392,11 @@ export function buildCommentContext(
     perspective,
     hasNag: includeNags && classificationHasNag(move.classification),
   };
+
+  // Only set plannedVariations if defined (exactOptionalPropertyTypes compatibility)
+  if (exploredVariations) {
+    context.plannedVariations = exploredVariations;
+  }
+
+  return context;
 }
