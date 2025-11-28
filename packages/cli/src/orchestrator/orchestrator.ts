@@ -3,7 +3,7 @@
  */
 
 import { createAnalysisPipeline, type GameAnalysis, type ParsedGameInput } from '@chessbeast/core';
-import type { VerbosityLevel } from '@chessbeast/llm';
+import type { VerbosityLevel, AnnotationProgress } from '@chessbeast/llm';
 import {
   parsePgn,
   renderPgn,
@@ -171,11 +171,30 @@ export async function orchestrateAnalysis(
       reporter.startPhase('llm_annotation');
       try {
         const preferredVerbosity = mapVerbosity(config.output.verbosity);
+
+        // Create progress callback for annotation updates
+        const onProgress = (progress: AnnotationProgress): void => {
+          if (progress.phase === 'annotating' && progress.currentMove) {
+            // Update move progress (always shown)
+            reporter.updateMoveProgress(
+              progress.currentIndex + 1,
+              progress.totalPositions,
+              progress.currentMove,
+            );
+
+            // Display thinking (only in verbose mode - handled by reporter)
+            if (progress.thinking) {
+              reporter.displayThinking(progress.currentMove, progress.thinking);
+            }
+          }
+        };
+
         const result = await services.annotator.annotate(analysis, {
           preferredVerbosity,
           generateSummary: config.output.includeSummary,
           perspective: config.output.perspective as AnnotationPerspective,
           includeNags: config.output.includeNags,
+          onProgress,
         });
         analysis = result.analysis;
         totalAnnotations += result.positionsAnnotated;

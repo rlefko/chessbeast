@@ -9,6 +9,7 @@ An AI-powered chess game annotator that produces human-friendly analysis. ChessB
 - **Critical Moment Detection**: Identifies key turning points, blunders, and missed opportunities
 - **Opening Recognition**: ECO classification and reference to master games
 - **Standards-Compliant Output**: Produces valid annotated PGN loadable in any chess GUI
+- **Advanced Reasoning Models**: Supports OpenAI reasoning models (gpt-5-codex, o1, o3) with configurable reasoning effort and real-time thought streaming
 
 ## Installation
 
@@ -65,6 +66,9 @@ chessbeast analyze --input game.pgn --perspective black
 # Limit LLM token usage for cost control
 chessbeast analyze --input game.pgn --token-budget 30000
 
+# Enable verbose mode to see LLM reasoning in real-time
+chessbeast analyze --input game.pgn --verbose
+
 # Skip external services for offline analysis
 chessbeast analyze --input game.pgn --skip-maia --skip-llm
 
@@ -89,6 +93,8 @@ chessbeast analyze --show-config
 | `--token-budget <tokens>` | Max tokens per game for LLM (default: 50000) |
 | `--skip-maia` | Skip Maia human-likeness analysis |
 | `--skip-llm` | Skip LLM annotations (use templates only) |
+| `--reasoning-effort <level>` | LLM reasoning effort: `none`, `low`, `medium`, `high` (default: medium) |
+| `--verbose` | Enable verbose mode with real-time LLM reasoning display |
 | `--show-config` | Print resolved configuration and exit |
 | `--no-color` | Disable colored output (useful for piping) |
 | `--dry-run` | Validate setup and configuration without running analysis |

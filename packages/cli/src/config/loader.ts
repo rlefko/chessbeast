@@ -11,6 +11,7 @@ import type {
   AnalysisProfile,
   OutputVerbosity,
   AnnotationPerspective,
+  ReasoningEffort,
 } from './schema.js';
 import { validateConfig, validatePartialConfig } from './validation.js';
 
@@ -35,6 +36,8 @@ const ENV_VAR_MAP: Record<string, string> = {
   CHESSBEAST_LLM_MODEL: 'llm.model',
   CHESSBEAST_LLM_TIMEOUT: 'llm.timeout',
   CHESSBEAST_TOKEN_BUDGET: 'llm.tokenBudget',
+  LLM_REASONING_EFFORT: 'llm.reasoningEffort',
+  LLM_STREAMING: 'llm.streaming',
 
   // Services
   CHESSBEAST_STOCKFISH_HOST: 'services.stockfish.host',
@@ -264,6 +267,19 @@ function mapCliToConfig(options: CliOptions): Partial<ChessBeastConfig> {
     config.llm = {
       ...config.llm,
       tokenBudget: options.tokenBudget,
+    } as ChessBeastConfig['llm'];
+  }
+
+  if (options.reasoningEffort !== undefined) {
+    const effortMap: Record<ReasoningEffort, ReasoningEffort> = {
+      none: 'none',
+      low: 'low',
+      medium: 'medium',
+      high: 'high',
+    };
+    config.llm = {
+      ...config.llm,
+      reasoningEffort: effortMap[options.reasoningEffort],
     } as ChessBeastConfig['llm'];
   }
 

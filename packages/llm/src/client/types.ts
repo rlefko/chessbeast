@@ -2,10 +2,24 @@
  * Types for LLM client operations
  */
 
+import type { ReasoningEffort } from '../config/llm-config.js';
+
 /**
  * Message role in conversation
  */
 export type MessageRole = 'system' | 'user' | 'assistant';
+
+/**
+ * Streaming chunk from LLM
+ */
+export interface StreamChunk {
+  /** Type of content: 'thinking' for reasoning, 'content' for response */
+  type: 'thinking' | 'content';
+  /** Text content of this chunk */
+  text: string;
+  /** Whether this is the final chunk */
+  done: boolean;
+}
 
 /**
  * Chat message
@@ -27,6 +41,10 @@ export interface LLMRequest {
   maxTokens?: number;
   /** Response format (json for structured output) */
   responseFormat?: 'text' | 'json';
+  /** Reasoning effort for o1/o3/codex models */
+  reasoningEffort?: ReasoningEffort;
+  /** Streaming callback for real-time response chunks */
+  onChunk?: (chunk: StreamChunk) => void;
 }
 
 /**
@@ -39,6 +57,8 @@ export interface LLMResponse {
   finishReason: 'stop' | 'length' | 'content_filter';
   /** Token usage */
   usage: TokenUsage;
+  /** Reasoning/thinking content from reasoning models (if any) */
+  thinkingContent?: string;
 }
 
 /**
@@ -51,6 +71,8 @@ export interface TokenUsage {
   completionTokens: number;
   /** Total tokens used */
   totalTokens: number;
+  /** Tokens used for reasoning/thinking (if reasoning model) */
+  thinkingTokens?: number;
 }
 
 /**

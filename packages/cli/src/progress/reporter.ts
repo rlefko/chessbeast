@@ -57,6 +57,8 @@ export interface ProgressReporterOptions {
   silent?: boolean;
   /** Enable colored output (default: true) */
   color?: boolean;
+  /** Enable verbose output including reasoning thoughts (default: false) */
+  verbose?: boolean;
 }
 
 // Helper functions for colorized output
@@ -101,8 +103,10 @@ export class ProgressReporter {
   private phaseStartTime: number = 0;
   private silent: boolean;
   private useColor: boolean;
+  private verbose: boolean;
   private timeEstimator: TimeEstimator;
   private currentPhaseName: string = '';
+  private thinkingBuffer: string = '';
 
   // Color functions
   private c: ReturnType<typeof createColorFns>;
@@ -112,9 +116,11 @@ export class ProgressReporter {
     if (typeof options === 'boolean') {
       this.silent = options;
       this.useColor = true;
+      this.verbose = false;
     } else {
       this.silent = options.silent ?? false;
       this.useColor = options.color ?? true;
+      this.verbose = options.verbose ?? false;
     }
 
     this.timeEstimator = new TimeEstimator();
@@ -219,6 +225,68 @@ export class ProgressReporter {
     const progressStr = `${current}/${total}`;
 
     this.spinner.text = `${this.currentPhaseName}... ${progressStr}${etaStr}`;
+  }
+
+  /**
+   * Update progress for move annotation with move notation
+   * Shows "Analyzing 14... Be6 (3/8)" in the spinner
+   */
+  updateMoveProgress(current: number, total: number, moveNotation: string): void {
+    if (this.silent || !this.spinner) return;
+
+    // Reset thinking buffer when starting a new move
+    this.thinkingBuffer = '';
+
+    // Record sample for ETA estimation
+    this.timeEstimator.record(current);
+
+    // Calculate ETA
+    const etaMs = this.timeEstimator.estimateRemaining(current, total);
+    const etaStr = etaMs !== null ? this.c.dim(` (${formatEta(etaMs)} remaining)`) : '';
+
+    // Build progress string with move notation
+    const progressStr = `(${current}/${total})`;
+
+    this.spinner.text = `Analyzing ${this.c.cyan(moveNotation)} ${progressStr}${etaStr}`;
+  }
+
+  /**
+   * Display streaming reasoning/thinking content
+   * Only shown when verbose mode is enabled
+   */
+  displayThinking(moveNotation: string, thought: string): void {
+    // Only display thinking in verbose mode
+    if (this.silent || !this.verbose || !this.spinner) return;
+
+    // Accumulate thinking content
+    this.thinkingBuffer += thought;
+
+    // Get terminal width for truncation
+    const terminalWidth = process.stdout.columns || 80;
+    const maxWidth = Math.max(40, terminalWidth - 25);
+
+    // Get the last line of thinking (most recent thought)
+    const lines = this.thinkingBuffer.split('\n');
+    const lastLine = lines[lines.length - 1] ?? '';
+
+    // Truncate if needed
+    const truncated =
+      lastLine.length > maxWidth ? lastLine.slice(0, maxWidth - 3) + '...' : lastLine;
+
+    // Clean up whitespace
+    const cleaned = truncated.replace(/\s+/g, ' ').trim();
+
+    if (cleaned) {
+      // Update spinner with thinking content
+      this.spinner.text = `${this.c.cyan(moveNotation)}: ${this.c.dim(cleaned)}`;
+    }
+  }
+
+  /**
+   * Check if verbose mode is enabled
+   */
+  isVerbose(): boolean {
+    return this.verbose;
   }
 
   /**

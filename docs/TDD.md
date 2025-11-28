@@ -31,7 +31,7 @@ PGN → Parser → Positions → Engine + Maia + DB → Critical Moments → Ann
 | Maia Service | Python 3.10+ + gRPC | Maia2 PyTorch model serving (`pip install maia2`) |
 | Inter-service Comm | gRPC + Protobuf | Efficient binary protocol |
 | Database | SQLite | ECO openings + Lichess Elite games |
-| LLM | OpenAI API (GPT-4o) | Upgradeable to GPT-5 |
+| LLM | OpenAI API (GPT-5-codex) | Reasoning model with streaming support |
 
 ⸻
 
@@ -436,7 +436,7 @@ Implementation:
 	•	Opening info and phase transitions.
 	•	For each position:
 	•	FEN, move in SAN, evals (before/after), best line(s).
-	•	Reason why it’s critical & themes from planner.
+	•	Reason why it's critical & themes from planner.
 	•	Ask LLM to:
 	•	Provide concise comments for each move.
 	•	Suggest NAGs.
@@ -444,6 +444,39 @@ Implementation:
 	•	Parse LLM output into structured annotations, validating:
 	•	That NAG codes are from an allowed set.
 	•	That move identifiers match known positions.
+
+### 3.7.1 Reasoning Model Support
+
+The LLM client supports OpenAI reasoning models (gpt-5-codex, o1, o3) with configurable reasoning effort:
+
+**Key interfaces:**
+- `ReasoningEffort`: 'none' | 'low' | 'medium' | 'high' - controls depth of model reasoning
+- `StreamChunk`: Real-time streaming of thinking content and final response
+- `TokenUsage`: Tracks thinking tokens separately from completion tokens
+
+**Configuration:**
+
+```typescript
+interface LLMConfig {
+  model: string;              // e.g., "gpt-5-codex"
+  reasoningEffort: ReasoningEffort; // Default: "medium"
+  streaming: boolean;         // Default: true
+  temperature: number;
+  timeout: number;
+}
+```
+
+**Streaming flow:**
+1. Client sends request with `reasoning_effort` parameter
+2. Model streams `reasoning_content` chunks (thinking process)
+3. Model streams final `content` chunks (response)
+4. Progress callback receives chunks for real-time display
+5. Token usage includes separate `thinkingTokens` count
+
+**Verbose mode:**
+- When `--verbose` flag is set, reasoning thoughts are displayed in real-time
+- Shows model's step-by-step analysis of each position
+- Helps users understand how annotations were generated
 
 3.8 PGN Renderer
 	•	Merge:

@@ -42,9 +42,11 @@ You can also specify a config file explicitly with the `--config` flag.
     "targetAudienceRating": 1600
   },
   "llm": {
-    "model": "gpt-4o",
+    "model": "gpt-5-codex",
     "temperature": 0.7,
-    "timeout": 30000
+    "timeout": 30000,
+    "reasoningEffort": "medium",
+    "streaming": true
   },
   "services": {
     "stockfish": {
@@ -87,9 +89,11 @@ ratings:
   targetAudienceRating: 1600
 
 llm:
-  model: gpt-4o
+  model: gpt-5-codex
   temperature: 0.7
   timeout: 30000
+  reasoningEffort: medium
+  streaming: true
 
 services:
   stockfish:
@@ -138,9 +142,19 @@ output:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `llm.apiKey` | string | — | OpenAI API key (prefer `OPENAI_API_KEY` env var) |
-| `llm.model` | string | `"gpt-4o"` | OpenAI model to use |
+| `llm.model` | string | `"gpt-5-codex"` | OpenAI model to use |
 | `llm.temperature` | number | 0.7 | Model temperature (0.0-2.0) |
 | `llm.timeout` | number | 30000 | Request timeout in milliseconds |
+| `llm.reasoningEffort` | `"none"` \| `"low"` \| `"medium"` \| `"high"` | `"medium"` | Reasoning effort for codex models |
+| `llm.streaming` | boolean | true | Enable streaming for real-time progress |
+
+**Reasoning Effort Levels:**
+- `none`: Disable reasoning (standard completion, fastest)
+- `low`: Minimal reasoning for faster responses
+- `medium`: Balanced reasoning for quality analysis (default)
+- `high`: Maximum reasoning for complex positions (slower, most thorough)
+
+When using reasoning models (gpt-5-codex, o1, o3), the model's thinking process can be displayed in verbose mode (`--verbose` flag). This shows real-time reasoning as each move is analyzed.
 
 ### Service Settings
 
@@ -202,6 +216,8 @@ All configuration options can be set via environment variables:
 |----------|-------------|
 | `CHESSBEAST_LLM_MODEL` | `llm.model` |
 | `CHESSBEAST_LLM_TIMEOUT` | `llm.timeout` |
+| `LLM_REASONING_EFFORT` | `llm.reasoningEffort` |
+| `LLM_STREAMING` | `llm.streaming` |
 
 ### Services
 | Variable | Config Path |

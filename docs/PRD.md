@@ -23,7 +23,7 @@ The following technology choices have been made for v1:
 | Architecture | Hybrid (TypeScript + Python) | Best of both worlds: TypeScript for CLI/API, Python for ML |
 | CLI & Orchestration | TypeScript / Node.js | Modern async, good DX, familiar ecosystem |
 | ML Services | Python + gRPC | Native Maia2/Stockfish support, efficient binary protocol |
-| LLM Provider | OpenAI GPT-4o (upgradeable to GPT-5) | Strong performance, good API |
+| LLM Provider | OpenAI GPT-5-codex (reasoning model) | Advanced reasoning, streaming support |
 | Database | SQLite | Simple local storage, no external dependencies |
 | Deployment Target | Local CLI | Simplicity for v1; cloud deployment deferred |
 
@@ -129,6 +129,11 @@ The following technology choices have been made for v1:
 	•	Why a move was good/bad at that level.
 	•	How the game could have gone in main sidelines.
 	•	The story arc of the game (opening, middlegame plans, endgame technique).
+	•	FR16: Advanced LLM reasoning:
+	•	Support reasoning models (gpt-5-codex, o1, o3) with configurable reasoning effort.
+	•	Stream reasoning thoughts in real-time during annotation (verbose mode).
+	•	Track thinking tokens separately for cost visibility.
+	•	Reasoning effort levels: none, low, medium (default), high.
 
 5.3 Output
 	•	FR13: Return a valid, standards-compliant annotated PGN:

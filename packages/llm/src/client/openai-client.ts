@@ -8,7 +8,14 @@ import type { LLMConfig } from '../config/llm-config.js';
 import { LLMError, LLMErrorCode, RateLimitError, TimeoutError, APIError } from '../errors.js';
 
 import { CircuitBreaker } from './circuit-breaker.js';
-import type { LLMRequest, LLMResponse, TokenUsage, HealthStatus, CircuitState } from './types.js';
+import type {
+  LLMRequest,
+  LLMResponse,
+  TokenUsage,
+  HealthStatus,
+  CircuitState,
+  StreamChunk,
+} from './types.js';
 
 /**
  * Sleep for a given number of milliseconds
@@ -152,31 +159,50 @@ export class OpenAIClient {
         content: m.content,
       }));
 
-      const response =
-        request.responseFormat === 'json'
-          ? await this.client.chat.completions.create({
-              model: this.config.model,
-              messages,
-              temperature: request.temperature ?? this.config.temperature,
-              max_tokens: request.maxTokens ?? null,
-              response_format: { type: 'json_object' },
-            })
-          : await this.client.chat.completions.create({
-              model: this.config.model,
-              messages,
-              temperature: request.temperature ?? this.config.temperature,
-              max_tokens: request.maxTokens ?? null,
-            });
+      // Build request options
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const options: any = {
+        model: this.config.model,
+        messages,
+        temperature: request.temperature ?? this.config.temperature,
+        max_tokens: request.maxTokens ?? null,
+      };
+
+      // Add reasoning effort for supported models (o1, o3, codex)
+      const reasoningEffort = request.reasoningEffort ?? this.config.reasoningEffort;
+      if (reasoningEffort && reasoningEffort !== 'none') {
+        options.reasoning_effort = reasoningEffort;
+      }
+
+      // Add JSON format if requested
+      if (request.responseFormat === 'json') {
+        options.response_format = { type: 'json_object' };
+      }
+
+      // Use streaming if callback provided and streaming is enabled
+      if (request.onChunk && this.config.streaming) {
+        return this.doChatStreaming(options, request.onChunk);
+      }
+
+      // Non-streaming path
+      const response = await this.client.chat.completions.create(options);
 
       const choice = response.choices[0];
       if (!choice) {
         throw new LLMError('No response from LLM', LLMErrorCode.INVALID_RESPONSE, false);
       }
 
+      // Extract reasoning content if present (for non-streaming reasoning models)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = choice.message as any;
+      const thinkingContent = message.reasoning_content ?? undefined;
+
       const usage: TokenUsage = {
         promptTokens: response.usage?.prompt_tokens ?? 0,
         completionTokens: response.usage?.completion_tokens ?? 0,
         totalTokens: response.usage?.total_tokens ?? 0,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        thinkingTokens: (response.usage as any)?.reasoning_tokens ?? undefined,
       };
 
       // Track token usage
@@ -186,10 +212,88 @@ export class OpenAIClient {
         content: choice.message.content ?? '',
         finishReason: this.mapFinishReason(choice.finish_reason),
         usage,
+        thinkingContent,
       };
     } catch (error) {
       throw this.mapError(error);
     }
+  }
+
+  /**
+   * Streaming chat completion with real-time chunk callbacks
+   */
+  private async doChatStreaming(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    options: any,
+    onChunk: (chunk: StreamChunk) => void,
+  ): Promise<LLMResponse> {
+    options.stream = true;
+    // Request usage in final streaming chunk
+    options.stream_options = { include_usage: true };
+
+    // Create stream - TypeScript SDK returns AsyncIterable when stream: true
+    const stream = await this.client.chat.completions.create({
+      ...options,
+      stream: true,
+    } as Parameters<typeof this.client.chat.completions.create>[0] & { stream: true });
+
+    let content = '';
+    let thinkingContent = '';
+    let usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    let finishReason: 'stop' | 'length' | 'content_filter' = 'stop';
+
+    // Stream is an async iterable
+    for await (const chunk of stream) {
+      const choice = chunk.choices[0];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const delta = choice?.delta as any;
+
+      // Handle thinking/reasoning content
+      if (delta?.reasoning_content) {
+        thinkingContent += delta.reasoning_content;
+        onChunk({ type: 'thinking', text: delta.reasoning_content, done: false });
+      }
+
+      // Handle regular content
+      if (delta?.content) {
+        content += delta.content;
+        onChunk({ type: 'content', text: delta.content, done: false });
+      }
+
+      // Capture finish reason
+      if (choice?.finish_reason) {
+        finishReason = this.mapFinishReason(choice.finish_reason);
+      }
+
+      // Track usage from final chunk (when include_usage is true)
+      if (chunk.usage) {
+        usage = {
+          promptTokens: chunk.usage.prompt_tokens ?? 0,
+          completionTokens: chunk.usage.completion_tokens ?? 0,
+          totalTokens: chunk.usage.total_tokens ?? 0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          thinkingTokens: (chunk.usage as any).reasoning_tokens ?? undefined,
+        };
+      }
+    }
+
+    // Signal completion
+    onChunk({ type: 'content', text: '', done: true });
+
+    // Track token usage
+    this.tokenTracker.spend(usage.totalTokens);
+
+    // Build response with optional thinkingContent (avoid undefined for exactOptionalPropertyTypes)
+    const response: LLMResponse = {
+      content,
+      finishReason,
+      usage,
+    };
+    if (thinkingContent) {
+      response.thinkingContent = thinkingContent;
+    }
+
+    return response;
   }
 
   private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
