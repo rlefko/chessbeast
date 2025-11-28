@@ -81,6 +81,9 @@ coverage/
 # Data Files (Large)
 # ========================================
 data/*.db
+data/eco-source/*
+data/eco.*
+data/lichess-elite.pgn
 data/*.sqlite
 data/*.sqlite3
 services/maia/models/
@@ -179,3 +182,7 @@ bin/
 *.pid
 *.seed
 *.pid.lock
+
+.mcp.json
+.claude-indexer/*
+maia2_models/*
