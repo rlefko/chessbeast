@@ -58,6 +58,8 @@ export interface AnnotationOptions extends PlanOptions {
   skipOnCircuitOpen?: boolean;
   /** Progress callback for real-time status updates */
   onProgress?: (progress: AnnotationProgress) => void;
+  /** Warning callback for non-fatal issues (default: console.warn) */
+  onWarning?: (message: string) => void;
 }
 
 /**
@@ -144,6 +146,7 @@ export class Annotator {
       generateSummary = true,
       skipOnCircuitOpen = false,
       onProgress,
+      onWarning = (msg: string): void => console.warn(msg),
       ...planOptions
     } = options;
 
@@ -216,7 +219,8 @@ export class Annotator {
             }
           } catch (error) {
             // Log but continue - exploration is optional enhancement
-            console.warn(`Variation exploration failed for ply ${planned.plyIndex}:`, error);
+            const errMsg = error instanceof Error ? error.message : String(error);
+            onWarning(`Variation exploration failed for ply ${planned.plyIndex}: ${errMsg}`);
           }
           explorationIndex++;
         }
@@ -289,7 +293,12 @@ export class Annotator {
         : undefined;
 
       // Generate comment
-      const comment = await this.commentGenerator.generateComment(context, planned, onChunk);
+      const comment = await this.commentGenerator.generateComment(
+        context,
+        planned,
+        onChunk,
+        onWarning,
+      );
 
       // Apply to analysis
       if (move && comment.comment) {
@@ -308,7 +317,11 @@ export class Annotator {
         totalPositions: plan.positions.length,
       });
 
-      const summary = await this.summaryGenerator.generateSummary(analysis, plan.targetRating);
+      const summary = await this.summaryGenerator.generateSummary(
+        analysis,
+        plan.targetRating,
+        onWarning,
+      );
       analysis.summary = formatSummaryAsString(summary);
       summaryGenerated = true;
     }
