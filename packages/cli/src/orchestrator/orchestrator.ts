@@ -312,7 +312,7 @@ async function runAgenticAnnotation(
       const maxToolCalls = config.agentic.explorationMaxToolCalls ?? 40;
 
       const explorationResult = await agenticExplorer.explore(
-        move.fenAfter,
+        move.fenBefore,
         targetRating,
         move.san,
         (progress: AgenticExplorerProgress) => {

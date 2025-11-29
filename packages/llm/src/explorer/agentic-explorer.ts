@@ -1047,10 +1047,14 @@ TARGET AUDIENCE: ${targetRating} rated players
     const parts = ['STARTING POSITION:', board, '', `FEN: ${fen}`];
 
     if (playedMove) {
-      parts.push(`PLAYED MOVE: ${playedMove}`);
       parts.push('');
-      parts.push('Explore why this move was played and what the alternatives were.');
-      parts.push('Show the consequences of good and bad moves.');
+      parts.push(`THE MOVE PLAYED WAS: ${playedMove}`);
+      parts.push('');
+      parts.push('The starting position is BEFORE this move was played.');
+      parts.push('First, show what should have been played instead (the better alternative).');
+      parts.push(
+        'Then you may show what happens after the played move to explain why it was suboptimal.',
+      );
     } else {
       parts.push('');
       parts.push('Explore the key variations from this position.');
