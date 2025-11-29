@@ -54,7 +54,16 @@ export interface AgenticExplorerProgress {
   toolCalls: number;
   currentDepth: number;
   branchCount: number;
-  lastTool?: string;
+  lastTool?: string | undefined;
+  /** Rich tool information for debug logging */
+  toolArgs?: Record<string, unknown> | undefined;
+  toolResult?: unknown;
+  toolError?: string | undefined;
+  toolDurationMs?: number | undefined;
+  /** Chess context for meaningful display */
+  currentFen?: string | undefined;
+  currentLine?: string[] | undefined;
+  branchPurpose?: string | undefined;
 }
 
 /**
@@ -243,6 +252,17 @@ export class AgenticVariationExplorer {
       for (const toolCall of response.toolCalls) {
         toolCallCount++;
 
+        // Parse tool arguments for logging
+        let toolArgs: Record<string, unknown> = {};
+        try {
+          toolArgs = JSON.parse(toolCall.function.arguments || '{}') as Record<string, unknown>;
+        } catch {
+          // Ignore parse errors
+        }
+
+        // Capture timing
+        const toolStartTime = Date.now();
+
         // Execute the tool
         const result = await this.executeExplorationTool(
           toolCall,
@@ -251,6 +271,8 @@ export class AgenticVariationExplorer {
           previousEval,
           currentEval,
         );
+
+        const toolDurationMs = Date.now() - toolStartTime;
 
         // Track eval for swing detection
         if (typeof result === 'object' && result !== null) {
@@ -268,28 +290,44 @@ export class AgenticVariationExplorer {
           toolCallId: toolCall.id,
         });
 
-        // Report progress with tool info
+        // Determine phase and branch purpose
+        const toolName = toolCall.function.name;
+        const phase =
+          toolName === 'start_branch'
+            ? 'branching'
+            : toolName === 'finish_exploration'
+              ? 'finishing'
+              : 'exploring';
+
+        // Get branch purpose if this is a branching call
+        const branchPurpose =
+          toolName === 'start_branch' ? (toolArgs.purpose as string | undefined) : undefined;
+
+        // Check for tool error
+        const toolError =
+          typeof result === 'object' && result !== null && 'error' in result
+            ? String((result as Record<string, unknown>).error)
+            : undefined;
+
+        // Report rich progress with tool details and chess context
         onProgress?.({
-          phase:
-            toolCall.function.name === 'start_branch'
-              ? 'branching'
-              : toolCall.function.name === 'finish_exploration'
-                ? 'finishing'
-                : 'exploring',
+          phase,
           toolCalls: toolCallCount,
           currentDepth: state.getCurrentDepth(),
           branchCount: state.getBranchCount(),
-          lastTool: toolCall.function.name,
+          lastTool: toolName,
+          toolArgs,
+          toolResult: result,
+          toolError,
+          toolDurationMs,
+          currentFen: state.getCurrentFen(),
+          currentLine: state.getMoveHistory(),
+          branchPurpose,
         });
 
         // Check for exploration completion
-        if (toolCall.function.name === 'finish_exploration') {
-          try {
-            const args = JSON.parse(toolCall.function.arguments || '{}') as { summary?: string };
-            summary = args.summary;
-          } catch {
-            // Ignore parse errors
-          }
+        if (toolName === 'finish_exploration') {
+          summary = toolArgs.summary as string | undefined;
           finished = true;
           break;
         }

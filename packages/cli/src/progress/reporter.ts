@@ -489,6 +489,372 @@ export class ProgressReporter {
   }
 
   /**
+   * Display exploration tool call in chess-friendly format (debug mode only)
+   * Shows tool name, arguments, and chess context for an experienced coach
+   */
+  displayExplorationToolCall(
+    _moveNotation: string,
+    toolName: string,
+    toolArgs: Record<string, unknown>,
+    iteration: number,
+    maxIterations: number,
+    context: {
+      currentFen?: string | undefined;
+      currentLine?: string[] | undefined;
+      depth?: number | undefined;
+      branchPurpose?: string | undefined;
+    },
+  ): void {
+    if (this.silent || !this.debug) return;
+
+    // Stop spinner temporarily
+    const spinnerText = this.spinner?.text;
+    if (this.spinner) {
+      this.spinner.stop();
+    }
+
+    // Format based on tool type for coach-friendly output
+    const iterStr = `[Tool ${iteration}/${maxIterations}]`;
+
+    switch (toolName) {
+      case 'evaluate_position': {
+        const depth = (toolArgs.depth as number) ?? 16;
+        const multipv = (toolArgs.multipv as number) ?? 1;
+        const multipvStr = multipv > 1 ? `, multipv ${multipv}` : '';
+        process.stderr.write(`${this.c.yellow(iterStr)} evaluate_position (depth ${depth}${multipvStr})\n`);
+        if (context.currentLine && context.currentLine.length > 0) {
+          process.stderr.write(`  └─ Position: after ${this.formatMoveSequence(context.currentLine)}\n`);
+        }
+        break;
+      }
+
+      case 'predict_human_moves': {
+        const rating = (toolArgs.rating as number) ?? 1500;
+        process.stderr.write(`${this.c.yellow(iterStr)} predict_human_moves (rating ${rating})\n`);
+        break;
+      }
+
+      case 'push_move': {
+        const move = (toolArgs.move ?? toolArgs.san ?? 'unknown') as string;
+        process.stderr.write(`${this.c.yellow(iterStr)} push_move: ${this.c.cyan(move)}\n`);
+        break;
+      }
+
+      case 'pop_move': {
+        process.stderr.write(`${this.c.yellow(iterStr)} pop_move\n`);
+        if (context.currentLine && context.currentLine.length > 0) {
+          process.stderr.write(`  └─ Backtracking from: ${this.formatMoveSequence(context.currentLine)}\n`);
+        }
+        break;
+      }
+
+      case 'start_branch': {
+        const purpose = toolArgs.purpose as string;
+        const branchNum = (context.depth ?? 0) + 1;
+        process.stderr.write(`\n${this.c.cyan(`[Branch ${branchNum}]`)} Starting sub-variation\n`);
+        process.stderr.write(`  └─ Purpose: ${purpose}\n`);
+        if (context.currentLine && context.currentLine.length > 0) {
+          process.stderr.write(`  └─ Branching from: ${this.formatMoveSequence(context.currentLine)}\n`);
+        }
+        // Show ASCII board at branch points
+        if (context.currentFen) {
+          process.stderr.write(`  └─ Board:\n`);
+          this.printAsciiBoard(context.currentFen, '     ');
+        }
+        break;
+      }
+
+      case 'end_branch': {
+        process.stderr.write(`${this.c.dim(iterStr)} end_branch\n`);
+        process.stderr.write(`  └─ Returning to main line\n`);
+        break;
+      }
+
+      case 'add_comment': {
+        const comment = toolArgs.comment as string;
+        const truncated = comment.length > 60 ? comment.slice(0, 60) + '...' : comment;
+        process.stderr.write(`${this.c.dim(iterStr)} add_comment\n`);
+        process.stderr.write(`  └─ "${truncated}"\n`);
+        break;
+      }
+
+      case 'add_nag': {
+        const nag = toolArgs.nag as string;
+        const nagMeaning = this.getNagMeaning(nag);
+        process.stderr.write(`${this.c.dim(iterStr)} add_nag ${nag}${nagMeaning ? ` (${nagMeaning})` : ''}\n`);
+        break;
+      }
+
+      case 'finish_exploration': {
+        process.stderr.write(`\n${this.c.green(iterStr)} finish_exploration\n`);
+        break;
+      }
+
+      default: {
+        // Generic fallback
+        process.stderr.write(`${this.c.yellow(iterStr)} ${toolName}\n`);
+        process.stderr.write(`  ${this.c.dim('Args:')} ${JSON.stringify(toolArgs)}\n`);
+      }
+    }
+
+    process.stderr.write('\n');
+
+    // Restart spinner
+    if (this.spinner && spinnerText) {
+      this.spinner.start(spinnerText);
+    }
+  }
+
+  /**
+   * Display exploration tool result in chess-friendly format (debug mode only)
+   * Shows evaluations, predictions, and move results for an experienced coach
+   */
+  displayExplorationToolResult(
+    toolName: string,
+    result: unknown,
+    error: string | undefined,
+    durationMs: number,
+  ): void {
+    if (this.silent || !this.debug) return;
+
+    // Stop spinner temporarily
+    const spinnerText = this.spinner?.text;
+    if (this.spinner) {
+      this.spinner.stop();
+    }
+
+    // Handle errors
+    if (error) {
+      process.stderr.write(`  ${this.c.red('✗ Error:')} ${error}\n\n`);
+      if (this.spinner && spinnerText) {
+        this.spinner.start(spinnerText);
+      }
+      return;
+    }
+
+    // Format based on tool type
+    switch (toolName) {
+      case 'evaluate_position': {
+        const evalResult = result as {
+          evaluation?: { cp?: number; mate?: number };
+          bestMove?: string;
+          pv?: string[];
+          alternatives?: Array<{ move: string; evaluation: { cp?: number; mate?: number }; pv?: string[] }>;
+        };
+
+        if (evalResult.evaluation) {
+          const evalStr = this.formatEvaluation(evalResult.evaluation);
+          process.stderr.write(`  └─ Result: ${evalStr}\n`);
+
+          // Show best line (full PV)
+          if (evalResult.pv && evalResult.pv.length > 0) {
+            process.stderr.write(`     Best line: ${evalResult.pv.join(' ')}\n`);
+          } else if (evalResult.bestMove) {
+            process.stderr.write(`     Best: ${evalResult.bestMove}\n`);
+          }
+
+          // Show alternatives
+          if (evalResult.alternatives && evalResult.alternatives.length > 0) {
+            for (const alt of evalResult.alternatives) {
+              const altEval = this.formatEvaluation(alt.evaluation);
+              const altPv = alt.pv && alt.pv.length > 0 ? ` ${alt.pv.slice(0, 5).join(' ')}...` : '';
+              process.stderr.write(`     Alt:  ${alt.move} ${altEval}${altPv}\n`);
+            }
+          }
+        }
+        break;
+      }
+
+      case 'predict_human_moves': {
+        const predictions = result as Array<{ move: string; probability: number; comment?: string }>;
+        if (Array.isArray(predictions) && predictions.length > 0) {
+          process.stderr.write(`  └─ Human predictions:\n`);
+          for (let i = 0; i < Math.min(predictions.length, 5); i++) {
+            const pred = predictions[i]!;
+            const pct = (pred.probability * 100).toFixed(0);
+            const comment = pred.comment ? ` - ${pred.comment}` : '';
+            process.stderr.write(`     ${i + 1}. ${pred.move} (${pct}%)${comment}\n`);
+          }
+        }
+        break;
+      }
+
+      case 'push_move': {
+        const moveResult = result as { success?: boolean; check?: boolean; capture?: boolean; fen?: string };
+        if (moveResult.success !== false) {
+          let details = '✓';
+          if (moveResult.check) details += ' Check';
+          if (moveResult.capture) details += ' Capture';
+          process.stderr.write(`  └─ ${this.c.green(details)}\n`);
+        }
+        break;
+      }
+
+      case 'pop_move': {
+        process.stderr.write(`  └─ ${this.c.dim('Reverted')}\n`);
+        break;
+      }
+
+      // Branch operations don't need result display
+      case 'start_branch':
+      case 'end_branch':
+      case 'add_comment':
+      case 'add_nag':
+      case 'finish_exploration':
+        break;
+
+      default: {
+        // Generic result display
+        if (result !== undefined && result !== null) {
+          const resultStr = JSON.stringify(result);
+          if (resultStr.length > 100) {
+            process.stderr.write(`  └─ ${resultStr.slice(0, 100)}...\n`);
+          } else {
+            process.stderr.write(`  └─ ${resultStr}\n`);
+          }
+        }
+      }
+    }
+
+    // Show timing for slow operations
+    if (durationMs > 100) {
+      process.stderr.write(`  ${this.c.dim(`(${durationMs}ms)`)}\n`);
+    }
+
+    // Restart spinner
+    if (this.spinner && spinnerText) {
+      this.spinner.start(spinnerText);
+    }
+  }
+
+  /**
+   * Display exploration completion summary (debug mode only)
+   */
+  displayExplorationComplete(stats: {
+    toolCalls: number;
+    maxToolCalls: number;
+    branchCount: number;
+    totalAnnotations?: number;
+  }): void {
+    if (this.silent || !this.debug) return;
+
+    // Stop spinner temporarily
+    const spinnerText = this.spinner?.text;
+    if (this.spinner) {
+      this.spinner.stop();
+    }
+
+    process.stderr.write(`\n${this.c.green('[Exploration Complete]')}\n`);
+    process.stderr.write(`  ├─ Variations: ${stats.branchCount} lines explored\n`);
+    if (stats.totalAnnotations !== undefined) {
+      process.stderr.write(`  ├─ Annotations: ${stats.totalAnnotations}\n`);
+    }
+    process.stderr.write(`  └─ Tool calls: ${stats.toolCalls}/${stats.maxToolCalls} used\n`);
+    process.stderr.write('\n');
+
+    // Restart spinner
+    if (this.spinner && spinnerText) {
+      this.spinner.start(spinnerText);
+    }
+  }
+
+  /**
+   * Format evaluation in chess-friendly format: centipawns + verbal
+   * e.g., "+4.28 (White winning)" or "M5 (White mates in 5)"
+   */
+  private formatEvaluation(evaluation: { cp?: number; mate?: number }): string {
+    if (evaluation.mate !== undefined) {
+      const side = evaluation.mate > 0 ? 'White' : 'Black';
+      const moves = Math.abs(evaluation.mate);
+      return this.c.bold(`M${moves}`) + ` (${side} mates in ${moves})`;
+    }
+
+    if (evaluation.cp !== undefined) {
+      const cp = evaluation.cp;
+      const pawns = (cp / 100).toFixed(2);
+      const sign = cp >= 0 ? '+' : '';
+      const verbal = this.getEvalVerbal(cp);
+      return `${sign}${pawns} ${this.c.dim(`(${verbal})`)}`;
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Get verbal description of evaluation
+   */
+  private getEvalVerbal(cp: number): string {
+    const absCp = Math.abs(cp);
+    const side = cp >= 0 ? 'White' : 'Black';
+
+    if (absCp < 25) return 'Equal';
+    if (absCp < 75) return `Slight edge ${side}`;
+    if (absCp < 150) return `${side} better`;
+    if (absCp < 300) return `${side} much better`;
+    if (absCp < 500) return `${side} winning`;
+    return `${side} winning decisively`;
+  }
+
+  /**
+   * Format a sequence of moves for display
+   * e.g., ["Nxg7", "Kxg7"] -> "1... Nxg7 2. Kxg7"
+   */
+  private formatMoveSequence(moves: string[]): string {
+    if (moves.length === 0) return '';
+    // Just join them - the move sequence should already include notation
+    return moves.slice(-4).join(' '); // Show last 4 moves to keep it readable
+  }
+
+  /**
+   * Get human-readable NAG meaning
+   */
+  private getNagMeaning(nag: string): string {
+    const meanings: Record<string, string> = {
+      '$1': '!',
+      '$2': '?',
+      '$3': '!!',
+      '$4': '??',
+      '$5': '!?',
+      '$6': '?!',
+      '$10': '=',
+      '$13': 'unclear',
+      '$14': '+=',
+      '$15': '=+',
+      '$16': '±',
+      '$17': '∓',
+      '$18': '+-',
+      '$19': '-+',
+    };
+    return meanings[nag] ?? '';
+  }
+
+  /**
+   * Print ASCII board representation
+   */
+  private printAsciiBoard(fen: string, indent: string = ''): void {
+    const pieces: Record<string, string> = {
+      'K': 'K', 'Q': 'Q', 'R': 'R', 'B': 'B', 'N': 'N', 'P': 'P',
+      'k': 'k', 'q': 'q', 'r': 'r', 'b': 'b', 'n': 'n', 'p': 'p',
+    };
+
+    const boardPart = fen.split(' ')[0];
+    if (!boardPart) return;
+
+    const rows = boardPart.split('/');
+    for (const row of rows) {
+      let line = '';
+      for (const char of row) {
+        if (char >= '1' && char <= '8') {
+          line += '. '.repeat(parseInt(char, 10));
+        } else {
+          line += (pieces[char] ?? '?') + ' ';
+        }
+      }
+      process.stderr.write(`${indent}${line.trim()}\n`);
+    }
+  }
+
+  /**
    * Complete a phase successfully
    */
   completePhase(phase: AnalysisPhase, detail?: string): void {
