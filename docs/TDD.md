@@ -31,7 +31,7 @@ PGN → Parser → Positions → Engine + Maia + DB → Critical Moments → Ann
 | Maia Service | Python 3.10+ + gRPC | Maia2 PyTorch model serving (`pip install maia2`) |
 | Inter-service Comm | gRPC + Protobuf | Efficient binary protocol |
 | Database | SQLite | ECO openings + Lichess Elite games |
-| LLM | OpenAI API (GPT-5) | Reasoning model with streaming support |
+| LLM | OpenAI API (GPT-5 series) | Reasoning models with streaming support |
 
 ⸻
 
@@ -458,7 +458,7 @@ The LLM client supports OpenAI reasoning models (gpt-5, o1, o3) with configurabl
 
 ```typescript
 interface LLMConfig {
-  model: string;              // e.g., "gpt-5"
+  model: string;              // e.g., "gpt-5-mini" (default), "gpt-5-codex", "gpt-5-nano"
   reasoningEffort: ReasoningEffort; // Default: "medium"
   streaming: boolean;         // Default: true
   temperature: number;
@@ -518,8 +518,17 @@ interface AgenticConfig {
 **Cost tracking:**
 - `CostTracker`: Accumulates token usage across API calls
 - `MODEL_PRICING`: Per-model pricing (input, output, reasoning tokens per 1M)
-- Supports GPT-4o, GPT-4o-mini, o1, gpt-5 models
+- Supports GPT-4o, GPT-4o-mini, o1, gpt-5 series models
 - Cost summary displayed with `--show-costs` flag
+
+**Available Models:**
+| Model | Input | Output | Best For |
+|-------|-------|--------|----------|
+| `gpt-5-codex` | $1.25/1M | $10.00/1M | Deep analysis with reasoning |
+| `gpt-5-mini` | $0.25/1M | $2.00/1M | Cost-effective quality (default) |
+| `gpt-5-nano` | $0.05/1M | $0.40/1M | Fast, budget-friendly |
+
+Use `--model <model>` CLI flag to select.
 
 3.8 PGN Renderer
 	•	Merge:

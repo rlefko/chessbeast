@@ -23,7 +23,7 @@ The following technology choices have been made for v1:
 | Architecture | Hybrid (TypeScript + Python) | Best of both worlds: TypeScript for CLI/API, Python for ML |
 | CLI & Orchestration | TypeScript / Node.js | Modern async, good DX, familiar ecosystem |
 | ML Services | Python + gRPC | Native Maia2/Stockfish support, efficient binary protocol |
-| LLM Provider | OpenAI GPT-5 (reasoning model) | Advanced reasoning, streaming support |
+| LLM Provider | OpenAI GPT-5 series | Model selection via `--model` flag |
 | Database | SQLite | Simple local storage, no external dependencies |
 | Deployment Target | Local CLI | Simplicity for v1; cloud deployment deferred |
 
@@ -141,6 +141,10 @@ The following technology choices have been made for v1:
 	•	Configurable max tool calls per position (default: 5).
 	•	Cost tracking with model-specific pricing.
 	•	By default applies to critical moments only; --agentic-all for all moves.
+	•	FR18: Model selection:
+	•	Support multiple GPT-5 model tiers via `--model` CLI flag.
+	•	Available models: gpt-5-codex, gpt-5, gpt-5-mini (default), gpt-5-nano.
+	•	Model pricing: gpt-5-codex ($1.25/$10), gpt-5-mini ($0.25/$2), gpt-5-nano ($0.05/$0.40) per 1M tokens.
 
 5.3 Output
 	•	FR13: Return a valid, standards-compliant annotated PGN:

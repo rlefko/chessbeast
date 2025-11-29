@@ -116,6 +116,12 @@ Common emoji prefixes:
 - `--show-costs` displays LLM cost summary at end
 - Cost tracking in `packages/llm/src/cost/` (model pricing per 1M tokens)
 
+**Model Selection** (see `packages/llm/src/cost/pricing.ts`):
+- Default model: `gpt-5-mini` (cost-effective at $0.25/$2.00 per 1M tokens)
+- Use `--model` CLI flag to override (e.g., `--model gpt-5-nano` for budget, `--model gpt-5-codex` for deep reasoning)
+- Available models: `gpt-5-codex`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
+- Pricing tracked in `packages/llm/src/cost/pricing.ts`
+
 ## Testing Requirements
 
 - Unit tests mock all external dependencies (Stockfish, Maia, OpenAI)

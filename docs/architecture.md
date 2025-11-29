@@ -41,6 +41,7 @@ ChessBeast is a hybrid TypeScript + Python monorepo that combines multiple analy
 │  Generate: OpenAI API calls with chess context                       │
 │  Validate: Check NAGs and move references                            │
 │  Fallback: Template-based comments if API fails                      │
+│  Model: Configurable via --model (gpt-5-mini default)                │
 │                                                                       │
 │  Variation Explorer: Iterative engine/Maia/LLM dialogue              │
 │    ├─ Engine: Best line analysis (depth 22, up to 40 moves)          │
@@ -72,7 +73,7 @@ ChessBeast is a hybrid TypeScript + Python monorepo that combines multiple analy
 | **pgn** | PGN parsing and rendering | `PgnParser`, `PgnRenderer`, `ParsedGame` |
 | **grpc-client** | gRPC clients for Python services | `StockfishClient`, `MaiaClient` |
 | **database** | SQLite database clients | `EcoClient`, `LichessEliteClient` |
-| **llm** | OpenAI integration, annotation generation, variation exploration | `CommentGenerator`, `AnnotationPlanner`, `VariationExplorer` |
+| **llm** | OpenAI integration, annotation generation, variation exploration | `CommentGenerator`, `AnnotationPlanner`, `VariationExplorer`, model pricing |
 | **test-utils** | Shared test utilities and mocks | Test fixtures, mock services |
 
 ### Python Services (`services/`)
@@ -307,3 +308,20 @@ ChessBeast implements graceful degradation:
 4. **Engine timeout**: Use partial results or skip position
 
 Use `--skip-maia` and `--skip-llm` flags for offline analysis.
+
+## LLM Model Selection
+
+ChessBeast supports multiple OpenAI GPT-5 model tiers:
+
+| Model | Input | Output | Use Case |
+|-------|-------|--------|----------|
+| `gpt-5-codex` | $1.25/1M | $10.00/1M | Deep reasoning, complex analysis |
+| `gpt-5-mini` | $0.25/1M | $2.00/1M | Balanced quality/cost (default) |
+| `gpt-5-nano` | $0.05/1M | $0.40/1M | Budget-friendly, fast |
+
+Configure via:
+- CLI: `--model gpt-5-nano`
+- Environment: `CHESSBEAST_LLM_MODEL=gpt-5-nano`
+- Config file: `llm.model: "gpt-5-nano"`
+
+Pricing is tracked in `packages/llm/src/cost/pricing.ts`.
