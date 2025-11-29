@@ -741,9 +741,10 @@ TARGET AUDIENCE: ${targetRating} rated players
    - Don't stop in the middle of tactical sequences
 
 3. **Add comments at KEY moments only**
-   - Opening comment: WHY this variation ("the engine's choice", "a human error")
+   - First move of a branch: WHY this variation ("the engine's choice", "a human error")
    - Critical moves: "the point", "with tempo", "threatening Qxh7"
    - Ending: OUTCOME ("and Black wins material", "with equality")
+   - NOTE: Always push_move BEFORE add_comment - comments attach to the last played move
 
 4. **Use NAGs appropriately**
    - Use suggest_nag after important moves to get engine-based quality assessment
@@ -756,6 +757,7 @@ TARGET AUDIENCE: ${targetRating} rated players
    - Human-likely moves that fail
    - Alternative winning methods
    - Maximum ${this.config.maxBranches} branches
+   - WORKFLOW: start_branch → push_move → add_comment → ... → end_branch
 
 6. **Use assess_continuation when unsure**
    - It will tell you if the position is worth exploring further
