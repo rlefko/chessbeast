@@ -245,6 +245,14 @@ export class ChessPosition {
   }
 
   /**
+   * Get the board as an 8x8 array
+   * @returns 2D array where [0][0] is a8 and [7][7] is h1
+   */
+  board(): Array<Array<{ type: string; color: 'w' | 'b' } | null>> {
+    return this.chess.board();
+  }
+
+  /**
    * Get all pieces on the board
    * @returns Array of pieces with their squares
    */

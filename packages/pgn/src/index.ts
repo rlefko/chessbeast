@@ -88,6 +88,10 @@ export {
 } from './chess/tension-resolver.js';
 export type { TensionConfig, ResolutionState, ResolutionResult } from './chess/tension-resolver.js';
 
+// Re-export board visualization utilities
+export { renderBoard, formatBoardForPrompt } from './chess/board-visualizer.js';
+export type { Perspective, BoardRenderOptions } from './chess/board-visualizer.js';
+
 // Re-export error types
 export { PgnParseError, InvalidFenError, IllegalMoveError } from './errors.js';
 

@@ -104,6 +104,9 @@ chessbeast analyze --show-config
 | `--agentic-all` | Enable agentic mode for all moves (not just critical) |
 | `--max-tool-calls <n>` | Max tool calls per position in agentic mode (default: 5) |
 | `--show-costs` | Display LLM cost summary after analysis |
+| `--agentic-exploration` | Enable agentic variation exploration |
+| `--exploration-max-tool-calls <n>` | Max tool calls per variation exploration (default: 40) |
+| `--exploration-max-depth <n>` | Max depth for variation exploration (default: 50) |
 | `--show-config` | Print resolved configuration and exit |
 | `--no-color` | Disable colored output (useful for piping) |
 | `--dry-run` | Validate setup and configuration without running analysis |
@@ -188,6 +191,36 @@ chessbeast analyze --input game.pgn --agentic --show-costs
 | `make_move` | Apply a move and get resulting position |
 
 Agentic mode produces richer annotations by allowing the LLM to explore positions dynamically.
+
+### Agentic Exploration Mode
+
+Agentic exploration gives the LLM full control over variation exploration, allowing it to leave comments throughout variations (not just at the start/end) and decide which lines are worth pursuing:
+
+```bash
+# Enable agentic exploration for deep variation analysis
+chessbeast analyze --input game.pgn --agentic-exploration
+
+# Combine with standard agentic mode for comprehensive analysis
+chessbeast analyze --input game.pgn --agentic --agentic-exploration
+
+# Customize exploration limits
+chessbeast analyze --input game.pgn --agentic-exploration \
+  --exploration-max-tool-calls 60 --exploration-max-depth 40
+```
+
+**Exploration Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `get_board` | ASCII board visualization for the current position |
+| `push_move` / `pop_move` | Navigate through positions |
+| `start_branch` / `end_branch` | Manage variation branches |
+| `add_comment` / `add_nag` | Annotate positions dynamically |
+| `suggest_nag` | Get engine-based NAG suggestion for move quality |
+| `get_eval_nag` | Get position evaluation NAG (+=, -+, etc.) |
+| `assess_continuation` | Check if exploration should continue |
+
+Agentic exploration uses intelligent caching for expensive Stockfish evaluations to avoid redundant analysis.
 
 ### Configuration
 

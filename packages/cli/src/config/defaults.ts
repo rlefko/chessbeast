@@ -76,6 +76,9 @@ export const DEFAULT_AGENTIC_CONFIG = {
   annotateAll: false,
   maxToolCalls: 5,
   showCosts: true,
+  agenticExploration: false,
+  explorationMaxToolCalls: 40,
+  explorationMaxDepth: 50,
 };
 
 /**

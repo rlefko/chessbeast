@@ -52,7 +52,10 @@ You can also specify a config file explicitly with the `--config` flag.
     "enabled": false,
     "annotateAll": false,
     "maxToolCalls": 5,
-    "showCosts": true
+    "showCosts": true,
+    "agenticExploration": false,
+    "explorationMaxToolCalls": 40,
+    "explorationMaxDepth": 50
   },
   "services": {
     "stockfish": {
@@ -106,6 +109,9 @@ agentic:
   annotateAll: false
   maxToolCalls: 5
   showCosts: true
+  agenticExploration: false
+  explorationMaxToolCalls: 40
+  explorationMaxDepth: 50
 
 services:
   stockfish:
@@ -230,6 +236,9 @@ Note: `--debug` implies `--verbose` (debug is a superset of verbose mode).
 | `agentic.annotateAll` | boolean | false | Annotate all moves (not just critical moments) |
 | `agentic.maxToolCalls` | number | 5 | Maximum tool calls per position |
 | `agentic.showCosts` | boolean | true | Display LLM cost summary after analysis |
+| `agentic.agenticExploration` | boolean | false | Enable agentic variation exploration |
+| `agentic.explorationMaxToolCalls` | number | 40 | Maximum tool calls per variation exploration |
+| `agentic.explorationMaxDepth` | number | 50 | Maximum depth (half-moves) for variation exploration |
 
 **Agentic Mode:**
 When enabled, the LLM can query external services using OpenAI function calling:
@@ -238,6 +247,23 @@ When enabled, the LLM can query external services using OpenAI function calling:
 - `lookup_opening`: Query ECO database
 - `find_reference_games`: Search Lichess Elite games
 - `make_move`: Apply a move and get resulting position
+
+**Agentic Exploration Mode:**
+When `agenticExploration` is enabled, variation exploration becomes fully agentic. The LLM has complete control over which lines to explore and can leave comments throughout variations (not just at the start/end). Available exploration tools:
+
+- `get_board`: Visual ASCII board representation for the current position
+- `push_move`: Play a move and advance the position
+- `pop_move`: Take back a move
+- `start_branch`: Begin a new variation branch
+- `end_branch`: Close the current variation
+- `add_comment`: Add a comment at the current position
+- `add_nag`: Add a NAG (Numeric Annotation Glyph) to the current move
+- `suggest_nag`: Get engine-based NAG suggestion for a move (compares to best move)
+- `get_eval_nag`: Get position evaluation NAG (+=, -+, etc.)
+- `assess_continuation`: Check if exploration should continue (tactical tension, eval swings)
+- `finish_exploration`: Complete exploration and return results
+
+The explorer uses intelligent caching for expensive Stockfish evaluations (depth ≥ 14) to avoid redundant analysis. Stopping heuristics combine tactical tension detection, evaluation swings, and budget awareness to balance thoroughness with efficiency.
 
 ### Service Settings
 

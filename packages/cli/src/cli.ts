@@ -54,6 +54,10 @@ const AGENTIC_HELP = `Enable agentic annotation mode with tool calling.
     The LLM can query Stockfish, Maia, and game databases
     to generate richer, more insightful annotations.`;
 
+const AGENTIC_EXPLORATION_HELP = `Enable agentic variation exploration.
+    The LLM autonomously explores variations, leaving comments
+    at critical points and navigating with tool calls.`;
+
 /**
  * Create and configure the CLI program
  */
@@ -94,6 +98,17 @@ export function createProgram(): Command {
       parseInt,
     )
     .option('--show-costs', 'Show LLM cost summary at end of analysis')
+    .option('--agentic-exploration', AGENTIC_EXPLORATION_HELP)
+    .option(
+      '--exploration-max-tool-calls <count>',
+      'Max tool calls for agentic exploration (default: 40)',
+      parseInt,
+    )
+    .option(
+      '--exploration-max-depth <depth>',
+      'Max variation depth in agentic exploration (default: 50)',
+      parseInt,
+    )
     .option('--show-config', 'Print resolved configuration and exit')
     .option('--no-color', 'Disable colored output (useful for piping)')
     .option('--dry-run', 'Validate setup and configuration without running analysis')
@@ -138,6 +153,12 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['maxToolCalls'] !== undefined)
     result.maxToolCalls = options['maxToolCalls'] as number;
   if (options['showCosts'] !== undefined) result.showCosts = options['showCosts'] as boolean;
+  if (options['agenticExploration'] !== undefined)
+    result.agenticExploration = options['agenticExploration'] as boolean;
+  if (options['explorationMaxToolCalls'] !== undefined)
+    result.explorationMaxToolCalls = options['explorationMaxToolCalls'] as number;
+  if (options['explorationMaxDepth'] !== undefined)
+    result.explorationMaxDepth = options['explorationMaxDepth'] as number;
 
   return result;
 }

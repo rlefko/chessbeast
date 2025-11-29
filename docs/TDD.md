@@ -417,6 +417,65 @@ interface ExplorationConfig {
 }
 ```
 
+### 3.6.2 Agentic Variation Explorer
+
+The agentic explorer gives the LLM full control over variation exploration, replacing the fixed iteration pattern with a flexible tool-calling loop.
+
+**Key components:**
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `AgenticVariationExplorer` | `agentic-explorer.ts` | Main exploration loop with tool dispatch |
+| `ExplorationState` | `exploration-state.ts` | Tree-based state management |
+| `explorationTools` | `exploration-tools.ts` | 14 tool definitions for LLM |
+| `assessContinuation` | `stopping-heuristics.ts` | Hybrid stopping assessment |
+| `renderBoard` | `board-visualizer.ts` | ASCII board for LLM comprehension |
+
+**Available tools:**
+
+| Tool | Purpose |
+|------|---------|
+| `get_board` | ASCII board visualization |
+| `push_move` | Play a move and advance position |
+| `pop_move` | Take back a move |
+| `start_branch` | Begin a new variation branch |
+| `end_branch` | Close current variation |
+| `add_comment` | Add comment at current position |
+| `add_nag` | Add NAG to current move |
+| `suggest_nag` | Get engine-based NAG suggestion (compares to best move) |
+| `get_eval_nag` | Get position evaluation NAG (+=, -+, etc.) |
+| `evaluate_position` | Deep Stockfish evaluation |
+| `predict_human_moves` | Maia predictions |
+| `lookup_opening` | ECO database query |
+| `find_reference_games` | Lichess Elite search |
+| `assess_continuation` | Check if exploration should continue |
+| `finish_exploration` | Complete and return results |
+
+**Stopping heuristics:**
+
+The `assessContinuation` function uses hybrid scoring:
+- **Tactical tension**: Detects unresolved tactics (checks, captures, hanging pieces)
+- **Evaluation swings**: Large eval changes suggest interesting positions
+- **Budget awareness**: Balances thoroughness with cost
+- Score threshold determines recommendation (continue, consider stopping, stop)
+
+**Caching:**
+
+Deep Stockfish evaluations (depth ≥ 14) are cached using an LRU cache with TTL:
+- Avoids redundant analysis of the same position
+- Cache stats included in `AgenticExplorerResult`
+- Configurable cache size and TTL
+
+**Configuration:**
+
+```typescript
+interface AgenticExplorationConfig {
+  agenticExploration: boolean;  // Default: false
+  explorationMaxToolCalls: number;  // Default: 40
+  explorationMaxDepth: number;  // Default: 50
+}
+```
+
 3.7 LLM Annotation Generator
 
 Interface:
