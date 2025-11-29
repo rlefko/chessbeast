@@ -7,6 +7,7 @@ import {
   OpenAIClient,
   createLLMConfig,
   AgenticCommentGenerator,
+  AgenticVariationExplorer,
   buildRichContext,
   type VerbosityLevel,
   type AnnotationProgress,
@@ -14,6 +15,7 @@ import {
   type AgenticProgress,
   type AgenticServices,
   type StreamChunk,
+  type AgenticExplorerProgress,
 } from '@chessbeast/llm';
 import {
   parsePgn,
@@ -155,6 +157,15 @@ async function runAgenticAnnotation(
   const targetRating = config.ratings.targetAudienceRating ?? config.ratings.defaultRating;
   const generator = new AgenticCommentGenerator(client, llmConfig, agenticServices, targetRating);
 
+  // Create agentic explorer if enabled
+  let agenticExplorer: AgenticVariationExplorer | undefined;
+  if (config.agentic.agenticExploration) {
+    agenticExplorer = new AgenticVariationExplorer(client, llmConfig, agenticServices, {
+      maxToolCalls: config.agentic.explorationMaxToolCalls,
+      maxDepth: config.agentic.explorationMaxDepth,
+    });
+  }
+
   // Determine which positions to annotate
   const positionsToAnnotate: number[] = [];
   if (config.agentic.annotateAll) {
@@ -280,6 +291,39 @@ async function runAgenticAnnotation(
     if (result.comment.comment) {
       move.comment = result.comment.comment;
       annotationCount++;
+    }
+
+    // Explore variations if enabled and this is a critical moment
+    if (agenticExplorer && criticalMoment) {
+      reporter.updateMoveProgress(
+        i + 1,
+        positionsToAnnotate.length,
+        `${moveNotation} (exploring variations)`,
+      );
+
+      const explorationResult = await agenticExplorer.explore(
+        move.fenAfter,
+        targetRating,
+        move.san,
+        (progress: AgenticExplorerProgress) => {
+          if (reporter.isDebug()) {
+            reporter.displayThinking(
+              moveNotation,
+              `Exploring: ${progress.toolCalls} tools, depth ${progress.currentDepth}`,
+            );
+          }
+        },
+      );
+
+      // Attach explored variations to move analysis (convert Map to Record for type compatibility)
+      if (explorationResult.variations.length > 0) {
+        move.exploredVariations = explorationResult.variations.map((v) => ({
+          moves: v.moves,
+          annotations: Object.fromEntries(v.annotations),
+          purpose: v.purpose,
+          source: v.source,
+        }));
+      }
     }
   }
 
