@@ -474,6 +474,190 @@ describe('Analysis Transformer', () => {
     });
   });
 
+  describe('explored variation labeling', () => {
+    it('should label engine best variations', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: true,
+            exploredVariations: [
+              {
+                moves: ['d4', 'd5', 'c4'],
+                purpose: 'best',
+                source: 'engine',
+              },
+            ],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      expect(game.moves[0]!.variations).toHaveLength(1);
+      expect(game.moves[0]!.variations![0]![0]!.commentBefore).toBe('engine best');
+    });
+
+    it('should label human alternative variations from Maia', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: true,
+            exploredVariations: [
+              {
+                moves: ['Nf3', 'd5', 'g3'],
+                purpose: 'human_alternative',
+                source: 'maia',
+              },
+            ],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      expect(game.moves[0]!.variations).toHaveLength(1);
+      expect(game.moves[0]!.variations![0]![0]!.commentBefore).toBe('human alternative');
+    });
+
+    it('should label refutation variations', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: true,
+            exploredVariations: [
+              {
+                moves: ['e4', 'e5', 'Nf3'],
+                purpose: 'refutation',
+                source: 'engine',
+              },
+            ],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      expect(game.moves[0]!.variations).toHaveLength(1);
+      expect(game.moves[0]!.variations![0]![0]!.commentBefore).toBe('refutation');
+    });
+
+    it('should label trap variations', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: true,
+            exploredVariations: [
+              {
+                moves: ['c4', 'e6', 'd4'],
+                purpose: 'trap',
+                source: 'llm',
+              },
+            ],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      expect(game.moves[0]!.variations).toHaveLength(1);
+      expect(game.moves[0]!.variations![0]![0]!.commentBefore).toBe('trap to avoid');
+    });
+
+    it('should label thematic variations', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: true,
+            exploredVariations: [
+              {
+                moves: ['d4', 'd5', 'c4'],
+                purpose: 'thematic',
+                source: 'llm',
+              },
+            ],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      expect(game.moves[0]!.variations).toHaveLength(1);
+      expect(game.moves[0]!.variations![0]![0]!.commentBefore).toBe('thematic idea');
+    });
+
+    it('should prepend label to existing commentBefore', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: true,
+            exploredVariations: [
+              {
+                moves: ['d4', 'd5'],
+                annotations: { 0: 'the solid choice' }, // This becomes commentAfter, not commentBefore
+                purpose: 'best',
+                source: 'engine',
+              },
+            ],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      // Label should be in commentBefore, annotation in commentAfter
+      expect(game.moves[0]!.variations![0]![0]!.commentBefore).toBe('engine best');
+      expect(game.moves[0]!.variations![0]![0]!.commentAfter).toBe('the solid choice');
+    });
+
+    it('should include inline annotations from explored variations', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: true,
+            exploredVariations: [
+              {
+                moves: ['e4', 'e5', 'Nf3'],
+                annotations: {
+                  0: 'wins space',
+                  2: 'and white develops',
+                },
+                purpose: 'best',
+                source: 'engine',
+              },
+            ],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      const variation = game.moves[0]!.variations![0]!;
+      expect(variation[0]!.commentBefore).toBe('engine best');
+      expect(variation[0]!.commentAfter).toBe('wins space');
+      expect(variation[2]!.commentAfter).toBe('and white develops');
+    });
+
+    it('should handle multiple explored variations with different labels', () => {
+      const analysis = createMockAnalysis({
+        moves: [
+          createMockMove({
+            isCriticalMoment: true,
+            exploredVariations: [
+              {
+                moves: ['d4', 'd5'],
+                purpose: 'best',
+                source: 'engine',
+              },
+              {
+                moves: ['Nf3', 'Nf6'],
+                purpose: 'human_alternative',
+                source: 'maia',
+              },
+            ],
+          }),
+        ],
+      });
+      const game = transformAnalysisToGame(analysis, { includeVariations: true });
+
+      expect(game.moves[0]!.variations).toHaveLength(2);
+      expect(game.moves[0]!.variations![0]![0]!.commentBefore).toBe('engine best');
+      expect(game.moves[0]!.variations![1]![0]!.commentBefore).toBe('human alternative');
+    });
+  });
+
   describe('round-trip tests', () => {
     it('should produce parseable PGN', () => {
       const analysis = createMockAnalysis({
