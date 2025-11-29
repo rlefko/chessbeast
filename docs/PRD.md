@@ -145,6 +145,15 @@ The following technology choices have been made for v1:
 	•	Support multiple GPT-5 model tiers via `--model` CLI flag.
 	•	Available models: gpt-5-codex, gpt-5, gpt-5-mini (default), gpt-5-nano.
 	•	Model pricing: gpt-5-codex ($1.25/$10), gpt-5-mini ($0.25/$2), gpt-5-nano ($0.05/$0.40) per 1M tokens.
+	•	FR19: Agentic variation exploration:
+	•	Opt-in mode where LLM has full control over variation exploration.
+	•	LLM can leave comments throughout variations (not just at start/end).
+	•	Visual ASCII board representation for LLM comprehension.
+	•	Tree-based exploration state management with branching.
+	•	Engine-based NAG suggestion tools for move quality assessment.
+	•	Hybrid stopping heuristics (tactical tension, eval swings, budget awareness).
+	•	Intelligent caching for expensive Stockfish evaluations (depth ≥ 14).
+	•	Configurable max tool calls (default: 40) and max depth (default: 50).
 
 5.3 Output
 	•	FR13: Return a valid, standards-compliant annotated PGN:

@@ -88,6 +88,12 @@ export interface AgenticConfigSchema {
   maxToolCalls: number;
   /** Show cost summary at end (default: true) */
   showCosts: boolean;
+  /** Enable agentic variation exploration (default: false) */
+  agenticExploration: boolean;
+  /** Maximum tool calls for exploration (default: 40) */
+  explorationMaxToolCalls: number;
+  /** Maximum depth for variation exploration (default: 50) */
+  explorationMaxDepth: number;
 }
 
 /**
@@ -204,4 +210,10 @@ export interface CliOptions {
   maxToolCalls?: number;
   /** Show cost summary at end of analysis */
   showCosts?: boolean;
+  /** Enable agentic variation exploration */
+  agenticExploration?: boolean;
+  /** Maximum tool calls for agentic exploration */
+  explorationMaxToolCalls?: number;
+  /** Maximum depth for agentic exploration */
+  explorationMaxDepth?: number;
 }

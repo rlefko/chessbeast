@@ -339,6 +339,28 @@ function mapCliToConfig(options: CliOptions): Partial<ChessBeastConfig> {
     } as ChessBeastConfig['agentic'];
   }
 
+  // Agentic exploration options
+  if (options.agenticExploration !== undefined) {
+    config.agentic = {
+      ...config.agentic,
+      agenticExploration: options.agenticExploration,
+    } as ChessBeastConfig['agentic'];
+  }
+
+  if (options.explorationMaxToolCalls !== undefined) {
+    config.agentic = {
+      ...config.agentic,
+      explorationMaxToolCalls: options.explorationMaxToolCalls,
+    } as ChessBeastConfig['agentic'];
+  }
+
+  if (options.explorationMaxDepth !== undefined) {
+    config.agentic = {
+      ...config.agentic,
+      explorationMaxDepth: options.explorationMaxDepth,
+    } as ChessBeastConfig['agentic'];
+  }
+
   return config;
 }
 

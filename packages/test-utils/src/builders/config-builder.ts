@@ -67,6 +67,9 @@ export interface AgenticConfigSchema {
   annotateAll: boolean;
   maxToolCalls: number;
   showCosts: boolean;
+  agenticExploration: boolean;
+  explorationMaxToolCalls: number;
+  explorationMaxDepth: number;
 }
 
 /**
@@ -178,6 +181,9 @@ const DEFAULT_CONFIG: ChessBeastConfig = {
     annotateAll: false,
     maxToolCalls: 5,
     showCosts: true,
+    agenticExploration: false,
+    explorationMaxToolCalls: 40,
+    explorationMaxDepth: 50,
   },
   services: {
     stockfish: {
@@ -343,6 +349,9 @@ export class ConfigBuilder {
     annotateAll?: boolean;
     maxToolCalls?: number;
     showCosts?: boolean;
+    agenticExploration?: boolean;
+    explorationMaxToolCalls?: number;
+    explorationMaxDepth?: number;
   }): this {
     if (options.enabled !== undefined) {
       this.config.agentic.enabled = options.enabled;
@@ -355,6 +364,15 @@ export class ConfigBuilder {
     }
     if (options.showCosts !== undefined) {
       this.config.agentic.showCosts = options.showCosts;
+    }
+    if (options.agenticExploration !== undefined) {
+      this.config.agentic.agenticExploration = options.agenticExploration;
+    }
+    if (options.explorationMaxToolCalls !== undefined) {
+      this.config.agentic.explorationMaxToolCalls = options.explorationMaxToolCalls;
+    }
+    if (options.explorationMaxDepth !== undefined) {
+      this.config.agentic.explorationMaxDepth = options.explorationMaxDepth;
     }
     return this;
   }
