@@ -36,6 +36,8 @@ const DEFAULT_GAME_LIMIT = 3;
  */
 export class ToolExecutor {
   private stats: ToolExecutionStats[] = [];
+  /** FEN-based cache for position evaluations */
+  private evalCache = new Map<string, EvaluatePositionResult>();
 
   constructor(
     private readonly services: AgenticServices,
@@ -125,6 +127,13 @@ export class ToolExecutor {
     const depth = params.depth ?? DEFAULT_DEPTH;
     const multipv = Math.min(Math.max(params.multipv ?? DEFAULT_MULTIPV, 1), 5);
 
+    // Check cache first (keyed by FEN + depth + multipv)
+    const cacheKey = `${params.fen}:${depth}:${multipv}`;
+    const cached = this.evalCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const response = await this.services.stockfish.evaluate(params.fen, {
       depth,
       multipv,
@@ -169,6 +178,9 @@ export class ToolExecutor {
         },
       );
     }
+
+    // Cache the result
+    this.evalCache.set(cacheKey, result);
 
     return result;
   }

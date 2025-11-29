@@ -121,10 +121,13 @@ function renderMoves(moves: MoveInfo[], result: string): string {
       parts.push(`{${escapeComment(move.commentAfter)}}`);
     }
 
-    // Variations
+    // Variations (filter out empty ones)
     if (move.variations && move.variations.length > 0) {
       for (const variation of move.variations) {
-        parts.push(renderVariation(variation));
+        const rendered = renderVariation(variation);
+        if (rendered) {
+          parts.push(rendered);
+        }
       }
     }
   }
@@ -136,10 +139,11 @@ function renderMoves(moves: MoveInfo[], result: string): string {
 
 /**
  * Render a variation (alternative line) in parentheses
+ * Returns empty string if no valid moves to render
  */
 function renderVariation(moves: MoveInfo[]): string {
   if (moves.length === 0) {
-    return '()';
+    return ''; // Don't render empty variations
   }
 
   const parts: string[] = ['('];
@@ -177,10 +181,13 @@ function renderVariation(moves: MoveInfo[]): string {
       parts.push(`{${escapeComment(move.commentAfter)}}`);
     }
 
-    // Handle nested variations recursively
+    // Handle nested variations recursively (filter out empty ones)
     if (move.variations && move.variations.length > 0) {
       for (const nestedVar of move.variations) {
-        parts.push(renderVariation(nestedVar));
+        const rendered = renderVariation(nestedVar);
+        if (rendered) {
+          parts.push(rendered);
+        }
       }
     }
   }

@@ -20,17 +20,17 @@ import { ChessPosition } from '@chessbeast/pgn';
  * Convert UCI principal variation to SAN notation
  * @param uciPv - Array of UCI moves (e.g., ["e2e4", "e7e5"])
  * @param fen - Starting position FEN
- * @returns Array of SAN moves (e.g., ["e4", "e5"])
+ * @returns Array of SAN moves (e.g., ["e4", "e5"]), or empty array on conversion failure
  */
 function convertPvToSan(uciPv: string[], fen: string): string[] {
   if (!uciPv || uciPv.length === 0) return [];
   try {
     return ChessPosition.convertPvToSan(uciPv, fen);
   } catch {
-    // If conversion fails (e.g., illegal move in PV), return original
-    // This shouldn't happen with valid engine output, but provides safety
+    // If conversion fails (e.g., illegal move in PV), return empty array
+    // Returning UCI notation would create invalid PGN (e.g., "f5g7" instead of "Nxg7")
     console.warn(`Failed to convert PV to SAN for position ${fen}`);
-    return uciPv;
+    return [];
   }
 }
 
