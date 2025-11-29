@@ -308,8 +308,8 @@ async function runAgenticAnnotation(
       );
 
       // Track last displayed state to avoid duplicate messages
-      let lastPhase = '';
       let lastToolCalls = 0;
+      const maxToolCalls = config.agentic.explorationMaxToolCalls ?? 40;
 
       const explorationResult = await agenticExplorer.explore(
         move.fenAfter,
@@ -323,37 +323,39 @@ async function runAgenticAnnotation(
             `${moveNotation} (exploring: ${progress.toolCalls} tools)`,
           );
 
-          // Detailed debug output
-          if (reporter.isDebug()) {
-            // Show tool calls as they happen
-            if (progress.lastTool && progress.toolCalls > lastToolCalls) {
-              reporter.displayToolCall(
-                moveNotation,
+          // Rich debug output with chess-friendly formatting
+          if (reporter.isDebug() && progress.lastTool && progress.toolCalls > lastToolCalls) {
+            // Show chess-friendly tool call with context
+            reporter.displayExplorationToolCall(
+              moveNotation,
+              progress.lastTool,
+              progress.toolArgs ?? {},
+              progress.toolCalls,
+              maxToolCalls,
+              {
+                currentFen: progress.currentFen,
+                currentLine: progress.currentLine,
+                depth: progress.currentDepth,
+                branchPurpose: progress.branchPurpose,
+              },
+            );
+
+            // Show chess-friendly result
+            if (progress.toolResult !== undefined || progress.toolError) {
+              reporter.displayExplorationToolResult(
                 progress.lastTool,
-                progress.toolCalls,
-                40, // maxToolCalls
+                progress.toolResult,
+                progress.toolError,
+                progress.toolDurationMs ?? 0,
               );
-              lastToolCalls = progress.toolCalls;
             }
 
-            // Show phase transitions
-            if (progress.phase !== lastPhase) {
-              const phaseMessages: Record<string, string> = {
-                starting: 'Beginning position analysis',
-                exploring: `Following main line (depth ${progress.currentDepth})`,
-                branching: `Creating sub-variation (branch ${progress.branchCount})`,
-                finishing: 'Completing exploration',
-              };
-              const msg = phaseMessages[progress.phase];
-              if (msg) {
-                reporter.displayThinking(moveNotation, msg);
-              }
-              lastPhase = progress.phase;
-            }
+            lastToolCalls = progress.toolCalls;
           }
         },
       );
 
+      // Show completion summary in debug mode
       if (reporter.isDebug()) {
         const varCount = explorationResult.variations.length;
         const annCount = explorationResult.variations.reduce(
@@ -361,10 +363,12 @@ async function runAgenticAnnotation(
           0,
         );
         const nagCount = explorationResult.variations.reduce((sum, v) => sum + v.nags.size, 0);
-        reporter.displayThinking(
-          moveNotation,
-          `Exploration complete: ${varCount} variations, ${annCount} comments, ${nagCount} NAGs, ${explorationResult.toolCalls} tool calls`,
-        );
+        reporter.displayExplorationComplete({
+          toolCalls: explorationResult.toolCalls,
+          maxToolCalls,
+          branchCount: varCount,
+          totalAnnotations: annCount + nagCount,
+        });
       }
 
       // Attach explored variations to move analysis (convert Map to Record for type compatibility)
