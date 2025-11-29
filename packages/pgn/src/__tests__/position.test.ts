@@ -237,4 +237,89 @@ describe('ChessPosition', () => {
       expect(pos2.fen()).toBe(STARTING_FEN);
     });
   });
+
+  describe('getPiece', () => {
+    it('returns piece at occupied square', () => {
+      const pos = ChessPosition.startingPosition();
+
+      const whiteKing = pos.getPiece('e1');
+      expect(whiteKing).toEqual({ type: 'k', color: 'w' });
+
+      const blackQueen = pos.getPiece('d8');
+      expect(blackQueen).toEqual({ type: 'q', color: 'b' });
+
+      const whitePawn = pos.getPiece('e2');
+      expect(whitePawn).toEqual({ type: 'p', color: 'w' });
+    });
+
+    it('returns undefined for empty square', () => {
+      const pos = ChessPosition.startingPosition();
+
+      expect(pos.getPiece('e4')).toBeUndefined();
+      expect(pos.getPiece('d5')).toBeUndefined();
+    });
+  });
+
+  describe('isSquareAttacked', () => {
+    it('detects attacked squares in starting position', () => {
+      const pos = ChessPosition.startingPosition();
+
+      // d3 is attacked by white pawn on e2 (and d2)
+      expect(pos.isSquareAttacked('e3', 'w')).toBe(true);
+
+      // e4 is not attacked by black in starting position
+      expect(pos.isSquareAttacked('e4', 'b')).toBe(false);
+    });
+
+    it('detects knight attacks', () => {
+      // Position with knight on e4
+      const pos = ChessPosition.fromFen('8/8/8/8/4N3/8/8/K6k w - - 0 1');
+
+      expect(pos.isSquareAttacked('f6', 'w')).toBe(true);
+      expect(pos.isSquareAttacked('d6', 'w')).toBe(true);
+      expect(pos.isSquareAttacked('g5', 'w')).toBe(true);
+      expect(pos.isSquareAttacked('e5', 'w')).toBe(false);
+    });
+  });
+
+  describe('getAttackers', () => {
+    it('returns attacking squares', () => {
+      // Position with white knight on f3 attacking e5
+      const pos = ChessPosition.fromFen('8/8/8/4p3/8/5N2/8/K6k w - - 0 1');
+
+      const attackers = pos.getAttackers('e5', 'w');
+      expect(attackers).toContain('f3'); // Knight on f3 attacks e5
+    });
+
+    it('returns empty array for unattacked square', () => {
+      const pos = ChessPosition.startingPosition();
+
+      const attackers = pos.getAttackers('e4', 'b');
+      expect(attackers).toEqual([]);
+    });
+  });
+
+  describe('getAllPieces', () => {
+    it('returns all pieces in starting position', () => {
+      const pos = ChessPosition.startingPosition();
+
+      const pieces = pos.getAllPieces();
+
+      // 32 pieces in starting position
+      expect(pieces).toHaveLength(32);
+
+      // Check for specific pieces
+      expect(pieces).toContainEqual({ square: 'e1', type: 'k', color: 'w' });
+      expect(pieces).toContainEqual({ square: 'e8', type: 'k', color: 'b' });
+      expect(pieces).toContainEqual({ square: 'd1', type: 'q', color: 'w' });
+    });
+
+    it('returns fewer pieces after captures', () => {
+      // Position after several captures
+      const pos = ChessPosition.fromFen('8/8/8/4k3/8/8/8/4K3 w - - 0 1');
+
+      const pieces = pos.getAllPieces();
+      expect(pieces).toHaveLength(2); // Just two kings
+    });
+  });
 });

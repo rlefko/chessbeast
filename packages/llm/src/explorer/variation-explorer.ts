@@ -363,6 +363,21 @@ export class VariationExplorer {
     parts.push("- Is the human-likely move a mistake worth highlighting? What's the refutation?");
     parts.push('- Should we explore deeper or is the position simple enough?');
     parts.push('');
+    parts.push('## VARIATION LENGTH GUIDANCE:');
+    parts.push('Variations should continue until the position is RESOLVED.');
+    parts.push('');
+    parts.push('STOP EXPLORING when:');
+    parts.push('- Material is won/lost and recaptures are exhausted');
+    parts.push('- A forcing sequence ends (checks/captures stop)');
+    parts.push('- Position reaches clear equality with no remaining tension');
+    parts.push('- Mate is delivered or forced');
+    parts.push('');
+    parts.push('KEEP EXPLORING if:');
+    parts.push('- Captures are still being exchanged');
+    parts.push('- Checks are ongoing without repetition');
+    parts.push('- Hanging pieces could still be taken');
+    parts.push('- The "point" has not been demonstrated yet');
+    parts.push('');
     parts.push(
       'RULES: No numeric evaluations. Use verbal assessments: "winning", "clear advantage", "slight edge", "equal".',
     );
@@ -419,8 +434,9 @@ export class VariationExplorer {
     }
 
     // For long tactical lines, ask LLM to identify key moves to annotate
+    // Pass finalEval so LLM can generate appropriate ending comments
     if (lineMoves.length > 4 && session.llmCallCount < session.softCallCap) {
-      const keyMoves = await this.identifyKeyMoves(session, lineMoves);
+      const keyMoves = await this.identifyKeyMoves(session, lineMoves, line.finalEval);
       for (const km of keyMoves) {
         if (km.moveIndex < line.moves.length) {
           line.annotations.set(km.moveIndex, km.explanation);
@@ -632,26 +648,77 @@ export class VariationExplorer {
   }
 
   /**
-   * Ask LLM to identify key moves in a line that deserve annotation
+   * Ask LLM to identify key moves in a line that deserve terse inline annotation
+   *
+   * Uses enhanced prompt to generate short, impactful comments like:
+   * "{the point}", "{threatening mate}", "{and black wins material}"
+   *
+   * @param session - Current exploration session
+   * @param moves - SAN moves in the variation
+   * @param finalEval - Optional engine evaluation at end of line
    */
   private async identifyKeyMoves(
     session: ExplorationSession,
     moves: string[],
+    finalEval?: EngineEvaluation,
   ): Promise<Array<{ moveIndex: number; explanation: string }>> {
+    // Calculate final position's FEN and verbal assessment
+    let finalFen = session.position;
+    try {
+      const pos = new ChessPosition(session.position);
+      for (const m of moves) {
+        pos.move(m);
+      }
+      finalFen = pos.fen();
+    } catch {
+      // Use starting position if playthrough fails
+    }
+
+    const isWhiteAtEnd = this.isWhiteToMove(finalFen);
+    const verbalEval = finalEval
+      ? this.formatEvalVerbal(finalEval.cp, finalEval.mate, isWhiteAtEnd)
+      : 'unclear';
+
+    // Determine expected number of key moves based on line length
+    const expectedKeyMoves = moves.length <= 6 ? '2-3' : moves.length <= 12 ? '3-4' : '4-5';
+
     const prompt = [
       `POSITION: ${session.position}`,
       `LINE: ${moves.join(' ')}`,
       `TARGET RATING: ${session.targetRating}`,
+      `FINAL ASSESSMENT: ${verbalEval}`,
       '',
-      'TASK: Identify the 2-3 most instructive moves in this line.',
-      'These are moves that teach an important concept or are tactically critical.',
-      'Each explanation must be 1 sentence, no numeric evaluations.',
+      'TASK: Annotate this variation with terse inline comments.',
+      '',
+      '## Comment Guidelines:',
+      `- Mark ${expectedKeyMoves} key moments`,
+      '- Keep comments SHORT: 2-6 words preferred',
+      '- Use lowercase, no ending punctuation',
+      '- Style: "{the point}", "{threatening Qxh7}"',
+      '',
+      '## Comment Types:',
+      '1. "THE POINT" - key tactical idea revealed',
+      '   Examples: "the point", "the idea becomes clear"',
+      '',
+      '2. "BUILDUP" - plan coming together',
+      '   Examples: "threatening mate", "with tempo", "forcing"',
+      '',
+      '3. "OUTCOME" - REQUIRED at variation END explaining WHY',
+      '   Decisive: "and black wins the exchange"',
+      '   Mate: "forced mate follows"',
+      '   Draw: "with everything symmetrical, this is a draw"',
+      '   Equal: "with approximate equality"',
+      '',
+      '## CRITICAL RULES:',
+      '- Last move MUST have contextual outcome comment',
+      '- No numeric evaluations',
+      '- No "this move" or "here" - just the idea',
       '',
       'Respond with JSON:',
       '{',
       '  "keyMoves": [',
-      '    { "moveIndex": 0, "explanation": "Why this move matters" },',
-      '    { "moveIndex": 3, "explanation": "Why this move matters" }',
+      '    { "moveIndex": 0, "explanation": "the point" },',
+      `    { "moveIndex": ${moves.length - 1}, "explanation": "and black wins material" }`,
       '  ]',
       '}',
     ].join('\n');
@@ -671,10 +738,69 @@ export class VariationExplorer {
       const parsed = JSON.parse(response.content) as {
         keyMoves?: Array<{ moveIndex: number; explanation: string }>;
       };
-      return parsed.keyMoves ?? [];
+
+      const keyMoves = parsed.keyMoves ?? [];
+
+      // Ensure we have an ending comment if LLM missed it
+      const hasEndingComment = keyMoves.some((km) => km.moveIndex === moves.length - 1);
+      if (!hasEndingComment && moves.length > 0) {
+        // Add a fallback ending comment based on evaluation
+        keyMoves.push({
+          moveIndex: moves.length - 1,
+          explanation: this.generateEndingComment(verbalEval),
+        });
+      }
+
+      return keyMoves;
     } catch {
+      // Fallback: just add ending comment
+      if (moves.length > 0) {
+        return [
+          {
+            moveIndex: moves.length - 1,
+            explanation: this.generateEndingComment(verbalEval),
+          },
+        ];
+      }
       return [];
     }
+  }
+
+  /**
+   * Generate a contextual ending comment based on evaluation
+   */
+  private generateEndingComment(verbalEval: string): string {
+    // Convert verbal evaluation to terse ending comment
+    if (verbalEval.includes('checkmate')) {
+      return 'checkmate';
+    }
+    if (verbalEval.includes('forced mate')) {
+      return 'with forced mate';
+    }
+    if (verbalEval.includes('decisive')) {
+      const side = verbalEval.includes('White') ? 'white' : 'black';
+      return `and ${side} wins`;
+    }
+    if (verbalEval.includes('winning')) {
+      const side = verbalEval.includes('White') ? 'white' : 'black';
+      return `${side} is winning`;
+    }
+    if (verbalEval.includes('much better')) {
+      const side = verbalEval.includes('White') ? 'white' : 'black';
+      return `${side} has a large advantage`;
+    }
+    if (verbalEval.includes('clear advantage')) {
+      const side = verbalEval.includes('White') ? 'white' : 'black';
+      return `${side} is clearly better`;
+    }
+    if (verbalEval.includes('slightly better') || verbalEval.includes('slight edge')) {
+      const side = verbalEval.includes('White') ? 'white' : 'black';
+      return `${side} is slightly better`;
+    }
+    if (verbalEval === 'equal' || verbalEval.includes('equal')) {
+      return 'with equality';
+    }
+    return 'with an unclear position';
   }
 }
 
