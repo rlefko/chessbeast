@@ -333,13 +333,7 @@ export function getResolutionState(
     if (Math.abs(cp) >= WINNING_THRESHOLD) {
       // Decisive advantage
       const winner =
-        cp > 0
-          ? sideToMove === 'w'
-            ? 'White'
-            : 'Black'
-          : sideToMove === 'w'
-            ? 'Black'
-            : 'White';
+        cp > 0 ? (sideToMove === 'w' ? 'White' : 'Black') : sideToMove === 'w' ? 'Black' : 'White';
 
       return {
         state: winner === 'White' ? 'winning_white' : 'winning_black',
@@ -355,13 +349,7 @@ export function getResolutionState(
 
     // Clear but not decisive advantage
     const better =
-      cp > 0
-        ? sideToMove === 'w'
-          ? 'White'
-          : 'Black'
-        : sideToMove === 'w'
-          ? 'Black'
-          : 'White';
+      cp > 0 ? (sideToMove === 'w' ? 'White' : 'Black') : sideToMove === 'w' ? 'Black' : 'White';
 
     return {
       state: 'quiet',

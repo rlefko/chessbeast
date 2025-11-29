@@ -194,9 +194,7 @@ export function hasCheckTension(pos: ChessPosition): TensionResult {
 
   // Check if any legal move gives check
   const legalMoves = pos.getLegalMoves();
-  const checksAvailable = legalMoves.filter(
-    (m) => m.includes('+') || m.includes('#'),
-  );
+  const checksAvailable = legalMoves.filter((m) => m.includes('+') || m.includes('#'));
 
   if (checksAvailable.length > 0) {
     if (checksAvailable.some((m) => m.includes('#'))) {
@@ -222,11 +220,7 @@ export function hasCheckTension(pos: ChessPosition): TensionResult {
  * @returns TensionResult combining all detected tension
  */
 export function detectTension(pos: ChessPosition): TensionResult {
-  const results = [
-    hasCheckTension(pos),
-    hasHangingPieces(pos),
-    hasPromotionThreat(pos),
-  ];
+  const results = [hasCheckTension(pos), hasHangingPieces(pos), hasPromotionThreat(pos)];
 
   const allReasons = results.flatMap((r) => r.reasons);
 

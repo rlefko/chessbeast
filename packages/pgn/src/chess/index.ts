@@ -14,8 +14,4 @@ export {
   hasTacticalTension,
   getResolutionState,
 } from './tension-resolver.js';
-export type {
-  TensionConfig,
-  ResolutionState,
-  ResolutionResult,
-} from './tension-resolver.js';
+export type { TensionConfig, ResolutionState, ResolutionResult } from './tension-resolver.js';
