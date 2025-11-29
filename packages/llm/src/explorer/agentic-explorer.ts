@@ -741,7 +741,25 @@ TARGET AUDIENCE: ${targetRating} rated players
 - Max 2 sentences per comment
 - No numeric evaluations (use "winning", "slight edge", "equal")
 - Focus on WHY, not just outcomes
-- Keep comments SHORT: 2-6 words preferred`;
+- Keep comments SHORT: 2-6 words preferred
+
+## CRITICAL: AVOID THESE COMMENT MISTAKES
+
+1. **NEVER repeat the move notation** - the move is already shown
+   - BAD: "Nxg7! wins the queen"
+   - GOOD: "wins the queen"
+
+2. **NEVER start comments with "this" or "here"**
+   - BAD: "this threatens mate"
+   - GOOD: "threatening mate"
+
+3. **Keep comments about THE CURRENT MOVE only**
+   - Comments should explain the move they're attached to
+   - Don't discuss future or past moves in the comment
+
+4. **Use lowercase, no punctuation at end**
+   - BAD: "The point!"
+   - GOOD: "the point"`;
   }
 
   /**

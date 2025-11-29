@@ -248,12 +248,16 @@ export class ExplorationState {
       return [];
     }
 
-    // Build annotations map from comments
+    // Build annotations and NAGs maps from moves
     const annotations = new Map<number, string>();
+    const nags = new Map<number, string>();
     for (let i = 0; i < branch.moves.length; i++) {
       const move = branch.moves[i]!;
       if (move.comment) {
         annotations.set(i, move.comment);
+      }
+      if (move.nag) {
+        nags.set(i, move.nag);
       }
     }
 
@@ -273,6 +277,7 @@ export class ExplorationState {
     const line: ExploredLine = {
       moves: branch.moves.map((m) => m.san),
       annotations,
+      nags,
       branches: nestedBranches,
       purpose: branch.purpose,
       source: branch.source,

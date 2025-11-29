@@ -64,6 +64,8 @@ export interface ExploredVariation {
   moves: string[];
   /** Inline annotations for specific moves (move index -> comment) */
   annotations?: Record<number, string>;
+  /** NAGs for specific moves (move index -> NAG like "$1", "$4") */
+  nags?: Record<number, string>;
   purpose: 'best' | 'human_alternative' | 'refutation' | 'trap' | 'thematic';
   source: 'engine' | 'maia' | 'llm';
   /** Final evaluation at the end of the line (for position NAG) */
@@ -492,6 +494,15 @@ function transformExploredVariations(
       const annotation = explored.annotations?.[i];
       if (annotation) {
         moveInfo.commentAfter = annotation;
+      }
+
+      // Attach NAG if present for this move index
+      const nag = explored.nags?.[i];
+      if (nag) {
+        moveInfo.nags = moveInfo.nags ?? [];
+        if (!moveInfo.nags.includes(nag)) {
+          moveInfo.nags.push(nag);
+        }
       }
 
       variationMoves.push(moveInfo);

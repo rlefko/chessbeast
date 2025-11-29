@@ -204,6 +204,7 @@ export class Annotator {
               move.exploredVariations = exploredLines.map((line) => ({
                 moves: line.moves,
                 annotations: Object.fromEntries(line.annotations),
+                nags: Object.fromEntries(line.nags),
                 purpose: line.purpose,
                 source: line.source,
                 // Include finalEval for position NAG at end of variation

@@ -221,12 +221,14 @@ async function runAgenticAnnotation(
     );
 
     // Display move context in debug mode
+    // Use evalBefore (position before move) to match fenBefore being displayed
     if (reporter.isDebug()) {
+      const beforeAnalysis = toDeepAnalysis(move.evalBefore, move.bestMove);
       reporter.displayMoveContext({
         moveNotation,
         fen: move.fenBefore,
-        evaluation: currentAnalysis.evaluation,
-        bestMove: currentAnalysis.bestMove,
+        evaluation: beforeAnalysis.evaluation, // Matches the FEN shown
+        bestMove: beforeAnalysis.bestMove,
         classification: move.classification,
         cpLoss: move.cpLoss,
       });
@@ -295,31 +297,82 @@ async function runAgenticAnnotation(
 
     // Explore variations if enabled and this is a critical moment
     if (agenticExplorer && criticalMoment) {
+      if (reporter.isDebug()) {
+        reporter.displayThinking(moveNotation, 'Starting agentic variation exploration...');
+      }
+
       reporter.updateMoveProgress(
         i + 1,
         positionsToAnnotate.length,
         `${moveNotation} (exploring variations)`,
       );
 
+      // Track last displayed state to avoid duplicate messages
+      let lastPhase = '';
+      let lastToolCalls = 0;
+
       const explorationResult = await agenticExplorer.explore(
         move.fenAfter,
         targetRating,
         move.san,
         (progress: AgenticExplorerProgress) => {
+          // Update progress status for non-debug mode
+          reporter.updateMoveProgress(
+            i + 1,
+            positionsToAnnotate.length,
+            `${moveNotation} (exploring: ${progress.toolCalls} tools)`,
+          );
+
+          // Detailed debug output
           if (reporter.isDebug()) {
-            reporter.displayThinking(
-              moveNotation,
-              `Exploring: ${progress.toolCalls} tools, depth ${progress.currentDepth}`,
-            );
+            // Show tool calls as they happen
+            if (progress.lastTool && progress.toolCalls > lastToolCalls) {
+              reporter.displayToolCall(
+                moveNotation,
+                progress.lastTool,
+                progress.toolCalls,
+                40, // maxToolCalls
+              );
+              lastToolCalls = progress.toolCalls;
+            }
+
+            // Show phase transitions
+            if (progress.phase !== lastPhase) {
+              const phaseMessages: Record<string, string> = {
+                starting: 'Beginning position analysis',
+                exploring: `Following main line (depth ${progress.currentDepth})`,
+                branching: `Creating sub-variation (branch ${progress.branchCount})`,
+                finishing: 'Completing exploration',
+              };
+              const msg = phaseMessages[progress.phase];
+              if (msg) {
+                reporter.displayThinking(moveNotation, msg);
+              }
+              lastPhase = progress.phase;
+            }
           }
         },
       );
+
+      if (reporter.isDebug()) {
+        const varCount = explorationResult.variations.length;
+        const annCount = explorationResult.variations.reduce(
+          (sum, v) => sum + v.annotations.size,
+          0,
+        );
+        const nagCount = explorationResult.variations.reduce((sum, v) => sum + v.nags.size, 0);
+        reporter.displayThinking(
+          moveNotation,
+          `Exploration complete: ${varCount} variations, ${annCount} comments, ${nagCount} NAGs, ${explorationResult.toolCalls} tool calls`,
+        );
+      }
 
       // Attach explored variations to move analysis (convert Map to Record for type compatibility)
       if (explorationResult.variations.length > 0) {
         move.exploredVariations = explorationResult.variations.map((v) => ({
           moves: v.moves,
           annotations: Object.fromEntries(v.annotations),
+          nags: Object.fromEntries(v.nags),
           purpose: v.purpose,
           source: v.source,
         }));

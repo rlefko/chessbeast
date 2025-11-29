@@ -826,8 +826,8 @@ describe('PGN Renderer', () => {
 
       const pgn = renderPgn(game);
 
-      // Should handle empty variation
-      expect(pgn).toContain('()');
+      // Empty variations should NOT be rendered (no invalid '()' in output)
+      expect(pgn).not.toContain('()');
     });
 
     it('handles game with only result', () => {

@@ -60,8 +60,10 @@ export type LineSource = 'engine' | 'maia' | 'llm';
 export interface ExploredLine {
   /** SAN moves in this line */
   moves: string[];
-  /** LLM explanation for key moves in this line */
+  /** LLM explanation for key moves in this line (move index -> comment) */
   annotations: Map<number, string>;
+  /** NAGs for moves in this line (move index -> NAG like "$1", "$4") */
+  nags: Map<number, string>;
   /** Nested variations branching from this line */
   branches: ExploredLine[];
   /** Purpose of this line */
@@ -423,6 +425,7 @@ export class VariationExplorer {
     const line: ExploredLine = {
       moves: lineMoves,
       annotations: new Map(),
+      nags: new Map(),
       branches: [],
       purpose,
       source,
@@ -544,6 +547,7 @@ export class VariationExplorer {
       return {
         moves: [mistakeMoveSan],
         annotations: new Map(),
+        nags: new Map(),
         branches: [],
         purpose: 'human_alternative',
         source: 'maia',
@@ -563,6 +567,7 @@ export class VariationExplorer {
       return {
         moves: [mistakeMoveSan],
         annotations: new Map(),
+        nags: new Map(),
         branches: [],
         purpose: 'human_alternative',
         source: 'maia',
@@ -589,6 +594,7 @@ export class VariationExplorer {
     const line: ExploredLine = {
       moves,
       annotations: new Map(),
+      nags: new Map(),
       branches: [],
       purpose: 'human_alternative',
       source: 'maia',
