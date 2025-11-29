@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { renderBoard, formatBoardForPrompt, STARTING_FEN } from '../index.js';
 
 describe('Board Visualizer', () => {
