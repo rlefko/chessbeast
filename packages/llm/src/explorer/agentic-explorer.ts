@@ -13,8 +13,6 @@
 
 import { ChessPosition, renderBoard, formatBoardForPrompt } from '@chessbeast/pgn';
 
-import type { ExploredLine, LinePurpose } from './variation-explorer.js';
-
 import { ResponseCache } from '../cache/response-cache.js';
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { ChatMessage, ToolChoice } from '../client/types.js';
@@ -30,6 +28,7 @@ import {
   type StoppingConfig,
   DEFAULT_STOPPING_CONFIG,
 } from './stopping-heuristics.js';
+import type { ExploredLine, LinePurpose } from './variation-explorer.js';
 
 /**
  * Configuration for the agentic explorer
