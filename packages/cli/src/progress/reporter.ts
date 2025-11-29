@@ -521,9 +521,13 @@ export class ProgressReporter {
         const depth = (toolArgs.depth as number) ?? 16;
         const multipv = (toolArgs.multipv as number) ?? 1;
         const multipvStr = multipv > 1 ? `, multipv ${multipv}` : '';
-        process.stderr.write(`${this.c.yellow(iterStr)} evaluate_position (depth ${depth}${multipvStr})\n`);
+        process.stderr.write(
+          `${this.c.yellow(iterStr)} evaluate_position (depth ${depth}${multipvStr})\n`,
+        );
         if (context.currentLine && context.currentLine.length > 0) {
-          process.stderr.write(`  └─ Position: after ${this.formatMoveSequence(context.currentLine)}\n`);
+          process.stderr.write(
+            `  └─ Position: after ${this.formatMoveSequence(context.currentLine)}\n`,
+          );
         }
         break;
       }
@@ -535,7 +539,7 @@ export class ProgressReporter {
       }
 
       case 'push_move': {
-        const move = (toolArgs.move ?? toolArgs.san ?? 'unknown') as string;
+        const move = (toolArgs.move ?? 'unknown') as string;
         process.stderr.write(`${this.c.yellow(iterStr)} push_move: ${this.c.cyan(move)}\n`);
         break;
       }
@@ -543,7 +547,9 @@ export class ProgressReporter {
       case 'pop_move': {
         process.stderr.write(`${this.c.yellow(iterStr)} pop_move\n`);
         if (context.currentLine && context.currentLine.length > 0) {
-          process.stderr.write(`  └─ Backtracking from: ${this.formatMoveSequence(context.currentLine)}\n`);
+          process.stderr.write(
+            `  └─ Backtracking from: ${this.formatMoveSequence(context.currentLine)}\n`,
+          );
         }
         break;
       }
@@ -554,7 +560,9 @@ export class ProgressReporter {
         process.stderr.write(`\n${this.c.cyan(`[Branch ${branchNum}]`)} Starting sub-variation\n`);
         process.stderr.write(`  └─ Purpose: ${purpose}\n`);
         if (context.currentLine && context.currentLine.length > 0) {
-          process.stderr.write(`  └─ Branching from: ${this.formatMoveSequence(context.currentLine)}\n`);
+          process.stderr.write(
+            `  └─ Branching from: ${this.formatMoveSequence(context.currentLine)}\n`,
+          );
         }
         // Show ASCII board at branch points
         if (context.currentFen) {
@@ -581,7 +589,9 @@ export class ProgressReporter {
       case 'add_nag': {
         const nag = toolArgs.nag as string;
         const nagMeaning = this.getNagMeaning(nag);
-        process.stderr.write(`${this.c.dim(iterStr)} add_nag ${nag}${nagMeaning ? ` (${nagMeaning})` : ''}\n`);
+        process.stderr.write(
+          `${this.c.dim(iterStr)} add_nag ${nag}${nagMeaning ? ` (${nagMeaning})` : ''}\n`,
+        );
         break;
       }
 
@@ -639,7 +649,11 @@ export class ProgressReporter {
           evaluation?: { cp?: number; mate?: number };
           bestMove?: string;
           pv?: string[];
-          alternatives?: Array<{ move: string; evaluation: { cp?: number; mate?: number }; pv?: string[] }>;
+          alternatives?: Array<{
+            move: string;
+            evaluation: { cp?: number; mate?: number };
+            pv?: string[];
+          }>;
         };
 
         if (evalResult.evaluation) {
@@ -657,7 +671,8 @@ export class ProgressReporter {
           if (evalResult.alternatives && evalResult.alternatives.length > 0) {
             for (const alt of evalResult.alternatives) {
               const altEval = this.formatEvaluation(alt.evaluation);
-              const altPv = alt.pv && alt.pv.length > 0 ? ` ${alt.pv.slice(0, 5).join(' ')}...` : '';
+              const altPv =
+                alt.pv && alt.pv.length > 0 ? ` ${alt.pv.slice(0, 5).join(' ')}...` : '';
               process.stderr.write(`     Alt:  ${alt.move} ${altEval}${altPv}\n`);
             }
           }
@@ -666,7 +681,11 @@ export class ProgressReporter {
       }
 
       case 'predict_human_moves': {
-        const predictions = result as Array<{ move: string; probability: number; comment?: string }>;
+        const predictions = result as Array<{
+          move: string;
+          probability: number;
+          comment?: string;
+        }>;
         if (Array.isArray(predictions) && predictions.length > 0) {
           process.stderr.write(`  └─ Human predictions:\n`);
           for (let i = 0; i < Math.min(predictions.length, 5); i++) {
@@ -680,7 +699,12 @@ export class ProgressReporter {
       }
 
       case 'push_move': {
-        const moveResult = result as { success?: boolean; check?: boolean; capture?: boolean; fen?: string };
+        const moveResult = result as {
+          success?: boolean;
+          check?: boolean;
+          capture?: boolean;
+          fen?: string;
+        };
         if (moveResult.success !== false) {
           let details = '✓';
           if (moveResult.check) details += ' Check';
@@ -810,20 +834,20 @@ export class ProgressReporter {
    */
   private getNagMeaning(nag: string): string {
     const meanings: Record<string, string> = {
-      '$1': '!',
-      '$2': '?',
-      '$3': '!!',
-      '$4': '??',
-      '$5': '!?',
-      '$6': '?!',
-      '$10': '=',
-      '$13': 'unclear',
-      '$14': '+=',
-      '$15': '=+',
-      '$16': '±',
-      '$17': '∓',
-      '$18': '+-',
-      '$19': '-+',
+      $1: '!',
+      $2: '?',
+      $3: '!!',
+      $4: '??',
+      $5: '!?',
+      $6: '?!',
+      $10: '=',
+      $13: 'unclear',
+      $14: '+=',
+      $15: '=+',
+      $16: '±',
+      $17: '∓',
+      $18: '+-',
+      $19: '-+',
     };
     return meanings[nag] ?? '';
   }
@@ -833,8 +857,18 @@ export class ProgressReporter {
    */
   private printAsciiBoard(fen: string, indent: string = ''): void {
     const pieces: Record<string, string> = {
-      'K': 'K', 'Q': 'Q', 'R': 'R', 'B': 'B', 'N': 'N', 'P': 'P',
-      'k': 'k', 'q': 'q', 'r': 'r', 'b': 'b', 'n': 'n', 'p': 'p',
+      K: 'K',
+      Q: 'Q',
+      R: 'R',
+      B: 'B',
+      N: 'N',
+      P: 'P',
+      k: 'k',
+      q: 'q',
+      r: 'r',
+      b: 'b',
+      n: 'n',
+      p: 'p',
     };
 
     const boardPart = fen.split(' ')[0];

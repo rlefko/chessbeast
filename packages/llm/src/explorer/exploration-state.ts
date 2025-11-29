@@ -157,6 +157,17 @@ export class ExplorationState {
   }
 
   /**
+   * Get the SAN of the last move in the current branch
+   */
+  getLastMoveSan(): string | undefined {
+    const branch = this.getCurrentBranch();
+    if (branch.moves.length === 0) {
+      return undefined;
+    }
+    return branch.moves[branch.moves.length - 1]!.san;
+  }
+
+  /**
    * Add a NAG symbol to the last move in the current branch
    */
   addNag(nag: string): boolean {

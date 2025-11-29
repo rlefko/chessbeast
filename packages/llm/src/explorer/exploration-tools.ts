@@ -114,14 +114,14 @@ export const ADD_COMMENT_TOOL: OpenAITool = {
   function: {
     name: 'add_comment',
     description:
-      'Add annotation to the last played move. IMPORTANT: You must play a move with push_move first before calling this. Keep it SHORT (2-6 words). Style: "the point", "threatening mate"',
+      'Add annotation to the last played move. CRITICAL RULES: (1) You must play a move with push_move first. (2) NEVER repeat the move notation in your comment. (3) NEVER mention perspective (e.g., "from black\'s view"). Keep it SHORT (2-6 words). Style: "the point", "threatening mate", "wins material"',
     parameters: {
       type: 'object',
       properties: {
         comment: {
           type: 'string',
           description:
-            'Short annotation text (2-6 words preferred). No numeric evaluations. Lowercase, no ending punctuation.',
+            'Short annotation text (2-6 words). NEVER include the move itself (say "wins material" not "Nxg7 wins material"). NEVER mention perspective or point of view. Lowercase, no ending punctuation.',
         },
       },
       required: ['comment'],
