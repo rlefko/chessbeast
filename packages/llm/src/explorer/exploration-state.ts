@@ -8,7 +8,12 @@
  * - Conversion to ExploredLine output format
  */
 
-import type { LinePurpose, LineSource, ExploredLine, EngineEvaluation } from './variation-explorer.js';
+import type {
+  LinePurpose,
+  LineSource,
+  ExploredLine,
+  EngineEvaluation,
+} from './variation-explorer.js';
 
 /**
  * A single explored move with its annotations

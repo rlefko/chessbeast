@@ -236,7 +236,8 @@ export const FINISH_EXPLORATION_TOOL: OpenAITool = {
   type: 'function',
   function: {
     name: 'finish_exploration',
-    description: 'Signal that exploration is complete. Use when all important lines have been shown.',
+    description:
+      'Signal that exploration is complete. Use when all important lines have been shown.',
     parameters: {
       type: 'object',
       properties: {

@@ -126,7 +126,10 @@ export function assessContinuation(
   }
 
   // 4. RESOLUTION STATE
-  const resolution = getResolutionState(fen, currentEval !== undefined ? { cp: currentEval } : undefined);
+  const resolution = getResolutionState(
+    fen,
+    currentEval !== undefined ? { cp: currentEval } : undefined,
+  );
 
   switch (resolution.state) {
     case 'winning_white':
