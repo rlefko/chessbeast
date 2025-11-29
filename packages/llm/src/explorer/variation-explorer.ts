@@ -435,8 +435,15 @@ export class VariationExplorer {
 
     // For long tactical lines, ask LLM to identify key moves to annotate
     // Pass finalEval so LLM can generate appropriate ending comments
+    // Pass purpose/source so LLM can generate natural opening comments
     if (lineMoves.length > 4 && session.llmCallCount < session.softCallCap) {
-      const keyMoves = await this.identifyKeyMoves(session, lineMoves, line.finalEval);
+      const keyMoves = await this.identifyKeyMoves(
+        session,
+        lineMoves,
+        line.finalEval,
+        purpose,
+        source,
+      );
       for (const km of keyMoves) {
         if (km.moveIndex < line.moves.length) {
           line.annotations.set(km.moveIndex, km.explanation);
@@ -653,14 +660,21 @@ export class VariationExplorer {
    * Uses enhanced prompt to generate short, impactful comments like:
    * "{the point}", "{threatening mate}", "{and black wins material}"
    *
+   * The opening comment naturally incorporates the variation's purpose/source
+   * context (e.g., "the engine's top choice" vs "a practical alternative").
+   *
    * @param session - Current exploration session
    * @param moves - SAN moves in the variation
    * @param finalEval - Optional engine evaluation at end of line
+   * @param purpose - Purpose of this variation (best, human_alternative, etc.)
+   * @param source - Source of this variation (engine, maia, llm)
    */
   private async identifyKeyMoves(
     session: ExplorationSession,
     moves: string[],
     finalEval?: EngineEvaluation,
+    purpose?: LinePurpose,
+    source?: LineSource,
   ): Promise<Array<{ moveIndex: number; explanation: string }>> {
     // Calculate final position's FEN and verbal assessment
     let finalFen = session.position;
@@ -682,16 +696,52 @@ export class VariationExplorer {
     // Determine expected number of key moves based on line length
     const expectedKeyMoves = moves.length <= 6 ? '2-3' : moves.length <= 12 ? '3-4' : '4-5';
 
+    // Build context about variation purpose for natural opening comments
+    const purposeContext = purpose
+      ? {
+          best: "This is the engine's top recommendation - the most precise continuation.",
+          human_alternative:
+            'This is what humans typically play at this level - a practical choice.',
+          refutation: "This line punishes the opponent's inaccuracy.",
+          trap: 'This is a tempting but flawed idea.',
+          thematic: 'This illustrates a key positional or tactical theme.',
+        }[purpose]
+      : '';
+
+    const sourceHint =
+      source === 'maia'
+        ? 'This reflects typical human play at the target rating.'
+        : source === 'engine'
+          ? "This is the computer's precise recommendation."
+          : '';
+
     const prompt = [
       `POSITION: ${session.position}`,
       `LINE: ${moves.join(' ')}`,
       `TARGET RATING: ${session.targetRating}`,
       `FINAL ASSESSMENT: ${verbalEval}`,
+      purposeContext && `VARIATION CONTEXT: ${purposeContext}`,
+      sourceHint && `SOURCE: ${sourceHint}`,
       '',
       'TASK: Annotate this variation with terse inline comments.',
       '',
+      '## OPENING COMMENT (REQUIRED):',
+      'The FIRST move (moveIndex 0) MUST have a comment that naturally explains',
+      'WHY this variation is being shown. Use the VARIATION CONTEXT to guide this.',
+      '',
+      'Examples of natural opening comments:',
+      '- For engine lines: "the most precise continuation" or "the engine\'s recommendation"',
+      '- For human alternatives: "a practical choice" or "what many players naturally try"',
+      '- For refutations: "punishing the error" or "exploiting the weakness"',
+      '- For traps: "tempting but" or "this looks appealing but fails"',
+      '- For thematic ideas: "illustrating the key plan" or "the typical maneuver here"',
+      '',
+      'Make this NATURAL PROSE, not a label.',
+      'BAD: "engine best"',
+      'GOOD: "the engine\'s top choice, striking immediately in the center"',
+      '',
       '## Comment Guidelines:',
-      `- Mark ${expectedKeyMoves} key moments`,
+      `- Mark ${expectedKeyMoves} key moments (including opening and ending)`,
       '- Keep comments SHORT: 2-6 words preferred',
       '- Use lowercase, no ending punctuation',
       '- Style: "{the point}", "{threatening Qxh7}"',
@@ -710,6 +760,7 @@ export class VariationExplorer {
       '   Equal: "with approximate equality"',
       '',
       '## CRITICAL RULES:',
+      '- First move (index 0) MUST have natural opening comment',
       '- Last move MUST have contextual outcome comment',
       '- No numeric evaluations',
       '- No "this move" or "here" - just the idea',
@@ -717,11 +768,13 @@ export class VariationExplorer {
       'Respond with JSON:',
       '{',
       '  "keyMoves": [',
-      '    { "moveIndex": 0, "explanation": "the point" },',
+      '    { "moveIndex": 0, "explanation": "the engine\'s top choice" },',
       `    { "moveIndex": ${moves.length - 1}, "explanation": "and black wins material" }`,
       '  ]',
       '}',
-    ].join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     try {
       const response = await this.llmClient.chat({
