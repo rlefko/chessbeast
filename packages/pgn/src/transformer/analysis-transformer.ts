@@ -6,9 +6,9 @@
  */
 
 import { ChessPosition } from '../chess/position.js';
-import { resolveVariationLength } from '../chess/tension-resolver.js';
+import { resolveVariationLength, getResolutionState } from '../chess/tension-resolver.js';
 import type { GameMetadata, MoveInfo, ParsedGame } from '../index.js';
-import { classificationToNag, evalToPositionNag, type MoveClassification } from '../nag/index.js';
+import { classificationToNag, type MoveClassification } from '../nag/index.js';
 
 /**
  * Options for transforming analysis to PGN
@@ -505,16 +505,39 @@ function transformExploredVariations(
 
     // Add position NAG at the END of the variation (not on main line)
     // This shows the consequence of the variation after tension resolves
-    if (opts.includePositionNags && variationMoves.length > 0 && explored.finalEval) {
+    // Use getResolutionState() for comprehensive state detection
+    if (opts.includePositionNags && variationMoves.length > 0) {
       const lastMove = variationMoves[variationMoves.length - 1]!;
-      const posNag = evalToPositionNag(
-        explored.finalEval.cp,
-        explored.finalEval.mate,
-        opts.targetRating,
-      );
-      if (posNag) {
+
+      // Get resolution state using final position FEN and evaluation
+      // Build eval object conditionally to satisfy exactOptionalPropertyTypes
+      let evalForResolution: { cp?: number; mate?: number } | undefined;
+      if (explored.finalEval) {
+        evalForResolution = {};
+        if (explored.finalEval.cp !== undefined) {
+          evalForResolution.cp = explored.finalEval.cp;
+        }
+        if (explored.finalEval.mate !== undefined) {
+          evalForResolution.mate = explored.finalEval.mate;
+        }
+      }
+      const resolution = getResolutionState(lastMove.fenAfter, evalForResolution);
+
+      // Add NAG based on resolution state
+      if (resolution.nag) {
         lastMove.nags = lastMove.nags ?? [];
-        lastMove.nags.push(posNag);
+        // Avoid duplicate NAGs
+        if (!lastMove.nags.includes(resolution.nag)) {
+          lastMove.nags.push(resolution.nag);
+        }
+      }
+
+      // Add fallback ending comment if no annotation present and resolution provides one
+      if (!lastMove.commentAfter && resolution.reason) {
+        // Only add if it's informative (not just "quiet position")
+        if (resolution.state !== 'quiet' || resolution.reason !== 'quiet position') {
+          lastMove.commentAfter = resolution.reason;
+        }
       }
     }
 

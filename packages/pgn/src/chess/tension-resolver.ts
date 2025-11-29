@@ -6,6 +6,7 @@
  */
 
 import { ChessPosition } from './position.js';
+import { detectTension } from './tension-detector.js';
 
 /**
  * Configuration for tension resolution
@@ -222,10 +223,153 @@ export function hasTacticalTension(fen: string, lastMoveSan?: string): boolean {
     return true;
   }
 
-  // Could add more tension detection here:
-  // - Hanging pieces
-  // - Forcing moves available
-  // - Pawn promotion threats
+  // Use comprehensive tension detection
+  const tension = detectTension(pos);
+  if (tension.hasTension) {
+    return true;
+  }
 
   return false;
+}
+
+/**
+ * Resolution state of a position
+ * Used to determine appropriate NAG and ending comment
+ */
+export type ResolutionState =
+  | 'winning_white' // $18 territory
+  | 'winning_black' // $19 territory
+  | 'draw' // Stable drawn position
+  | 'quiet' // No immediate tactics
+  | 'unresolved'; // Still has tension
+
+/**
+ * Result of resolution state detection
+ */
+export interface ResolutionResult {
+  /** The resolution state */
+  state: ResolutionState;
+  /** Appropriate NAG for this state (if any) */
+  nag: string | undefined;
+  /** Human-readable reason for this assessment */
+  reason: string;
+}
+
+/** Thresholds for position assessment (centipawns) */
+const WINNING_THRESHOLD = 300; // Decisive advantage
+const SLIGHT_THRESHOLD = 50; // Clear difference from equal
+
+/**
+ * Get the resolution state of a position
+ *
+ * Combines tension detection with evaluation to determine
+ * whether a position is "resolved" and what the appropriate
+ * NAG and ending comment should be.
+ *
+ * @param fen - FEN of the position to assess
+ * @param eval_ - Optional engine evaluation
+ * @returns Resolution result with state, NAG, and reason
+ */
+export function getResolutionState(
+  fen: string,
+  eval_?: { cp?: number; mate?: number },
+): ResolutionResult {
+  const pos = new ChessPosition(fen);
+
+  // Game over states
+  if (pos.isCheckmate()) {
+    // Whoever is to move is checkmated
+    const winner = pos.turn() === 'w' ? 'Black' : 'White';
+    return {
+      state: winner === 'White' ? 'winning_white' : 'winning_black',
+      nag: winner === 'White' ? '$18' : '$19',
+      reason: 'checkmate',
+    };
+  }
+
+  if (pos.isDraw()) {
+    if (pos.isStalemate()) {
+      return { state: 'draw', nag: '$10', reason: 'stalemate' };
+    }
+    return { state: 'draw', nag: '$10', reason: 'draw' };
+  }
+
+  // Check for tension
+  const tension = detectTension(pos);
+  if (tension.hasTension) {
+    return {
+      state: 'unresolved',
+      nag: undefined,
+      reason: tension.reasons.join('; '),
+    };
+  }
+
+  // No tension - assess based on evaluation
+  if (eval_?.mate !== undefined) {
+    // Forced mate - decisive
+    // Mate from side-to-move's perspective: positive = side to move delivers mate
+    const winner =
+      eval_.mate > 0
+        ? pos.turn() === 'w'
+          ? 'White'
+          : 'Black'
+        : pos.turn() === 'w'
+          ? 'Black'
+          : 'White';
+
+    const moves = Math.abs(eval_.mate);
+    return {
+      state: winner === 'White' ? 'winning_white' : 'winning_black',
+      nag: winner === 'White' ? '$18' : '$19',
+      reason: moves === 1 ? 'mate' : `mate in ${moves}`,
+    };
+  }
+
+  if (eval_?.cp !== undefined) {
+    const cp = eval_.cp;
+    // cp is from side-to-move's perspective: positive = side to move is better
+    const sideToMove = pos.turn();
+
+    if (Math.abs(cp) >= WINNING_THRESHOLD) {
+      // Decisive advantage
+      const winner =
+        cp > 0
+          ? sideToMove === 'w'
+            ? 'White'
+            : 'Black'
+          : sideToMove === 'w'
+            ? 'Black'
+            : 'White';
+
+      return {
+        state: winner === 'White' ? 'winning_white' : 'winning_black',
+        nag: winner === 'White' ? '$18' : '$19',
+        reason: `${winner.toLowerCase()} is winning`,
+      };
+    }
+
+    if (Math.abs(cp) < SLIGHT_THRESHOLD) {
+      // Roughly equal
+      return { state: 'quiet', nag: '$10', reason: 'equal position' };
+    }
+
+    // Clear but not decisive advantage
+    const better =
+      cp > 0
+        ? sideToMove === 'w'
+          ? 'White'
+          : 'Black'
+        : sideToMove === 'w'
+          ? 'Black'
+          : 'White';
+
+    return {
+      state: 'quiet',
+      nag: better === 'White' ? '$14' : '$15', // Slight advantage
+      reason: `${better.toLowerCase()} is better`,
+    };
+  }
+
+  // No evaluation available - quiet position
+  return { state: 'quiet', nag: undefined, reason: 'quiet position' };
 }
