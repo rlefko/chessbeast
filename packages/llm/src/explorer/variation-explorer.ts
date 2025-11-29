@@ -699,10 +699,10 @@ export class VariationExplorer {
     // Build context about variation purpose for natural opening comments
     const purposeContext = purpose
       ? {
-          best: 'This is the engine\'s top recommendation - the most precise continuation.',
+          best: "This is the engine's top recommendation - the most precise continuation.",
           human_alternative:
             'This is what humans typically play at this level - a practical choice.',
-          refutation: 'This line punishes the opponent\'s inaccuracy.',
+          refutation: "This line punishes the opponent's inaccuracy.",
           trap: 'This is a tempting but flawed idea.',
           thematic: 'This illustrates a key positional or tactical theme.',
         }[purpose]
@@ -712,7 +712,7 @@ export class VariationExplorer {
       source === 'maia'
         ? 'This reflects typical human play at the target rating.'
         : source === 'engine'
-          ? 'This is the computer\'s precise recommendation.'
+          ? "This is the computer's precise recommendation."
           : '';
 
     const prompt = [
