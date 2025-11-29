@@ -438,55 +438,6 @@ function buildPvMoves(
 // Position assessment NAGs (⩲, ±, +-, etc.) indicate who stands better instead.
 
 /**
- * Get a human-readable label for a variation based on its purpose and source
- *
- * Labels help readers understand why a variation is being shown:
- * - {engine best} - Best move according to engine analysis
- * - {human alternative} - Move predicted by Maia (human-like play)
- * - {refutation} - Move that refutes opponent's idea
- * - {trap} - Tempting but losing move to avoid
- * - {thematic} - Illustrates positional/tactical theme
- *
- * @param purpose - The variation's purpose (best, human_alternative, etc.)
- * @param source - The variation's source (engine, maia, llm)
- * @returns Human-readable label or null if no label needed
- */
-function getVariationLabel(
-  purpose: ExploredVariation['purpose'],
-  source: ExploredVariation['source'],
-): string | null {
-  // Best moves from engine
-  if (purpose === 'best') {
-    return 'engine best';
-  }
-
-  // Human alternatives from Maia
-  if (purpose === 'human_alternative') {
-    // Source confirms it came from Maia predictions
-    if (source === 'maia') {
-      return 'human alternative';
-    }
-    // Even without Maia source, still label as human alternative
-    return 'human alternative';
-  }
-
-  // Tactical/strategic variations
-  if (purpose === 'refutation') {
-    return 'refutation';
-  }
-
-  if (purpose === 'trap') {
-    return 'trap to avoid';
-  }
-
-  if (purpose === 'thematic') {
-    return 'thematic idea';
-  }
-
-  return null;
-}
-
-/**
  * Transform explored variations from VariationExplorer into MoveInfo arrays
  *
  * Explored variations are deep, LLM-guided lines (10-40 moves) that are more
@@ -550,21 +501,6 @@ function transformExploredVariations(
         currentMoveNumber++;
       }
       isWhiteMove = !isWhiteMove;
-    }
-
-    // Add variation label to the first move (e.g., "{engine best}", "{human alternative}")
-    // This helps readers understand why the variation is being shown
-    if (variationMoves.length > 0) {
-      const label = getVariationLabel(explored.purpose, explored.source);
-      if (label) {
-        const firstMove = variationMoves[0]!;
-        // Prepend label to existing commentBefore or create new one
-        if (firstMove.commentBefore) {
-          firstMove.commentBefore = `${label}: ${firstMove.commentBefore}`;
-        } else {
-          firstMove.commentBefore = label;
-        }
-      }
     }
 
     // Add position NAG at the END of the variation (not on main line)
