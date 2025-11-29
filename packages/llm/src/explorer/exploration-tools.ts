@@ -114,7 +114,7 @@ export const ADD_COMMENT_TOOL: OpenAITool = {
   function: {
     name: 'add_comment',
     description:
-      'Add annotation to the last played move. Keep it SHORT (2-6 words). Style: "the point", "threatening mate"',
+      'Add annotation to the last played move. IMPORTANT: You must play a move with push_move first before calling this. Keep it SHORT (2-6 words). Style: "the point", "threatening mate"',
     parameters: {
       type: 'object',
       properties: {
