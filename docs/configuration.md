@@ -154,11 +154,19 @@ output:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `llm.apiKey` | string | — | OpenAI API key (prefer `OPENAI_API_KEY` env var) |
-| `llm.model` | string | `"gpt-5-codex"` | OpenAI model to use |
+| `llm.model` | string | `"gpt-5-codex"` | OpenAI model to use (see available models below) |
 | `llm.temperature` | number | 0.7 | Model temperature (0.0-2.0) |
 | `llm.timeout` | number | 30000 | Request timeout in milliseconds |
 | `llm.reasoningEffort` | `"none"` \| `"low"` \| `"medium"` \| `"high"` | `"medium"` | Reasoning effort for codex models |
 | `llm.streaming` | boolean | true | Enable streaming for real-time progress |
+
+**Available Models:**
+| Model | Input Cost | Output Cost | Best For |
+|-------|------------|-------------|----------|
+| `gpt-5-codex` | $1.25/1M | $10.00/1M | Deep analysis with reasoning (default) |
+| `gpt-5` | $1.25/1M | $10.00/1M | Full GPT-5 capabilities |
+| `gpt-5-mini` | $0.25/1M | $2.00/1M | Cost-effective quality analysis |
+| `gpt-5-nano` | $0.05/1M | $0.40/1M | Fast, budget-friendly annotations |
 
 **Reasoning Effort Levels:**
 - `none`: Disable reasoning (standard completion, fastest)

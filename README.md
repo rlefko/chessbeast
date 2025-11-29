@@ -93,6 +93,7 @@ chessbeast analyze --show-config
 | `-v, --verbosity <level>` | Output verbosity: `summary`, `normal`, `rich` (default: normal) |
 | `--perspective <side>` | Annotation perspective: `neutral`, `white`, `black` (default: neutral) |
 | `--target-elo <rating>` | Target audience rating for explanations |
+| `--model <model>` | OpenAI model to use (default: gpt-5-mini) |
 | `--token-budget <tokens>` | Max tokens per game for LLM (default: 50000) |
 | `--skip-maia` | Skip Maia human-likeness analysis |
 | `--skip-llm` | Skip LLM annotations (use templates only) |
@@ -116,6 +117,27 @@ chessbeast analyze --show-config
 | `quick` | 12/16 | ~15% of moves | 1 | Fast overview, blitz games |
 | `standard` | 14/22 | ~25% of moves | 3 | Balanced analysis (default) |
 | `deep` | 18/28 | ~35% of moves | 5 | Thorough study, tournament games |
+
+### Model Selection
+
+Choose the OpenAI model based on your needs:
+
+| Model | Input Cost | Output Cost | Best For |
+|-------|------------|-------------|----------|
+| `gpt-5-codex` | $1.25/1M | $10.00/1M | Deep analysis with reasoning |
+| `gpt-5-mini` | $0.25/1M | $2.00/1M | Cost-effective quality analysis (default) |
+| `gpt-5-nano` | $0.05/1M | $0.40/1M | Fast, budget-friendly annotations |
+
+```bash
+# Use default model (gpt-5-mini)
+chessbeast analyze --input game.pgn
+
+# Use budget-friendly nano model for quick analysis
+chessbeast analyze --input game.pgn --model gpt-5-nano
+
+# Use full codex model for deep reasoning
+chessbeast analyze --input game.pgn --model gpt-5-codex --reasoning-effort high
+```
 
 ### Verbosity Levels
 

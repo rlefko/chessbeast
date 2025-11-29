@@ -61,7 +61,7 @@ export const DEFAULT_RATINGS_CONFIG = {
  * Default LLM configuration
  */
 export const DEFAULT_LLM_CONFIG = {
-  model: 'gpt-5',
+  model: 'gpt-5-mini',
   temperature: 0.7,
   timeout: 30000,
   reasoningEffort: 'medium' as const,

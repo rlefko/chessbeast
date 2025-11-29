@@ -288,6 +288,13 @@ function mapCliToConfig(options: CliOptions): Partial<ChessBeastConfig> {
     } as ChessBeastConfig['llm'];
   }
 
+  if (options.model !== undefined) {
+    config.llm = {
+      ...config.llm,
+      model: options.model,
+    } as ChessBeastConfig['llm'];
+  }
+
   if (options.reasoningEffort !== undefined) {
     const effortMap: Record<ReasoningEffort, ReasoningEffort> = {
       none: 'none',
