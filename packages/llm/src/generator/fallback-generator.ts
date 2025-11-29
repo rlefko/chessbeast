@@ -51,9 +51,11 @@ export function generateFallbackComment(
 
 /**
  * Check if text is too generic to be useful
+ * Also catches meta-commentary and engine-speak that we don't want
  */
 function isGenericText(text: string): boolean {
   const genericPhrases = [
+    // Original generic phrases
     'is a strong move',
     'is a good move',
     'affects the position',
@@ -63,8 +65,80 @@ function isGenericText(text: string): boolean {
     'critical turning point',
     'transitions to a new phase',
     'An excellent find',
+
+    // Meta-commentary
+    'as noted',
+    'as mentioned',
+    'as shown',
+    'as demonstrated',
+    'in summary',
+    'to summarize',
+    'in conclusion',
+    'overall',
+    'generally speaking',
+
+    // Filler phrases
+    'it is worth noting',
+    'it should be noted',
+    'interestingly',
+    'importantly',
+    'notably',
+    'clearly',
+    'obviously',
+    'of course',
+    'needless to say',
+
+    // Generic move descriptions
+    'solid move',
+    'reasonable move',
+    'natural move',
+    'standard move',
+    'normal move',
+    'typical move',
+    'improves the position',
+    'maintains the position',
+    'develops the position',
+    'keeps the position',
+    'holds the position',
+
+    // Vague tactical language
+    'creates threats',
+    'puts pressure',
+    'applies pressure',
+    'increases pressure',
+    'gains an advantage',
+    'seizes the initiative',
+    'takes control',
+    'takes the initiative',
+
+    // Self-referential LLM phrases
+    'let me explain',
+    'let me analyze',
+    'upon analysis',
+    'after analysis',
+    'analysis shows',
+    'analysis reveals',
+
+    // Classification echoes (NAG already shows this)
+    'this is a mistake',
+    'this is a blunder',
+    'this is an inaccuracy',
+    'this move is a mistake',
+    'this move is a blunder',
+    'a costly mistake',
+    'a serious mistake',
+    'a critical mistake',
+    'a fatal blunder',
+    'a terrible blunder',
+
+    // Engine-speak
+    'the engine',
+    'stockfish',
+    'computer analysis',
+    'the computer',
   ];
-  return genericPhrases.some((phrase) => text.toLowerCase().includes(phrase.toLowerCase()));
+  const lowerText = text.toLowerCase();
+  return genericPhrases.some((phrase) => lowerText.includes(phrase.toLowerCase()));
 }
 
 /**

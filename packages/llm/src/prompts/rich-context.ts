@@ -51,12 +51,46 @@ export interface RichPositionContext {
 }
 
 /**
- * Format evaluation for display
+ * Format evaluation as verbal description (no centipawns)
+ * This avoids leaking numeric evaluations into the LLM context
+ *
+ * @param cp - Centipawn evaluation (from side-to-move's perspective)
+ * @param isWhiteToMove - Whose turn it is (to correctly interpret the sign)
  */
-function formatEval(cp: number | undefined): string {
-  if (cp === undefined) return 'N/A';
-  const sign = cp >= 0 ? '+' : '';
-  return `${sign}${(cp / 100).toFixed(2)}`;
+function formatEvalVerbal(cp: number | undefined, isWhiteToMove: boolean): string {
+  if (cp === undefined) return 'unclear';
+
+  const abs = Math.abs(cp);
+  // Side-to-move perspective: positive = side to move is better
+  const side = cp > 0 === isWhiteToMove ? 'White' : 'Black';
+
+  if (abs < 25) return 'equal';
+  if (abs < 50) return `${side} has a slight edge`;
+  if (abs < 100) return `${side} is slightly better`;
+  if (abs < 200) return `${side} has a clear advantage`;
+  if (abs < 400) return `${side} is much better`;
+  if (abs < 700) return `${side} is winning`;
+  return `${side} has a decisive advantage`;
+}
+
+/**
+ * Format move impact as verbal description
+ */
+function formatImpactVerbal(cpLoss: number): string {
+  if (cpLoss < 30) return 'minor';
+  if (cpLoss < 80) return 'notable';
+  if (cpLoss < 150) return 'significant';
+  if (cpLoss < 300) return 'severe';
+  return 'critical';
+}
+
+/**
+ * Format critical score as importance level
+ */
+function formatImportance(score: number): string {
+  if (score >= 70) return 'High';
+  if (score >= 40) return 'Medium';
+  return 'Low';
 }
 
 /**
@@ -117,9 +151,12 @@ export function formatRichContext(ctx: RichPositionContext): string {
   sections.push(`FEN: ${ctx.fen}`);
   sections.push('');
 
-  // Engine evaluation
-  sections.push(`### Engine Evaluation (Depth ${ctx.currentAnalysis.depth})`);
-  sections.push(`- Evaluation: ${formatEval(ctx.currentAnalysis.evaluation)}`);
+  // Position assessment
+  // currentAnalysis.evaluation is from opponent's perspective (after move was played)
+  sections.push(`### Position Assessment (Depth ${ctx.currentAnalysis.depth})`);
+  sections.push(
+    `- Assessment: ${formatEvalVerbal(ctx.currentAnalysis.evaluation, !ctx.isWhiteMove)}`,
+  );
   sections.push(`- Best move was: ${ctx.currentAnalysis.bestMove}`);
   sections.push(
     `- Principal variation: ${formatPV(ctx.currentAnalysis.principalVariation, ctx.moveNumber + (ctx.isWhiteMove ? 0 : 1), !ctx.isWhiteMove)}`,
@@ -128,18 +165,20 @@ export function formatRichContext(ctx: RichPositionContext): string {
 
   // Comparison with previous position
   if (ctx.previousAnalysis) {
+    // previousAnalysis.evaluation is from player's perspective (before move was played)
     sections.push('### Position Change');
-    sections.push(`- Previous evaluation: ${formatEval(ctx.previousAnalysis.evaluation)}`);
-    sections.push(`- Engine expected: ${ctx.previousAnalysis.bestMove || 'N/A'}`);
-    sections.push(`- Evaluation swing: ${ctx.classification.centipawnLoss}cp`);
+    sections.push(
+      `- Previous assessment: ${formatEvalVerbal(ctx.previousAnalysis.evaluation, ctx.isWhiteMove)}`,
+    );
+    sections.push(`- Expected move: ${ctx.previousAnalysis.bestMove || 'N/A'}`);
+    sections.push(`- Impact: ${formatImpactVerbal(ctx.classification.centipawnLoss)}`);
     sections.push('');
   }
 
   // Classification
   sections.push('### Move Classification');
   sections.push(`- Type: ${formatClassification(ctx.classification.type)}`);
-  sections.push(`- Centipawn loss: ${ctx.classification.centipawnLoss}cp`);
-  sections.push(`- Critical score: ${ctx.classification.criticalScore.toFixed(1)}/100`);
+  sections.push(`- Importance: ${formatImportance(ctx.classification.criticalScore)}`);
   sections.push('');
 
   // Opening context

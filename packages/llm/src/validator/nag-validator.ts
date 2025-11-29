@@ -14,4 +14,5 @@ export {
   filterValidNags,
   getNagDescription,
   getNagSymbol,
+  evalToVerbalDescription,
 } from '@chessbeast/pgn';

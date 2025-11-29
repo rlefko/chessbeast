@@ -125,6 +125,128 @@ function escapeRegex(str: string): string {
 }
 
 /**
+ * Maximum number of sentences allowed in a comment
+ */
+const MAX_SENTENCES = 2;
+
+/**
+ * Count sentences in text (simple heuristic)
+ * Looks for sentence-ending punctuation followed by space or end of string
+ */
+export function countSentences(text: string): number {
+  const matches = text.match(/[.!?]+(?:\s|$)/g);
+  return matches ? matches.length : text.trim() ? 1 : 0;
+}
+
+/**
+ * Truncate text to a maximum number of sentences
+ * Preserves complete sentences rather than cutting mid-sentence
+ */
+export function truncateToSentences(text: string, max: number): string {
+  if (max <= 0) return '';
+
+  // Match sentences: non-empty text followed by sentence-ending punctuation
+  const matches = text.match(/[^.!?]*[.!?]+/g);
+
+  if (!matches) {
+    return text; // No complete sentences found, return as-is (counts as 1 sentence)
+  }
+
+  // Check if there's remaining text after all matched sentences (trailing fragment)
+  const matchedLength = matches.join('').length;
+  const hasTrailingFragment = text.slice(matchedLength).trim().length > 0;
+
+  // Total sentences = matched sentences + optional trailing fragment
+  const totalSentences = matches.length + (hasTrailingFragment ? 1 : 0);
+
+  if (totalSentences <= max) {
+    return text;
+  }
+
+  // Join only the first max sentences
+  return matches.slice(0, max).join('').trim();
+}
+
+/**
+ * Regex patterns to match centipawn/evaluation values in text
+ * These should NOT appear in human-readable output
+ */
+const CENTIPAWN_PATTERNS = [
+  // Numeric patterns: +150cp, -2.3cp, 150 cp, 300 centipawns
+  /[+-]?\d+(?:\.\d+)?\s*(?:cp|centipawn|centipawns)\b/gi,
+  // Eval notation: +1.5, -0.3, +2.00 (standalone, not part of move like e4)
+  // Negative lookbehind ensures we don't match file letters (a-h)
+  /(?<![a-h])[+-]\d+\.\d+(?![0-9])/g,
+  // Raw centipawn mentions without numbers
+  /\b(?:centipawn|centipawns|cp loss|cp gain)\b/gi,
+  // Evaluation swing language with numbers
+  /\bevaluation?\s*(?:swing|change|drop|gain)?\s*(?:of\s*)?[+-]?\d+/gi,
+  // Stockfish-style eval: (eval: +1.5), [+0.8], etc.
+  /\(?\s*eval(?:uation)?:?\s*[+-]?\d+(?:\.\d+)?\s*\)?/gi,
+  // Pawns notation: ~0.38 pawns, 2 pawns
+  /[~≈]?\s*[+-]?\d+(?:\.\d+)?\s*pawns?\b/gi,
+];
+
+/**
+ * Strip centipawn and numeric evaluation patterns from comment text
+ *
+ * LLMs sometimes include evaluation numbers despite being told not to.
+ * This post-processes the output to remove any that slip through.
+ */
+export function stripCentipawnPatterns(comment: string): string {
+  let result = comment;
+
+  for (const pattern of CENTIPAWN_PATTERNS) {
+    result = result.replace(pattern, '');
+  }
+
+  // Clean up any double spaces or leading/trailing spaces left behind
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Meta-content patterns that slip through prompts
+ * These make the annotation sound robotic or self-referential
+ */
+const META_CONTENT_PATTERNS = [
+  // Headers and summaries
+  /^Summary\s*\([^)]+\):\s*/i,
+  /^Concrete idea:\s*/i,
+  /^Practical takeaway:\s*/i,
+  /^Why .+ is (bad|good|inaccurate):\s*/i,
+
+  // Self-referential and filler starters
+  /^(?:As (?:noted|mentioned|shown|demonstrated)),?\s*/i,
+  /^(?:Interestingly|Importantly|Notably|Clearly|Obviously),?\s*/i,
+  /^(?:It (?:is|should be) (?:worth )?not(?:ed|ing) that)\s*/i,
+  /^(?:Let me (?:explain|analyze))\s*/i,
+  /^(?:Upon|After) analysis,?\s*/i,
+
+  // Classification echoes (NAG shows this)
+  /^This (?:is |move is )?(?:a )?(?:mistake|blunder|inaccuracy)[.,]?\s*/i,
+  /^(?:A )?(?:Costly|Serious|Critical|Fatal|Terrible) (?:mistake|blunder)[.,]?\s*/i,
+];
+
+/**
+ * Strip meta-content patterns that make annotations sound robotic
+ */
+export function stripMetaContent(comment: string): string {
+  let result = comment;
+
+  for (const pattern of META_CONTENT_PATTERNS) {
+    result = result.replace(pattern, '');
+  }
+
+  // Clean up and capitalize first letter if needed after stripping
+  result = result.replace(/^\s*/, '');
+  if (result.length > 0) {
+    result = result.charAt(0).toUpperCase() + result.slice(1);
+  }
+
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Validate and sanitize a generated comment
  */
 export function validateComment(
@@ -190,6 +312,32 @@ export function validateComment(
     }
   }
 
+  // Strip centipawn patterns (LLMs sometimes include these despite being told not to)
+  if (comment) {
+    const beforeStrip = comment;
+    comment = stripCentipawnPatterns(comment);
+    if (comment !== beforeStrip) {
+      issues.push({
+        field: 'comment',
+        message: 'Stripped numeric evaluation patterns from comment',
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Strip meta-content patterns (headers, filler phrases)
+  if (comment) {
+    const beforeStrip = comment;
+    comment = stripMetaContent(comment);
+    if (comment !== beforeStrip) {
+      issues.push({
+        field: 'comment',
+        message: 'Stripped meta-content patterns from comment',
+        severity: 'warning',
+      });
+    }
+  }
+
   // Check comment length
   if (comment.length > 2000) {
     issues.push({
@@ -198,6 +346,19 @@ export function validateComment(
       severity: 'warning',
     });
     comment = comment.slice(0, 2000) + '...';
+  }
+
+  // Enforce max sentences (max 2 sentences)
+  if (comment) {
+    const sentenceCount = countSentences(comment);
+    if (sentenceCount > MAX_SENTENCES) {
+      issues.push({
+        field: 'comment',
+        message: `Comment has ${sentenceCount} sentences, truncating to ${MAX_SENTENCES}`,
+        severity: 'warning',
+      });
+      comment = truncateToSentences(comment, MAX_SENTENCES);
+    }
   }
 
   // Sanitize PGN special characters

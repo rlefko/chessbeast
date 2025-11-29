@@ -233,3 +233,96 @@ export function evalToPositionNag(
   }
   return cp > 0 ? POSITION_NAGS.winningWhite : POSITION_NAGS.winningBlack;
 }
+
+/**
+ * Convert engine evaluation to human-readable verbal description
+ *
+ * This provides natural language descriptions of position assessments
+ * without revealing raw centipawn values. Use this for LLM prompts and
+ * anywhere you want to describe evaluations in human terms.
+ *
+ * IMPORTANT: Evaluations in this codebase are from the side-to-move's perspective:
+ * - Positive cp/mate means the side to move is better/mating
+ * - Negative cp/mate means the side to move is worse/getting mated
+ *
+ * @param cp - Centipawn evaluation (from side-to-move's perspective)
+ * @param mate - Mate-in-X (from side-to-move's perspective)
+ * @param isWhiteToMove - Whose turn it is (required for correct interpretation)
+ * @returns Human-readable position assessment string
+ *
+ * @example
+ * evalToVerbalDescription(50, undefined, true)   // "roughly equal with balanced chances"
+ * evalToVerbalDescription(150, undefined, true)  // "White has a comfortable edge"
+ * evalToVerbalDescription(150, undefined, false) // "Black has a comfortable edge"
+ * evalToVerbalDescription(undefined, 5, true)    // "White has a forced mate in 5"
+ * evalToVerbalDescription(undefined, 1, false)   // "Black delivers checkmate"
+ */
+export function evalToVerbalDescription(
+  cp: number | undefined,
+  mate: number | undefined,
+  isWhiteToMove?: boolean,
+): string {
+  // Determine which side is better based on eval sign and side to move
+  // If isWhiteToMove is undefined, assume evaluations are already from White's perspective
+  // (backwards compatibility)
+  const determineSide = (evalIsPositive: boolean): 'White' | 'Black' => {
+    if (isWhiteToMove === undefined) {
+      // Legacy mode: assume positive = White better
+      return evalIsPositive ? 'White' : 'Black';
+    }
+    // Side-to-move perspective: positive = side to move is better
+    if (evalIsPositive) {
+      return isWhiteToMove ? 'White' : 'Black';
+    } else {
+      return isWhiteToMove ? 'Black' : 'White';
+    }
+  };
+
+  // Mate situations take precedence
+  if (mate !== undefined) {
+    const side = determineSide(mate > 0);
+    const moves = Math.abs(mate);
+    if (moves === 1) {
+      return `${side} delivers checkmate`;
+    }
+    if (moves <= 3) {
+      return `${side} has a forced mate in ${moves}`;
+    }
+    if (moves <= 10) {
+      return `${side} has a winning attack with mate in sight`;
+    }
+    return `${side} has a forced mate`;
+  }
+
+  if (cp === undefined) return 'position unclear';
+
+  const absCp = Math.abs(cp);
+  const side = determineSide(cp >= 0);
+
+  // Thresholds aligned with intermediate player (~1500)
+  if (absCp < 25) {
+    return 'the position is equal';
+  }
+  if (absCp < 50) {
+    return 'roughly equal with balanced chances';
+  }
+  if (absCp < 100) {
+    return `${side} has a slight pull`;
+  }
+  if (absCp < 150) {
+    return `${side} has a comfortable edge`;
+  }
+  if (absCp < 200) {
+    return `${side} has a clear advantage`;
+  }
+  if (absCp < 300) {
+    return `${side} is significantly better`;
+  }
+  if (absCp < 500) {
+    return `${side} has a winning advantage`;
+  }
+  if (absCp < 800) {
+    return `${side} is winning`;
+  }
+  return `${side} has a decisive advantage`;
+}

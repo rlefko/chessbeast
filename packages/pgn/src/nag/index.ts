@@ -17,4 +17,5 @@ export {
   getNagDescription,
   getNagSymbol,
   evalToPositionNag,
+  evalToVerbalDescription,
 } from './nag-validator.js';

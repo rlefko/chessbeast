@@ -333,12 +333,10 @@ export class VariationExplorer {
     parts.push(`POSITION: ${session.position}`);
     parts.push(`TARGET RATING: ${session.targetRating}`);
 
-    // Engine's best line
-    const evalStr =
-      engineBest.mate !== undefined
-        ? `Mate in ${Math.abs(engineBest.mate)}`
-        : `${(engineBest.cp ?? 0) / 100}`;
-    parts.push(`ENGINE BEST: ${engineBest.pv.slice(0, 8).join(' ')} (${evalStr})`);
+    // Engine's best line with verbal evaluation
+    const isWhite = this.isWhiteToMove(session.position);
+    const evalVerbal = this.formatEvalVerbal(engineBest.cp, engineBest.mate, isWhite);
+    parts.push(`BEST LINE: ${engineBest.pv.slice(0, 8).join(' ')} (${evalVerbal})`);
 
     // Maia's prediction
     if (maiaPrediction) {
@@ -364,6 +362,11 @@ export class VariationExplorer {
     );
     parts.push("- Is the human-likely move a mistake worth highlighting? What's the refutation?");
     parts.push('- Should we explore deeper or is the position simple enough?');
+    parts.push('');
+    parts.push(
+      'RULES: No numeric evaluations. Use verbal assessments: "winning", "clear advantage", "slight edge", "equal".',
+    );
+    parts.push('Each explanation must be 1-2 sentences max.');
     parts.push('');
     parts.push('Respond with JSON:');
     parts.push('{');
@@ -577,6 +580,58 @@ export class VariationExplorer {
   }
 
   /**
+   * Extract side-to-move from FEN string
+   */
+  private isWhiteToMove(fen: string): boolean {
+    const parts = fen.split(' ');
+    return parts.length < 2 || parts[1] === 'w';
+  }
+
+  /**
+   * Format evaluation as verbal description (no centipawns)
+   *
+   * @param cp - Centipawn evaluation (from side-to-move's perspective)
+   * @param mate - Mate-in-X (from side-to-move's perspective)
+   * @param isWhite - Whether White is to move (determines how to interpret the eval sign)
+   */
+  private formatEvalVerbal(
+    cp: number | undefined,
+    mate: number | undefined,
+    isWhite: boolean,
+  ): string {
+    // Determine which side is better based on eval sign and side to move
+    // Side-to-move perspective: positive = side to move is better
+    const determineSide = (evalIsPositive: boolean): 'White' | 'Black' => {
+      if (evalIsPositive) {
+        return isWhite ? 'White' : 'Black';
+      } else {
+        return isWhite ? 'Black' : 'White';
+      }
+    };
+
+    if (mate !== undefined) {
+      const side = determineSide(mate > 0);
+      const moves = Math.abs(mate);
+      if (moves === 1) return `${side} delivers checkmate`;
+      if (moves <= 3) return `${side} has a forced mate in ${moves}`;
+      return `${side} has a forced mate`;
+    }
+
+    if (cp === undefined) return 'unclear';
+
+    const abs = Math.abs(cp);
+    const side = determineSide(cp > 0);
+
+    if (abs < 25) return 'equal';
+    if (abs < 50) return `${side} has a slight edge`;
+    if (abs < 100) return `${side} is slightly better`;
+    if (abs < 200) return `${side} has a clear advantage`;
+    if (abs < 400) return `${side} is much better`;
+    if (abs < 700) return `${side} is winning`;
+    return `${side} has a decisive advantage`;
+  }
+
+  /**
    * Ask LLM to identify key moves in a line that deserve annotation
    */
   private async identifyKeyMoves(
@@ -590,6 +645,7 @@ export class VariationExplorer {
       '',
       'TASK: Identify the 2-3 most instructive moves in this line.',
       'These are moves that teach an important concept or are tactically critical.',
+      'Each explanation must be 1 sentence, no numeric evaluations.',
       '',
       'Respond with JSON:',
       '{',

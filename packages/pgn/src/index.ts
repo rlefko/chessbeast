@@ -90,6 +90,7 @@ export {
   filterValidNags,
   getNagDescription,
   getNagSymbol,
+  evalToVerbalDescription,
 } from './nag/index.js';
 
 // Re-export transformer utilities
