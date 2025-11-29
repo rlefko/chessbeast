@@ -62,7 +62,7 @@ function formatEvalVerbal(cp: number | undefined, isWhiteToMove: boolean): strin
 
   const abs = Math.abs(cp);
   // Side-to-move perspective: positive = side to move is better
-  const side = (cp > 0) === isWhiteToMove ? 'White' : 'Black';
+  const side = cp > 0 === isWhiteToMove ? 'White' : 'Black';
 
   if (abs < 25) return 'equal';
   if (abs < 50) return `${side} has a slight edge`;
@@ -154,7 +154,9 @@ export function formatRichContext(ctx: RichPositionContext): string {
   // Position assessment
   // currentAnalysis.evaluation is from opponent's perspective (after move was played)
   sections.push(`### Position Assessment (Depth ${ctx.currentAnalysis.depth})`);
-  sections.push(`- Assessment: ${formatEvalVerbal(ctx.currentAnalysis.evaluation, !ctx.isWhiteMove)}`);
+  sections.push(
+    `- Assessment: ${formatEvalVerbal(ctx.currentAnalysis.evaluation, !ctx.isWhiteMove)}`,
+  );
   sections.push(`- Best move was: ${ctx.currentAnalysis.bestMove}`);
   sections.push(
     `- Principal variation: ${formatPV(ctx.currentAnalysis.principalVariation, ctx.moveNumber + (ctx.isWhiteMove ? 0 : 1), !ctx.isWhiteMove)}`,
@@ -165,7 +167,9 @@ export function formatRichContext(ctx: RichPositionContext): string {
   if (ctx.previousAnalysis) {
     // previousAnalysis.evaluation is from player's perspective (before move was played)
     sections.push('### Position Change');
-    sections.push(`- Previous assessment: ${formatEvalVerbal(ctx.previousAnalysis.evaluation, ctx.isWhiteMove)}`);
+    sections.push(
+      `- Previous assessment: ${formatEvalVerbal(ctx.previousAnalysis.evaluation, ctx.isWhiteMove)}`,
+    );
     sections.push(`- Expected move: ${ctx.previousAnalysis.bestMove || 'N/A'}`);
     sections.push(`- Impact: ${formatImpactVerbal(ctx.classification.centipawnLoss)}`);
     sections.push('');

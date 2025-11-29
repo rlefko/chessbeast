@@ -363,7 +363,9 @@ export class VariationExplorer {
     parts.push("- Is the human-likely move a mistake worth highlighting? What's the refutation?");
     parts.push('- Should we explore deeper or is the position simple enough?');
     parts.push('');
-    parts.push('RULES: No numeric evaluations. Use verbal assessments: "winning", "clear advantage", "slight edge", "equal".');
+    parts.push(
+      'RULES: No numeric evaluations. Use verbal assessments: "winning", "clear advantage", "slight edge", "equal".',
+    );
     parts.push('Each explanation must be 1-2 sentences max.');
     parts.push('');
     parts.push('Respond with JSON:');
