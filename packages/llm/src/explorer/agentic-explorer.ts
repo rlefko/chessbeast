@@ -31,6 +31,63 @@ import {
 import type { ExploredLine, LinePurpose } from './variation-explorer.js';
 
 /**
+ * Validate and clean up LLM comment
+ * Silently cleans minor issues, rejects egregious problems
+ */
+function validateAndCleanComment(
+  comment: string,
+  lastMoveSan?: string,
+): { cleaned: string; rejected: boolean; reason?: string } {
+  // Reject egregiously bad comments first
+  if (comment.length > 100) {
+    return {
+      cleaned: '',
+      rejected: true,
+      reason: 'Comment too long (max 100 chars). Keep it to 2-6 words.',
+    };
+  }
+
+  let cleaned = comment;
+
+  // Silent cleanup: Remove perspective phrases
+  cleaned = cleaned.replace(
+    /from\s+(black|white|my|their|black's|white's)\s+(perspective|point of view|pov|view|side)[,:]?\s*/gi,
+    '',
+  );
+
+  // Silent cleanup: Remove move notation at start (e.g., "Nxg7 wins" -> "wins")
+  if (lastMoveSan) {
+    const escaped = lastMoveSan.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const movePattern = new RegExp(`^${escaped}[!?]*\\s+`, 'i');
+    cleaned = cleaned.replace(movePattern, '');
+  }
+
+  // Silent cleanup: Remove leading "this " or "here "
+  cleaned = cleaned.replace(/^(this|here)\s+/i, '');
+
+  // Silent cleanup: Ensure lowercase start
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+  }
+
+  // Silent cleanup: Remove ending punctuation
+  cleaned = cleaned.replace(/[.!]+$/, '');
+
+  cleaned = cleaned.trim();
+
+  // Reject if empty after cleanup
+  if (!cleaned) {
+    return {
+      cleaned: '',
+      rejected: true,
+      reason: 'Comment empty after cleanup. Provide meaningful annotation.',
+    };
+  }
+
+  return { cleaned, rejected: false };
+}
+
+/**
  * Configuration for the agentic explorer
  */
 export interface AgenticExplorerConfig {
@@ -44,6 +101,8 @@ export interface AgenticExplorerConfig {
   maxBranches?: number;
   /** Target rating for human-move predictions */
   targetRating?: number;
+  /** Callback for warning messages (e.g., parse failures) */
+  warnCallback?: (message: string) => void;
 }
 
 /**
@@ -95,6 +154,7 @@ const DEFAULT_CONFIG: Required<AgenticExplorerConfig> = {
   maxDepth: 50,
   maxBranches: 5,
   targetRating: 1500,
+  warnCallback: () => {}, // No-op by default
 };
 
 /**
@@ -256,8 +316,11 @@ export class AgenticVariationExplorer {
         let toolArgs: Record<string, unknown> = {};
         try {
           toolArgs = JSON.parse(toolCall.function.arguments || '{}') as Record<string, unknown>;
-        } catch {
-          // Ignore parse errors
+        } catch (e) {
+          // Log parse failure for debugging
+          this.config.warnCallback?.(
+            `Failed to parse tool arguments for ${toolCall.function.name}: ${toolCall.function.arguments}`,
+          );
         }
 
         // Capture timing
@@ -374,7 +437,10 @@ export class AgenticVariationExplorer {
 
     try {
       args = JSON.parse(toolCall.function.arguments || '{}') as Record<string, unknown>;
-    } catch {
+    } catch (e) {
+      this.config.warnCallback?.(
+        `Failed to parse tool arguments for ${name}: ${toolCall.function.arguments}`,
+      );
       args = {};
     }
 
@@ -480,15 +546,26 @@ export class AgenticVariationExplorer {
 
       // === Annotation ===
       case 'add_comment': {
-        const comment = args.comment as string;
-        if (!comment) {
+        const rawComment = args.comment as string;
+        if (!rawComment) {
           return { success: false, error: 'No comment provided' };
         }
-        const added = state.addComment(comment);
+
+        // Validate and clean up the comment
+        const { cleaned, rejected, reason } = validateAndCleanComment(
+          rawComment,
+          state.getLastMoveSan(),
+        );
+
+        if (rejected) {
+          return { success: false, error: reason };
+        }
+
+        const added = state.addComment(cleaned);
         if (!added) {
           return { success: false, error: 'No move to annotate (play a move first)' };
         }
-        return { success: true, comment };
+        return { success: true, comment: cleaned };
       }
 
       case 'add_nag': {
@@ -789,15 +866,20 @@ TARGET AUDIENCE: ${targetRating} rated players
    - BAD: "Nxg7! wins the queen"
    - GOOD: "wins the queen"
 
-2. **NEVER start comments with "this" or "here"**
+2. **NEVER mention perspective or point of view**
+   - BAD: "From black's perspective, this is crucial"
+   - BAD: "From white's point of view, this wins"
+   - GOOD: "the key resource" or "wins material"
+
+3. **NEVER start comments with "this" or "here"**
    - BAD: "this threatens mate"
    - GOOD: "threatening mate"
 
-3. **Keep comments about THE CURRENT MOVE only**
+4. **Keep comments about THE CURRENT MOVE only**
    - Comments should explain the move they're attached to
    - Don't discuss future or past moves in the comment
 
-4. **Use lowercase, no punctuation at end**
+5. **Use lowercase, no punctuation at end**
    - BAD: "The point!"
    - GOOD: "the point"`;
   }
