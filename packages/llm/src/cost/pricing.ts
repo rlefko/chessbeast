@@ -59,7 +59,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-5-codex': { input: 1.25, output: 10.0, reasoning: 10.0 },
   'gpt-5.1-chat-latest': { input: 1.25, output: 10.0, reasoning: 10.0 },
   'gpt-5-mini': { input: 0.25, output: 2.0 },
-  'gpt-5-nano': { input: 0.05, output: 0.40 },
+  'gpt-5-nano': { input: 0.05, output: 0.4 },
   'codex-mini': { input: 0.15, output: 0.6 },
 };
 
