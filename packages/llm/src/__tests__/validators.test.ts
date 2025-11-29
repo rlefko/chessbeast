@@ -15,12 +15,17 @@ import {
   normalizeNag,
   classificationToNag,
   filterValidNags,
+  evalToVerbalDescription,
 } from '../validator/nag-validator.js';
 import {
   parseJsonResponse,
   validateComment,
   validateSummary,
   sanitizePgnComment,
+  countSentences,
+  truncateToSentences,
+  stripCentipawnPatterns,
+  stripMetaContent,
 } from '../validator/output-validator.js';
 
 describe('NAG Validator', () => {
@@ -215,6 +220,221 @@ describe('Output Validator', () => {
       const text = 'Line 1\nLine 2';
       const result = sanitizePgnComment(text);
       expect(result).toBe('Line 1 Line 2');
+    });
+  });
+
+  describe('countSentences', () => {
+    it('should count single sentence', () => {
+      expect(countSentences('This is one sentence.')).toBe(1);
+    });
+
+    it('should count multiple sentences', () => {
+      expect(countSentences('First sentence. Second sentence! Third?')).toBe(3);
+    });
+
+    it('should handle text without ending punctuation', () => {
+      expect(countSentences('No ending')).toBe(1);
+    });
+
+    it('should handle empty string', () => {
+      expect(countSentences('')).toBe(0);
+    });
+
+    it('should handle multiple punctuation marks', () => {
+      expect(countSentences('Really?! Yes.')).toBe(2);
+    });
+  });
+
+  describe('truncateToSentences', () => {
+    it('should truncate to max sentences', () => {
+      const text = 'First sentence. Second sentence. Third sentence.';
+      expect(truncateToSentences(text, 2)).toBe('First sentence. Second sentence.');
+    });
+
+    it('should preserve text under limit', () => {
+      const text = 'Just one sentence.';
+      expect(truncateToSentences(text, 2)).toBe('Just one sentence.');
+    });
+
+    it('should return empty for zero max', () => {
+      expect(truncateToSentences('Any text.', 0)).toBe('');
+    });
+
+    it('should handle text without ending punctuation', () => {
+      const text = 'First. Second. Third without period';
+      expect(truncateToSentences(text, 2)).toBe('First. Second.');
+    });
+  });
+
+  describe('stripCentipawnPatterns', () => {
+    it('should strip cp values', () => {
+      expect(stripCentipawnPatterns('Lost 150cp here')).toBe('Lost here');
+      expect(stripCentipawnPatterns('Evaluation: +1.5cp advantage')).toBe('Evaluation: advantage');
+    });
+
+    it('should strip decimal evals', () => {
+      expect(stripCentipawnPatterns('Position is +1.5 for White')).toBe('Position is for White');
+      expect(stripCentipawnPatterns('Eval is -0.3 now')).toBe('Eval is now');
+    });
+
+    it('should strip centipawn words', () => {
+      expect(stripCentipawnPatterns('A 200 centipawns loss')).toBe('A loss');
+      expect(stripCentipawnPatterns('The cp loss was significant')).toBe('The was significant');
+    });
+
+    it('should strip pawns notation', () => {
+      expect(stripCentipawnPatterns('About ~0.38 pawns advantage')).toBe('About advantage');
+      expect(stripCentipawnPatterns('Worth 2 pawns')).toBe('Worth');
+    });
+
+    it('should preserve move notation', () => {
+      expect(stripCentipawnPatterns('e4 is strong')).toBe('e4 is strong');
+      expect(stripCentipawnPatterns('After Nf3')).toBe('After Nf3');
+    });
+
+    it('should preserve normal text', () => {
+      expect(stripCentipawnPatterns('Knight takes bishop')).toBe('Knight takes bishop');
+    });
+  });
+
+  describe('stripMetaContent', () => {
+    it('should strip "Summary" headers', () => {
+      expect(stripMetaContent('Summary (Black to move): The knight is weak')).toBe(
+        'The knight is weak',
+      );
+    });
+
+    it('should strip classification echoes', () => {
+      expect(stripMetaContent('This is a blunder because the knight hangs')).toBe(
+        'Because the knight hangs',
+      );
+      expect(stripMetaContent('A costly mistake. The rook is lost.')).toBe('The rook is lost.');
+    });
+
+    it('should strip filler starters', () => {
+      expect(stripMetaContent('Interestingly, white wins')).toBe('White wins');
+      expect(stripMetaContent('Notably, the knight is strong')).toBe('The knight is strong');
+    });
+
+    it('should capitalize after stripping', () => {
+      const result = stripMetaContent('interestingly, the position is equal');
+      expect(result.charAt(0)).toBe('T');
+    });
+
+    it('should preserve normal text', () => {
+      expect(stripMetaContent('The knight threatens the queen')).toBe(
+        'The knight threatens the queen',
+      );
+    });
+  });
+
+  describe('validateComment sentence truncation', () => {
+    it('should truncate comments with more than 2 sentences', () => {
+      const raw = {
+        comment: 'First sentence. Second sentence. Third sentence. Fourth.',
+        nags: [],
+      };
+      const result = validateComment(raw, []);
+      expect(countSentences(result.sanitized.comment!)).toBeLessThanOrEqual(2);
+    });
+  });
+
+  describe('validateComment centipawn stripping', () => {
+    it('should strip centipawn values from comments', () => {
+      const raw = { comment: 'Lost 150cp with this move', nags: [] };
+      const result = validateComment(raw, []);
+      expect(result.sanitized.comment).not.toContain('150cp');
+    });
+  });
+});
+
+describe('evalToVerbalDescription', () => {
+  describe('equal positions', () => {
+    it('should describe truly equal positions', () => {
+      expect(evalToVerbalDescription(10, undefined)).toBe('the position is equal');
+    });
+
+    it('should describe roughly equal positions', () => {
+      expect(evalToVerbalDescription(30, undefined)).toBe('roughly equal with balanced chances');
+    });
+  });
+
+  describe('advantages', () => {
+    it('should describe slight advantages', () => {
+      expect(evalToVerbalDescription(80, undefined)).toContain('slight pull');
+      expect(evalToVerbalDescription(-80, undefined)).toContain('Black');
+    });
+
+    it('should describe clear advantages', () => {
+      expect(evalToVerbalDescription(180, undefined)).toContain('clear advantage');
+    });
+
+    it('should describe winning positions', () => {
+      expect(evalToVerbalDescription(600, undefined)).toContain('winning');
+    });
+
+    it('should describe decisive advantages', () => {
+      expect(evalToVerbalDescription(900, undefined)).toContain('decisive');
+    });
+  });
+
+  describe('mate situations', () => {
+    it('should describe immediate checkmate', () => {
+      expect(evalToVerbalDescription(undefined, 1)).toContain('checkmate');
+    });
+
+    it('should describe short forced mates', () => {
+      expect(evalToVerbalDescription(undefined, 3)).toContain('forced mate in 3');
+    });
+
+    it('should describe longer mates', () => {
+      const result = evalToVerbalDescription(undefined, 15);
+      expect(result).toContain('forced mate');
+    });
+
+    it('should handle black mating', () => {
+      expect(evalToVerbalDescription(undefined, -2)).toContain('Black');
+    });
+  });
+
+  describe('undefined evaluation', () => {
+    it('should handle undefined cp with no mate', () => {
+      expect(evalToVerbalDescription(undefined, undefined)).toBe('position unclear');
+    });
+  });
+
+  describe('side-to-move perspective', () => {
+    it('should interpret positive cp as White better when White to move', () => {
+      // White to move, +120 = White is better (120 is in "comfortable edge" range 100-149)
+      expect(evalToVerbalDescription(120, undefined, true)).toContain('White');
+      expect(evalToVerbalDescription(120, undefined, true)).toContain('comfortable edge');
+    });
+
+    it('should interpret positive cp as Black better when Black to move', () => {
+      // Black to move, +120 = Black is better
+      expect(evalToVerbalDescription(120, undefined, false)).toContain('Black');
+      expect(evalToVerbalDescription(120, undefined, false)).toContain('comfortable edge');
+    });
+
+    it('should interpret negative cp as Black better when White to move', () => {
+      // White to move, -150 = Black is better
+      expect(evalToVerbalDescription(-150, undefined, true)).toContain('Black');
+    });
+
+    it('should interpret negative cp as White better when Black to move', () => {
+      // Black to move, -150 = White is better
+      expect(evalToVerbalDescription(-150, undefined, false)).toContain('White');
+    });
+
+    it('should interpret mate perspective correctly', () => {
+      // White to move, +3 mate = White is mating
+      expect(evalToVerbalDescription(undefined, 3, true)).toContain('White');
+      // Black to move, +3 mate = Black is mating
+      expect(evalToVerbalDescription(undefined, 3, false)).toContain('Black');
+      // White to move, -3 mate = Black is mating
+      expect(evalToVerbalDescription(undefined, -3, true)).toContain('Black');
+      // Black to move, -3 mate = White is mating
+      expect(evalToVerbalDescription(undefined, -3, false)).toContain('White');
     });
   });
 });

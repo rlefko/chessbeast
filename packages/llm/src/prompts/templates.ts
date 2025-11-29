@@ -64,20 +64,21 @@ export interface CommentContext {
 }
 
 /**
- * Word limits by verbosity level
+ * Sentence limits by verbosity level
+ * All levels use max 2 sentences for critical, 1-2 for non-critical
  */
-const WORD_LIMITS: Record<VerbosityLevel, { critical: number; nonCritical: number }> = {
-  'ultra-brief': { critical: 8, nonCritical: 5 },
-  brief: { critical: 15, nonCritical: 10 },
-  normal: { critical: 25, nonCritical: 10 },
-  detailed: { critical: 40, nonCritical: 15 },
+const SENTENCE_LIMITS: Record<VerbosityLevel, { critical: number; nonCritical: number }> = {
+  'ultra-brief': { critical: 1, nonCritical: 1 },
+  brief: { critical: 2, nonCritical: 1 },
+  normal: { critical: 2, nonCritical: 1 },
+  detailed: { critical: 2, nonCritical: 2 },
 };
 
 /**
- * Get word limit based on verbosity and whether it's a critical moment
+ * Get sentence limit based on verbosity and whether it's a critical moment
  */
-function getWordLimit(verbosity: VerbosityLevel, isCritical: boolean): number {
-  const limits = WORD_LIMITS[verbosity];
+function getSentenceLimit(verbosity: VerbosityLevel, isCritical: boolean): number {
+  const limits = SENTENCE_LIMITS[verbosity];
   return isCritical ? limits.critical : limits.nonCritical;
 }
 
@@ -176,33 +177,26 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
     parts.push(`PERSPECTIVE: ${side}'s view (${isOurMove ? 'our move' : "opponent's move"})`);
   }
 
-  // Word limit - strict
-  const wordLimit = getWordLimit(verbosity, true);
+  // Sentence limit - strict
+  const sentenceLimit = getSentenceLimit(verbosity, true);
+  parts.push('');
+
+  // Format rules
+  parts.push('FORMAT RULES:');
+  parts.push(`- Maximum ${sentenceLimit} sentence(s)`);
+  parts.push('- No headers, no bullet points, no evaluation numbers');
+  parts.push('- Use verbal evals: "winning", "clear advantage", "slight edge", "equal"');
   parts.push('');
 
   // When variations are present, the comment should explain WHY the move is wrong
   // since the variations will show WHAT to play instead
   if (context.plannedVariations && context.plannedVariations.length > 0) {
-    parts.push(`TASK: Explain WHY this move is problematic in UNDER ${wordLimit} WORDS.`);
-    parts.push(`FOCUS ON:`);
-    parts.push(`- What threat/tactic does it miss?`);
-    parts.push(`- What weakness does it create?`);
-    parts.push(`- What principle does it violate?`);
-    parts.push(`DO NOT:`);
-    parts.push(`- Describe alternative moves (they're shown in variations)`);
-    parts.push(`- Say "instead play X" or "better was Y" (variations show this)`);
-    parts.push(`- Use evaluation numbers (+1.5, -0.3, etc.)`);
-    parts.push(`- Say "This is a blunder/mistake" (NAG shows this)`);
+    parts.push(`TASK: Explain WHY this move is problematic in ${sentenceLimit} sentence(s).`);
+    parts.push('Focus on what threat/tactic it misses or what weakness it creates.');
+    parts.push('Do not describe alternatives - they are shown in variations.');
   } else {
-    parts.push(`TASK: Explain WHY this position matters in UNDER ${wordLimit} WORDS.`);
-    parts.push(`FOCUS ON:`);
-    parts.push(`- What tactical/strategic idea makes this important?`);
-    parts.push(`- What threat does the best move create?`);
-    parts.push(`- If mate, show the key moves`);
-    parts.push(`DO NOT:`);
-    parts.push(`- Use evaluation numbers (+1.5, -0.3, etc.)`);
-    parts.push(`- Say "This is a blunder/mistake/good move"`);
-    parts.push(`- Use generic phrases like "improves the position"`);
+    parts.push(`TASK: Explain WHY this position matters in ${sentenceLimit} sentence(s).`);
+    parts.push('Focus on tactical or strategic ideas. If mate exists, mention key moves.');
   }
 
   parts.push('');
@@ -236,13 +230,12 @@ export function buildBriefMovePrompt(context: CommentContext): string {
     parts.push(`PERSPECTIVE: ${side}'s view`);
   }
 
-  // Word limit - very strict for non-critical
-  const wordLimit = getWordLimit(verbosity, false);
+  // Sentence limit - very strict for non-critical
+  const sentenceLimit = getSentenceLimit(verbosity, false);
   parts.push('');
-  parts.push(`INSTRUCTIONS: Only comment if truly noteworthy. UNDER ${wordLimit} WORDS.`);
-  parts.push('- Return empty string if nothing important to say');
-  parts.push('- NO evaluation numbers');
-  parts.push('- NO "good move" / "solid move" filler');
+  parts.push(`INSTRUCTIONS: Only comment if truly noteworthy. MAX ${sentenceLimit} sentence(s).`);
+  parts.push('Return empty string if nothing important to say.');
+  parts.push('No evaluation numbers, no headers, no bullet points.');
 
   parts.push('');
   parts.push('Respond with JSON: { "comment": "annotation or empty string" }');
