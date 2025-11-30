@@ -16,6 +16,7 @@ import {
   type AgenticServices,
   type StreamChunk,
   type AgenticExplorerProgress,
+  type ExploredLine,
 } from '@chessbeast/llm';
 import {
   parsePgn,
@@ -23,6 +24,7 @@ import {
   transformAnalysisToGame,
   type ParsedGame,
   type MoveInfo,
+  type ExploredVariation,
 } from '@chessbeast/pgn';
 
 import type { ChessBeastConfig, OutputVerbosity, AnnotationPerspective } from '../config/schema.js';
@@ -373,15 +375,30 @@ async function runAgenticAnnotation(
 
       // Attach explored variations to move analysis (convert Map to Record for type compatibility)
       if (explorationResult.variations.length > 0) {
-        move.exploredVariations = explorationResult.variations.map((v) => ({
-          moves: v.moves,
-          annotations: Object.fromEntries(v.annotations),
-          nags: Object.fromEntries(v.nags),
-          purpose: v.purpose,
-          source: v.source,
-        }));
+        move.exploredVariations = explorationResult.variations.map(convertExploredLine);
       }
     }
+  }
+
+  /**
+   * Recursively convert ExploredLine to ExploredVariation
+   * Preserves nested branches and converts Map to Record
+   */
+  function convertExploredLine(line: ExploredLine): ExploredVariation {
+    const result: ExploredVariation = {
+      moves: line.moves,
+      annotations: Object.fromEntries(line.annotations),
+      nags: Object.fromEntries(line.nags),
+      purpose: line.purpose,
+      source: line.source,
+    };
+    if (line.finalEval) {
+      result.finalEval = line.finalEval;
+    }
+    if (line.branches && line.branches.length > 0) {
+      result.branches = line.branches.map(convertExploredLine);
+    }
+    return result;
   }
 
   return annotationCount;
