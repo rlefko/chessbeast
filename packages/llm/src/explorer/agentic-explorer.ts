@@ -536,39 +536,80 @@ export class AgenticVariationExplorer {
       }
 
       // === Annotation ===
-      case 'annotate': {
+      case 'set_comment': {
         const comment = args.comment as string | undefined;
-        const nags = args.nags as string[] | undefined;
-
-        if (comment) {
-          const { cleaned, rejected, reason } = validateAndCleanComment(
-            comment,
-            tree.getCurrentNode().san,
-          );
-          if (rejected) {
-            return { success: false, error: reason };
-          }
-          tree.setComment(cleaned);
+        if (!comment) {
+          return { success: false, error: 'No comment provided' };
         }
 
-        if (nags && nags.length > 0) {
-          tree.setNags(nags);
+        const { cleaned, rejected, reason } = validateAndCleanComment(
+          comment,
+          tree.getCurrentNode().san,
+        );
+        if (rejected) {
+          return { success: false, error: reason };
         }
+        tree.setComment(cleaned);
 
         return {
           success: true,
           comment: tree.getCurrentNode().comment,
-          nags: tree.getCurrentNode().nags,
         };
       }
 
-      case 'add_nag': {
+      case 'get_comment': {
+        return {
+          success: true,
+          comment: tree.getCurrentNode().comment ?? null,
+        };
+      }
+
+      case 'add_move_nag': {
         const nag = args.nag as string;
         if (!nag) {
           return { success: false, error: 'No NAG provided' };
         }
+        // Validate it's a move NAG ($1-$6)
+        const moveNags = ['$1', '$2', '$3', '$4', '$5', '$6'];
+        if (!moveNags.includes(nag)) {
+          return {
+            success: false,
+            error: `Invalid move NAG: ${nag}. Must be one of: $1 (!), $2 (?), $3 (!!), $4 (??), $5 (!?), $6 (?!)`,
+          };
+        }
         tree.addNag(nag);
         return { success: true, nags: tree.getCurrentNode().nags };
+      }
+
+      case 'set_position_nag': {
+        const nag = args.nag as string;
+        if (!nag) {
+          return { success: false, error: 'No NAG provided' };
+        }
+        // Validate it's a position NAG ($10-$19)
+        const positionNags = ['$10', '$13', '$14', '$15', '$16', '$17', '$18', '$19'];
+        if (!positionNags.includes(nag)) {
+          return {
+            success: false,
+            error: `Invalid position NAG: ${nag}. Must be one of: $10 (=), $13 (∞), $14 (⩲), $15 (⩱), $16 (±), $17 (∓), $18 (+−), $19 (−+)`,
+          };
+        }
+        // Remove any existing position NAGs first
+        const currentNags = tree.getCurrentNode().nags.filter((n) => !positionNags.includes(n));
+        tree.setNags([...currentNags, nag]);
+        return { success: true, nags: tree.getCurrentNode().nags };
+      }
+
+      case 'get_nags': {
+        return {
+          success: true,
+          nags: tree.getCurrentNode().nags,
+        };
+      }
+
+      case 'clear_nags': {
+        tree.setNags([]);
+        return { success: true, nags: [] };
       }
 
       case 'set_principal': {
@@ -614,6 +655,67 @@ export class AgenticVariationExplorer {
       }
 
       // === Analysis ===
+      case 'get_candidate_moves': {
+        const currentFen = tree.getCurrentNode().fen;
+        const count = Math.min(Math.max((args.count as number) ?? 3, 1), 5);
+
+        // Get the side to move from FEN
+        const fenParts = currentFen.split(' ');
+        const sideToMove = fenParts[1] === 'w' ? 'White' : 'Black';
+
+        // Use multipv analysis to get top N moves
+        const evalArgs = { fen: currentFen, depth: 18, multipv: count };
+        const result = await this.toolExecutor.execute({
+          ...toolCall,
+          function: {
+            name: 'evaluate_position',
+            arguments: JSON.stringify(evalArgs),
+          },
+        });
+
+        // Extract the moves from the result
+        if (result.error) {
+          return { success: false, error: result.error };
+        }
+
+        const evalResult = result.result as Record<string, unknown>;
+
+        // Check if we got multiple lines (multipv result)
+        if (evalResult.lines && Array.isArray(evalResult.lines)) {
+          const candidates = (evalResult.lines as Array<Record<string, unknown>>).map(
+            (line, idx) => ({
+              rank: idx + 1,
+              move: (line.principalVariation as string[])?.[0] ?? 'unknown',
+              evaluation: line.evaluation as number,
+              line: (line.principalVariation as string[])?.slice(0, 4).join(' ') ?? '',
+            }),
+          );
+          return {
+            success: true,
+            sideToMove,
+            candidates,
+            note: `These are ${sideToMove}'s best moves. Use add_alternative to explore them.`,
+          };
+        }
+
+        // Single line result (fallback)
+        const pv = evalResult.principalVariation as string[] | undefined;
+        const bestMove = pv?.[0] ?? 'unknown';
+        return {
+          success: true,
+          sideToMove,
+          candidates: [
+            {
+              rank: 1,
+              move: bestMove,
+              evaluation: evalResult.evaluation as number,
+              line: pv?.slice(0, 4).join(' ') ?? '',
+            },
+          ],
+          note: `This is ${sideToMove}'s best move. Use add_alternative to explore it.`,
+        };
+      }
+
       case 'evaluate_position': {
         const currentFen = tree.getCurrentNode().fen;
         const depth = (args.depth as number) ?? 20;
@@ -747,58 +849,72 @@ TARGET AUDIENCE: ${targetRating} rated players
 You start AT the move that was played (not before it).
 This means you can IMMEDIATELY use add_alternative to show better moves.
 
-## YOUR TOOLS
+## NAVIGATION TOOLS
 
-**Show alternatives (what SHOULD have been played):**
-- add_alternative(san) - Add a better move as a sibling. You stay at current position.
-- go_to(fen) - Navigate to the alternative's FEN to explore it.
-- add_move(san) - Continue the line by adding a child move. You move to it.
+- **get_candidate_moves** - Get engine's best moves for the side to move. USE THIS FIRST!
+- **add_alternative(san)** - Add a better move as a sibling. You stay at current position.
+- **go_to(fen)** - Navigate to the alternative's FEN to explore it.
+- **add_move(san)** - Continue the line by adding a child move. You move to it.
 
-**Annotate (do this INLINE as you explore, not at the end):**
-- annotate(comment, nags) - Add brief comment (2-8 words, lowercase, no punctuation)
-  GOOD: "wins the exchange", "threatens mate", "strong outpost"
-  BAD: "From our perspective, this move is passive and misses..."
+## ANNOTATION TOOLS
 
-**Finish:**
-- finish_exploration(summary) - When done exploring
+Comments:
+- **set_comment(comment)** - Add/replace comment (2-8 words, lowercase, no punctuation)
 
-**Analysis (use sparingly):**
-- evaluate_position - Get engine evaluation
-- predict_human_moves - What would a ${targetRating} player do?
+Move Quality NAGs (use freely on any move):
+- **add_move_nag(nag)** - $1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!
+
+Position Evaluation NAGs (ONLY at END of variation!):
+- **set_position_nag(nag)** - $10=equal, $14/15=slight edge, $16/17=clear advantage, $18/19=winning
+- ⚠️ NEVER use position NAGs mid-variation. ONLY at the final position!
+
+## ANALYSIS TOOLS
+
+- **evaluate_position** - Get engine evaluation (use every 3-4 moves)
+- **predict_human_moves** - What would a ${targetRating} player do?
 
 ## WORKFLOW
 
-1. Call evaluate_position to see what's best
-2. add_alternative(betterMove) to show the improvement
-3. go_to the alternative's FEN
-4. annotate with a SHORT comment (2-8 words)
-5. add_move to continue the line 4-8 more moves
-6. annotate key moments along the way
-7. finish_exploration when done
+1. **get_candidate_moves** - See best moves for the side to move
+2. **add_alternative(betterMove)** - Create the sideline
+3. **go_to** the alternative's FEN
+4. **set_comment** - Brief annotation (2-8 words)
+5. **add_move** - Continue 2-3 moves
+6. **evaluate_position** - Validate the line is going where expected
+7. Repeat add_move + evaluate_position every 3-4 moves
+8. **set_position_nag** - ONLY at the very end when position is clarified
+9. **finish_exploration**
 
 ## EXAMPLE
 
-Position at 12. Qe2 (an inaccuracy). Engine says Re1 was better.
+Position at 12. Qe2 (White's inaccuracy). Context says: "WHITE JUST PLAYED Qe2"
 
-1. evaluate_position           → "Re1 is +1.2, Qe2 is +0.6"
-2. add_alternative("Re1")      → Creates sibling to Qe2, returns FEN
-3. go_to(<Re1_fen>)            → Navigate to Re1 position
-4. annotate("activates the rook")
-5. add_move("Nd7")             → Continue: 12...Nd7
-6. add_move("Ne5")             → 13. Ne5
-7. annotate("strong outpost")
-8. finish_exploration("showed Re1 improvement")
+1. get_candidate_moves        → "White's best: Re1 (+1.2), Nc3 (+0.9), Qe2 (+0.6)"
+2. add_alternative("Re1")     → Creates sibling to Qe2, returns FEN
+3. go_to(<Re1_fen>)           → Navigate to Re1 position
+4. set_comment("activates the rook")
+5. add_move_nag("$1")         → Mark Re1 as good move (!)
+6. add_move("Nd7")            → Black responds: 12...Nd7
+7. add_move("Ne5")            → White: 13. Ne5
+8. evaluate_position          → Confirm +1.3
+9. set_comment("strong outpost")
+10. add_move("Nf6")           → Black: 13...Nf6
+11. add_move("Bf4")           → White: 14. Bf4
+12. set_position_nag("$14")   → Slight White advantage (at END of line)
+13. finish_exploration("Re1 activates rook with lasting initiative")
 
-Result: (12. Re1 {activates the rook} Nd7 13. Ne5 {strong outpost})
+Result: (12. Re1 $1 {activates the rook} Nd7 13. Ne5 {strong outpost} Nf6 14. Bf4 $14)
 
 ## CRITICAL RULES
 
-1. **add_alternative = create sideline** (you stay put, creates sibling)
-2. **add_move = continue line** (you move to the new position)
-3. **Annotate INLINE** as you explore, not all at the end
-4. **Comments: 2-8 words only** - lowercase, no punctuation
-5. **NEVER say "from our perspective" or "this move is"**
-6. **NEVER repeat move notation in comments**`;
+1. **get_candidate_moves FIRST** - Know what moves are legal and good!
+2. **add_alternative creates sibling** - Same color as the played move
+3. **add_move continues line** - Alternates colors after each move
+4. **Position NAGs ($10-$19) ONLY at the END** - Never mid-variation!
+5. **Move NAGs ($1-$6) anytime** - Use freely to mark good/bad moves
+6. **Comments: 2-8 words** - lowercase, no punctuation
+7. **NEVER say "from our perspective" or "this move is"**
+8. **evaluate_position every 3-4 moves** - Stay on track!`;
   }
 
   /**
@@ -820,10 +936,19 @@ Result: (12. Re1 {activates the rook} Nd7 13. Ne5 {strong outpost})
   ): string {
     const parts: string[] = [];
 
+    // Determine whose move this is from the FEN (before the move was played)
+    // If FEN shows 'w', the played move was White's; if 'b', it was Black's
+    const fenParts = fen.split(' ');
+    const sideToMove = fenParts[1] === 'w' ? 'WHITE' : 'BLACK';
+    const opponentSide = fenParts[1] === 'w' ? 'BLACK' : 'WHITE';
+
     if (playedMove) {
       // LLM starts AT the played move (we already added it to the tree)
       const classLabel = moveClassification ? ` (${moveClassification})` : '';
       parts.push(`YOU ARE AT: ${playedMove}${classLabel}`);
+      parts.push('');
+      parts.push(`**${sideToMove} JUST PLAYED ${playedMove}**`);
+      parts.push(`Alternatives must be ${sideToMove} moves (siblings replace ${playedMove}).`);
       parts.push('');
       parts.push(board);
       parts.push('');
@@ -832,20 +957,27 @@ Result: (12. Re1 {activates the rook} Nd7 13. Ne5 {strong outpost})
 
       if (moveClassification === 'blunder' || moveClassification === 'mistake') {
         parts.push('This was a significant error. Show what should have been played:');
-        parts.push('1. add_alternative(betterMove) - creates sibling to this move');
-        parts.push('2. go_to the alternative FEN');
-        parts.push('3. add_move to continue 4-8 moves deep');
-        parts.push('4. annotate key moments (2-8 words each)');
+        parts.push(`1. get_candidate_moves - see ${sideToMove}'s best options`);
+        parts.push('2. add_alternative(betterMove) - creates sibling to this move');
+        parts.push('3. go_to the alternative FEN');
+        parts.push(`4. add_move to continue (${opponentSide} responds, then ${sideToMove}, etc.)`);
+        parts.push('5. set_comment on key moments (2-8 words each)');
+        parts.push('6. evaluate_position every 3-4 moves to validate the line');
+        parts.push('7. set_position_nag ONLY at the END of the line');
       } else if (moveClassification === 'inaccuracy') {
         parts.push('This was slightly inaccurate. Show the stronger option:');
-        parts.push('1. add_alternative(betterMove)');
-        parts.push('2. go_to and explore briefly');
-        parts.push('3. annotate the key difference');
+        parts.push(`1. get_candidate_moves - see ${sideToMove}'s best options`);
+        parts.push('2. add_alternative(betterMove)');
+        parts.push('3. go_to and explore briefly');
+        parts.push('4. set_comment on the key difference');
+        parts.push('5. set_position_nag ONLY at the END');
       } else {
         parts.push('Explore alternatives from this position.');
       }
     } else {
       parts.push('POSITION:');
+      parts.push('');
+      parts.push(`**${sideToMove} TO MOVE**`);
       parts.push('');
       parts.push(board);
       parts.push('');
@@ -855,7 +987,7 @@ Result: (12. Re1 {activates the rook} Nd7 13. Ne5 {strong outpost})
     }
 
     parts.push('');
-    parts.push('Start with evaluate_position to see the best moves.');
+    parts.push('Start with get_candidate_moves to see the best options.');
 
     return parts.join('\n');
   }
