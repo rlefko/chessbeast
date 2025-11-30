@@ -1130,7 +1130,9 @@ NESTED variation (sub-variation within a variation):
         parts.push('This move is slightly inaccurate. Your task:');
         parts.push('1. Show the stronger alternative that was available.');
         parts.push('2. Explain what the played move misses (without over-dramatizing).');
-        parts.push('3. The difference may be subtle - focus on the key positional or tactical nuance.');
+        parts.push(
+          '3. The difference may be subtle - focus on the key positional or tactical nuance.',
+        );
       } else {
         // Good, excellent, book, or unknown - explore the position normally
         parts.push('');
