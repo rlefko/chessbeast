@@ -9,6 +9,7 @@ import {
   AgenticCommentGenerator,
   AgenticVariationExplorer,
   buildRichContext,
+  assessExplorationWorthiness,
   type VerbosityLevel,
   type AnnotationProgress,
   type DeepAnalysis,
@@ -303,8 +304,33 @@ async function runAgenticAnnotation(
 
     // Explore variations if enabled and this is a critical moment
     if (agenticExplorer && criticalMoment) {
+      // Check if position is worth exploring (especially in winning positions)
+      const worthiness = assessExplorationWorthiness(
+        move.fenBefore,
+        move.evalBefore.cp ?? 0,
+        move.evalBefore.mate,
+        move.classification,
+        move.san,
+        move.bestMove,
+      );
+
+      if (!worthiness.shouldExplore) {
+        // Skip exploration for quiet decided positions
+        if (reporter.isDebug()) {
+          reporter.displayThinking(moveNotation, `Skipping exploration: ${worthiness.reason}`);
+        }
+        continue;
+      }
+
       if (reporter.isDebug()) {
-        reporter.displayThinking(moveNotation, 'Starting agentic variation exploration...');
+        const budgetInfo =
+          worthiness.budgetMultiplier < 1.0
+            ? ` (${Math.round(worthiness.budgetMultiplier * 100)}% budget)`
+            : '';
+        reporter.displayThinking(
+          moveNotation,
+          `Starting exploration: ${worthiness.reason}${budgetInfo}`,
+        );
       }
 
       reporter.updateMoveProgress(
@@ -315,7 +341,9 @@ async function runAgenticAnnotation(
 
       // Track last displayed state to avoid duplicate messages
       let lastToolCalls = 0;
-      const maxToolCalls = config.agentic.explorationMaxToolCalls ?? 40;
+      // Apply budget multiplier for decided positions
+      const baseMaxToolCalls = config.agentic.explorationMaxToolCalls ?? 40;
+      const maxToolCalls = Math.max(20, Math.floor(baseMaxToolCalls * worthiness.budgetMultiplier));
 
       const explorationResult = await agenticExplorer.explore(
         move.fenBefore,
@@ -360,6 +388,8 @@ async function runAgenticAnnotation(
             lastToolCalls = progress.toolCalls;
           }
         },
+        undefined, // gameMoves
+        move.evalBefore.cp, // evalCp for winning position context
       );
 
       // Show completion summary in debug mode

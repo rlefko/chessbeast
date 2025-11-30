@@ -51,3 +51,9 @@ export {
   type TreeOperationResult,
   type NodeInfo,
 } from './variation-tree.js';
+
+// Winning position filter
+export {
+  assessExplorationWorthiness,
+  type ExplorationWorthiness,
+} from './winning-position-filter.js';

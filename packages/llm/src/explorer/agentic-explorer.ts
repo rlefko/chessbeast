@@ -253,6 +253,7 @@ export class AgenticVariationExplorer {
       | 'forced',
     onProgress?: (progress: AgenticExplorerProgress) => void,
     gameMoves?: Array<{ san: string; fenAfter: string }>,
+    evalCp?: number,
   ): Promise<AgenticExplorerResult> {
     // Initialize tree with position BEFORE the played move
     const tree = new VariationTree(startingFen);
@@ -283,7 +284,7 @@ export class AgenticVariationExplorer {
     let currentEval: number | undefined;
 
     // Build initial context
-    const systemPrompt = this.buildSystemPrompt(targetRating);
+    const systemPrompt = this.buildSystemPrompt(targetRating, evalCp);
     const initialBoard = formatBoardForPrompt(startingFen);
     const initialContext = this.buildInitialContext(
       startingFen,
@@ -976,8 +977,8 @@ export class AgenticVariationExplorer {
   /**
    * Build the system prompt for tree-based exploration
    */
-  private buildSystemPrompt(targetRating: number): string {
-    return `You are a chess coach showing a student what they did wrong and what they should have done.
+  private buildSystemPrompt(targetRating: number, evalCp?: number): string {
+    let prompt = `You are a chess coach showing a student what they did wrong and what they should have done.
 
 TARGET AUDIENCE: ${targetRating} rated players
 
@@ -1093,6 +1094,26 @@ Result: (12. Re1 $1 {activates the rook} Nd7 13. Ne5 {strong outpost} Nf6 14. Bf
 8. **NEVER say "from our perspective" or "this move is"**
 9. **Explore DEEP** - Don't stop at 3-5 moves, show full variations
 10. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives`;
+
+    // Add winning position focus when position is already decided
+    if (evalCp !== undefined && Math.abs(evalCp) >= 500) {
+      const evalPawns = (Math.abs(evalCp) / 100).toFixed(1);
+      const winningSide = evalCp > 0 ? 'White' : 'Black';
+      prompt += `
+
+## WINNING POSITION FOCUS
+
+This position is already decided (${winningSide} is ${evalPawns} pawns ahead).
+Focus your exploration on:
+1. **Counterplay** - What threats does the opponent have?
+2. **Traps** - What mistakes could throw away the win?
+3. **Clean conversion** - What's the simplest winning path?
+
+DO NOT spend tool calls proving +6 is better than +5.
+FINISH quickly once the winning idea is clear.`;
+    }
+
+    return prompt;
   }
 
   /**
