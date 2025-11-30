@@ -22,6 +22,7 @@ import {
   parsePgn,
   renderPgn,
   transformAnalysisToGame,
+  validateAndFixPgn,
   type ParsedGame,
   type MoveInfo,
   type ExploredVariation,
@@ -291,6 +292,9 @@ async function runAgenticAnnotation(
       onWarning,
     );
 
+    // End streaming and restart spinner
+    reporter.endThinking();
+
     // Apply comment to move
     if (result.comment.comment) {
       move.comment = result.comment.comment;
@@ -317,6 +321,7 @@ async function runAgenticAnnotation(
         move.fenBefore,
         targetRating,
         move.san,
+        move.classification,
         (progress: AgenticExplorerProgress) => {
           // Update progress status for non-debug mode
           reporter.updateMoveProgress(
@@ -575,7 +580,14 @@ export async function orchestrateAnalysis(
       includeNags: config.output.includeNags,
       includeSummary: config.output.includeSummary,
     });
-    const annotatedPgn = renderPgn(annotatedGame);
+
+    // Validate and auto-fix PGN structure issues
+    const { fixed: fixedGame, warnings: fixWarnings } = validateAndFixPgn(annotatedGame);
+    for (const warning of fixWarnings) {
+      reporter.warn(warning);
+    }
+
+    const annotatedPgn = renderPgn(fixedGame);
     reporter.completePhase('rendering');
 
     results.push({

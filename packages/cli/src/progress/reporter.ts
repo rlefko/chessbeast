@@ -152,6 +152,14 @@ export class ProgressReporter {
   }
 
   /**
+   * Display a warning message
+   */
+  warn(message: string): void {
+    if (this.silent) return;
+    console.log(this.c.yellow(`⚠ ${message}`));
+  }
+
+  /**
    * Start the overall analysis
    */
   startAnalysis(): void {
@@ -296,35 +304,42 @@ export class ProgressReporter {
 
   /**
    * Display streaming reasoning/thinking content
-   * Shows real-time LLM activity during annotation
+   * Streams full LLM output to stderr in real-time
    */
-  displayThinking(moveNotation: string, thought: string): void {
-    if (this.silent || !this.spinner) return;
+  displayThinking(_moveNotation: string, thought: string): void {
+    if (this.silent) return;
 
     // Stop the waiting timer - we're now receiving streaming content
     this.stopLlmWaitingTimer();
 
-    // Accumulate thinking content
+    // Pause spinner while streaming to prevent interference
+    if (this.spinner) {
+      this.spinner.stop();
+    }
+
+    // Stream the content directly to stderr
+    process.stderr.write(thought);
+
+    // Accumulate for tracking (still useful for buffer management)
     this.thinkingBuffer += thought;
+  }
 
-    // Get terminal width for truncation
-    const terminalWidth = process.stdout.columns || 80;
-    const maxWidth = Math.max(40, terminalWidth - 25);
+  /**
+   * Called when streaming is complete for a move
+   * Restarts the spinner if needed
+   */
+  endThinking(): void {
+    // Add newline if buffer doesn't end with one
+    if (this.thinkingBuffer && !this.thinkingBuffer.endsWith('\n')) {
+      process.stderr.write('\n');
+    }
 
-    // Get the last line of thinking (most recent thought)
-    const lines = this.thinkingBuffer.split('\n');
-    const lastLine = lines[lines.length - 1] ?? '';
+    // Clear buffer
+    this.thinkingBuffer = '';
 
-    // Truncate if needed
-    const truncated =
-      lastLine.length > maxWidth ? lastLine.slice(0, maxWidth - 3) + '...' : lastLine;
-
-    // Clean up whitespace
-    const cleaned = truncated.replace(/\s+/g, ' ').trim();
-
-    if (cleaned) {
-      // Update spinner with thinking content
-      this.spinner.text = `${this.c.cyan(moveNotation)}: ${this.c.dim(cleaned)}`;
+    // Restart spinner
+    if (this.spinner && !this.silent) {
+      this.spinner.start();
     }
   }
 
