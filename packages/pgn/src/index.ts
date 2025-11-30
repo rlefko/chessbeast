@@ -119,6 +119,7 @@ export type {
   AlternativeMove,
   EngineEvaluation,
   AnalysisMetadata,
+  ExploredVariation,
 } from './transformer/index.js';
 
 export { transformAnalysisToGame, hasAnnotations, countAnnotations } from './transformer/index.js';
