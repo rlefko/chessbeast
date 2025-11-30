@@ -11,11 +11,13 @@ ChessBeast is an AI chess annotator that takes PGN input and produces human-frie
 ## Architecture
 
 **Hybrid TypeScript + Python monorepo:**
+
 - `packages/` - TypeScript packages (CLI, core logic, PGN handling, gRPC clients)
 - `services/` - Python gRPC services (Stockfish wrapper, Maia model serving)
 - `data/` - SQLite databases (ECO openings, Lichess Elite games)
 
 **Data flow:**
+
 ```
 PGN → Parser → Positions → Engine + Maia + DB → Critical Moments → Annotation Plan → LLM → Annotated PGN
 ```
@@ -59,6 +61,7 @@ make docker-down        # Stop services
 ## Python Environment
 
 Python 3.12 via virtual environment:
+
 ```bash
 source .venv/bin/activate
 python -m pytest services/stockfish/tests/test_engine.py -v  # Single test file
@@ -74,6 +77,7 @@ python -m pytest -k "test_uci"  # Tests matching pattern
 - Pre-commit hooks enforce commit message format
 
 Common emoji prefixes:
+
 - ✨ New feature
 - 🐛 Bug fix
 - ♻️ Refactor
@@ -85,10 +89,12 @@ Common emoji prefixes:
 ## Key Technical Details
 
 **Move classification thresholds** are rating-dependent (see `packages/core/src/classifier/`):
+
 - 1200 Elo: inaccuracy 50-149cp, mistake 150-299cp, blunder ≥300cp
 - 2000 Elo: inaccuracy 30-89cp, mistake 90-179cp, blunder ≥180cp
 
 **Two-pass analysis**:
+
 - Pass 1 (shallow): depth 12-16 for all positions
 - Pass 2 (deep): depth 20-24, multipv=3 for critical moments only
 
@@ -97,29 +103,34 @@ Common emoji prefixes:
 **Maia models**: Rating bands 1100-1900 (100-point increments), loaded on demand
 
 **Variation Exploration** (see `packages/llm/src/explorer/`):
+
 - `VariationExplorer`: Iterative engine + Maia + LLM dialogue for deep variations
 - Max variation depth: 40 moves (depth-first exploration)
 - LLM call budget: 15-20 soft cap, 22 hard cap per position
 - `PlannedVariation` interface ensures LLM references actual PGN output
 
 **NAG (Numeric Annotation Glyph) behavior**:
+
 - Position NAG threshold: 150cp (significant eval change required)
 - `$1` (good move) only added for critical positions
 - Max 2 consecutive position NAGs (clustering prevention)
 
 **Agentic Annotation Mode** (see `packages/llm/src/generator/agentic-generator.ts`):
+
 - Opt-in via `--agentic` CLI flag
 - `--agentic-all` annotates all moves (not just critical moments)
 - `--show-costs` displays LLM cost summary at end
 - Cost tracking in `packages/llm/src/cost/` (model pricing per 1M tokens)
 
 **Model Selection** (see `packages/llm/src/cost/pricing.ts`):
+
 - Default model: `gpt-5-mini` (cost-effective at $0.25/$2.00 per 1M tokens)
 - Use `--model` CLI flag to override (e.g., `--model gpt-5-nano` for budget, `--model gpt-5-codex` for deep reasoning)
 - Available models: `gpt-5-codex`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
 - Pricing tracked in `packages/llm/src/cost/pricing.ts`
 
 **Agentic Exploration Mode** (see `packages/llm/src/explorer/` and `docs/agentic-annotation.md`):
+
 - Opt-in via `--agentic` CLI flag
 - LLM navigates a tree structure with tool-calling loop
 - Components: `agentic-explorer.ts`, `variation-tree.ts`, `exploration-tools.ts`, `stopping-heuristics.ts`
@@ -149,9 +160,10 @@ Common emoji prefixes:
 
 All documentation in `docs/` folder, written in Markdown.
 
-
 # ============================================================================
+
 # Semantic Code Memory System
+
 # ============================================================================
 
 # chessbeast - Development Instructions
@@ -167,6 +179,7 @@ Memory search is 3-5ms vs 500ms+ for file operations.
 ### 🎯 Memory-First Workflow (Follow Every Time)
 
 **Before ANY task:**
+
 1. 🔍 **Search memory** for existing implementations
 2. 📚 **Find patterns** to follow
 3. 🏗️ **Check relationships** to understand context
@@ -221,6 +234,7 @@ The semantic memory is powered by an MCP (Model Context Protocol) server configu
 **🔒 Security:** This file contains API keys and is automatically added to `.gitignore` during setup
 
 **👥 Team Workflow:** Use `.mcp.json.example` as a template:
+
 ```bash
 # Team members can set up their own .mcp.json
 cp .mcp.json.example .mcp.json
@@ -235,11 +249,13 @@ cp .mcp.json.example .mcp.json
 Memory Guard hooks provide additional code quality protection but are **not configured automatically**.
 
 **Manual Setup (Optional):**
+
 - Add UserPromptSubmit hooks for semantic command detection
 - Add PreToolUse hooks for duplicate code prevention
 - See main project documentation for hook configuration
 
 **Benefits when configured:**
+
 - Prevent duplicate code creation
 - Catch missing error handling patterns
 - Block breaking API changes
@@ -270,18 +286,21 @@ Memory Guard hooks provide additional code quality protection but are **not conf
 Control what gets indexed without modifying .gitignore:
 
 **When to use .claudeignore:**
+
 - Personal notes and TODOs (e.g., `*-notes.md`, `TODO-*.md`)
 - Test outputs and coverage reports
 - Debug artifacts and temporary files
 - Large data files not caught by .gitignore
 
 **Multi-Layer Exclusion System:**
+
 1. **Universal Defaults** - Binaries, archives, OS artifacts (always applied)
 2. **.gitignore** - Version control ignores (auto-detected)
 3. **.claudeignore** - Custom indexing exclusions (project-specific)
 4. **Binary Detection** - Executables detected via magic numbers
 
 **Example .claudeignore:**
+
 ```
 # Personal development
 *-notes.md
@@ -305,12 +324,15 @@ debug-*.log
 ## 🔧 Memory System Maintenance
 
 ### Automatic Updates
+
 Memory is automatically updated via git hooks:
+
 - **pre-commit**: Indexes changed files before commit
 - **post-merge**: Updates index after `git pull`
 - **post-checkout**: Updates index after branch switch
 
 ### Manual Re-index (if needed)
+
 ```bash
 # From memory project directory
 source .venv/bin/activate
@@ -318,6 +340,7 @@ claude-indexer index -p /Users/ryanlefkowitz/projects/chess/chessbeast -c chessb
 ```
 
 ### Check Memory Status
+
 ```bash
 # View collection statistics
 python utils/qdrant_stats.py -c chessbeast
@@ -331,6 +354,6 @@ Add your project-specific documentation below this section.
 
 ---
 
-*Memory system automatically configured by setup.sh*
-*Collection: chessbeast*
-*Generated: 2025-11-27 16:24:14*
+_Memory system automatically configured by setup.sh_
+_Collection: chessbeast_
+_Generated: 2025-11-27 16:24:14_
