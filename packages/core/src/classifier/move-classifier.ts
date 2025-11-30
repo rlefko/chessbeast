@@ -11,7 +11,10 @@ import type { EngineEvaluation, NormalizedEval } from '../types/analysis.js';
 import {
   getInterpolatedThresholds,
   DEFAULT_RATING,
+  getPositionStatus,
+  isDecidedPosition,
   type ClassificationThresholds,
+  type PositionStatus,
 } from './thresholds.js';
 
 /**
@@ -42,6 +45,14 @@ export interface ClassificationResult {
   isForced: boolean;
   /** Whether the move should be considered brilliant */
   isBrilliant: boolean;
+  /** Original classification before position-aware adjustment (if adjusted) */
+  rawClassification?: MoveClassification;
+  /** Whether the classification was adjusted due to position context */
+  wasAdjusted?: boolean;
+  /** Position status before the move (from player's perspective) */
+  statusBefore?: PositionStatus;
+  /** Position status after the move (from player's perspective) */
+  statusAfter?: PositionStatus;
 }
 
 /**
@@ -273,12 +284,60 @@ export function classifyMove(
     classification = 'good';
   }
 
-  return {
+  // Position-aware classification adjustment
+  // evalBefore is from player's perspective, evalAfter is from opponent's perspective
+  const normBefore =
+    evalBefore.mate !== undefined ? (evalBefore.mate > 0 ? 10000 : -10000) : (evalBefore.cp ?? 0);
+  const normAfter =
+    evalAfter.mate !== undefined ? (evalAfter.mate > 0 ? 10000 : -10000) : (evalAfter.cp ?? 0);
+  // Convert evalAfter to player's perspective (negate since it's from opponent's view)
+  const cpAfterFromPlayer = -normAfter;
+
+  const statusBefore = getPositionStatus(normBefore);
+  const statusAfter = getPositionStatus(cpAfterFromPlayer);
+
+  const isDecidedBefore = isDecidedPosition(statusBefore);
+  const isDecidedAfter = isDecidedPosition(statusAfter);
+
+  // Only adjust if position was decided and still is in same category
+  // (both decisive or both lost - meaning same side is still winning)
+  const sameDecidedCategory =
+    (statusBefore === 'decisive' && statusAfter === 'decisive') ||
+    (statusBefore === 'lost' && statusAfter === 'lost');
+
+  let wasAdjusted = false;
+  const rawClassification = classification;
+
+  if (sameDecidedCategory && isDecidedBefore && isDecidedAfter) {
+    // Position was decided and still is in the same winning/losing state
+    // Downgrade penalties since the game outcome is unchanged
+    if (classification === 'blunder') {
+      classification = 'mistake';
+      wasAdjusted = true;
+    } else if (classification === 'mistake') {
+      classification = 'inaccuracy';
+      wasAdjusted = true;
+    } else if (classification === 'inaccuracy') {
+      classification = 'good';
+      wasAdjusted = true;
+    }
+  }
+
+  const result: ClassificationResult = {
     classification,
     cpLoss,
     isForced,
     isBrilliant,
+    wasAdjusted,
+    statusBefore,
+    statusAfter,
   };
+
+  if (wasAdjusted) {
+    result.rawClassification = rawClassification;
+  }
+
+  return result;
 }
 
 /**

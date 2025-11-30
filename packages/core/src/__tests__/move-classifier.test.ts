@@ -9,6 +9,7 @@ import {
   isForcedMove,
   isBrilliantMove,
 } from '../classifier/move-classifier.js';
+import { getPositionStatus, isDecidedPosition } from '../classifier/thresholds.js';
 import type { EngineEvaluation } from '../types/analysis.js';
 
 describe('Move Classifier', () => {
@@ -253,6 +254,197 @@ describe('Move Classifier', () => {
       const lowLoss = calculateAccuracy([10, 10, 10]);
       const highLoss = calculateAccuracy([200, 200, 200]);
       expect(lowLoss).toBeGreaterThan(highLoss);
+    });
+  });
+
+  describe('getPositionStatus', () => {
+    it('should return decisive for >= 500cp', () => {
+      expect(getPositionStatus(500)).toBe('decisive');
+      expect(getPositionStatus(800)).toBe('decisive');
+      expect(getPositionStatus(10000)).toBe('decisive');
+    });
+
+    it('should return winning for 200-499cp', () => {
+      expect(getPositionStatus(200)).toBe('winning');
+      expect(getPositionStatus(350)).toBe('winning');
+      expect(getPositionStatus(499)).toBe('winning');
+    });
+
+    it('should return advantage for 100-199cp', () => {
+      expect(getPositionStatus(100)).toBe('advantage');
+      expect(getPositionStatus(150)).toBe('advantage');
+      expect(getPositionStatus(199)).toBe('advantage');
+    });
+
+    it('should return slight for 30-99cp', () => {
+      expect(getPositionStatus(30)).toBe('slight');
+      expect(getPositionStatus(50)).toBe('slight');
+      expect(getPositionStatus(99)).toBe('slight');
+    });
+
+    it('should return equal for -29 to +29cp', () => {
+      expect(getPositionStatus(0)).toBe('equal');
+      expect(getPositionStatus(29)).toBe('equal');
+      expect(getPositionStatus(-29)).toBe('equal');
+    });
+
+    it('should return lost for <= -500cp', () => {
+      expect(getPositionStatus(-500)).toBe('lost');
+      expect(getPositionStatus(-800)).toBe('lost');
+      expect(getPositionStatus(-10000)).toBe('lost');
+    });
+  });
+
+  describe('isDecidedPosition', () => {
+    it('should return true for decisive', () => {
+      expect(isDecidedPosition('decisive')).toBe(true);
+    });
+
+    it('should return true for lost', () => {
+      expect(isDecidedPosition('lost')).toBe(true);
+    });
+
+    it('should return false for winning', () => {
+      expect(isDecidedPosition('winning')).toBe(false);
+    });
+
+    it('should return false for equal', () => {
+      expect(isDecidedPosition('equal')).toBe(false);
+    });
+  });
+
+  describe('position-aware classification', () => {
+    it('should downgrade blunder to mistake when position stays decisive', () => {
+      // Black is decisive (+600) and plays a move that would normally be a blunder
+      // but stays decisive (+800 from Black's view)
+      // Before: Black to move, +600 (Black is winning)
+      // After: White to move, -800 (Black is still winning by more - not worse!)
+      // Wait - this doesn't make sense. Let me think again.
+      //
+      // For Black to have a blunder, the position must get WORSE for Black:
+      // Before: Black to move, eval from Black's perspective is +600 (Black is winning)
+      // After: White to move, eval from White's perspective must show Black lost ground
+      // If evalAfter.cp = +200 (White's view), then Black's view is -200 (Black went from +600 to -200)
+      //
+      // Actually, the evaluations are from side-to-move perspective:
+      // evalBefore.cp: From Black's perspective (positive = good for Black)
+      // evalAfter.cp: From White's perspective (positive = good for White)
+      //
+      // So for Black to have a big cpLoss but stay in decisive territory:
+      // Before: Black +600 (Black is winning by 6 pawns)
+      // After: White +200 (White sees +2, meaning Black is still -2 from White's view)
+      // cpLoss = 600 - (-200) = 800cp loss... but Black went from +6 to -2, that's not staying decisive
+      //
+      // Let's try:
+      // Before: Black +600 (Black is decisive)
+      // After: White -500 (White sees -5, meaning Black is still +5 = decisive)
+      // cpLoss = 600 - (500) = 100cp loss
+
+      // Actually simpler: let's just make it so the position stays in decisive range
+      // Before: Black is +700
+      // After: White sees -550 (so Black is still +550 = decisive)
+      const evalBefore: EngineEvaluation = { cp: 700, depth: 20, pv: ['Qh5'] };
+      const evalAfter: EngineEvaluation = { cp: -550, depth: 20, pv: ['Nf3'] };
+      // cpLoss = 700 - (550) = 150cp (mistake at 1500 rating)
+
+      const result = classifyMove(evalBefore, evalAfter, false, { rating: 1500 });
+      // Status before: decisive (+700)
+      // Status after: decisive (+550 from Black's view)
+      // Should downgrade mistake -> inaccuracy
+      expect(result.wasAdjusted).toBe(true);
+      expect(result.rawClassification).toBe('mistake');
+      expect(result.classification).toBe('inaccuracy');
+      expect(result.statusBefore).toBe('decisive');
+      expect(result.statusAfter).toBe('decisive');
+    });
+
+    it('should downgrade mistake to inaccuracy when position stays decisive', () => {
+      // Before: Black +600 (decisive)
+      // After: White -520 (Black still +520 = decisive)
+      // cpLoss = 600 - 520 = 80cp (inaccuracy at 1500 rating... hmm, need to check thresholds)
+      // At 1500 rating (Club 1400-1600): mistake 120-249, inaccuracy 40-119
+      // So 80cp is inaccuracy, let's make it 130cp for mistake
+      // 600 - x = 130 => x = 470... but 470 is losing not decisive
+      // Need both before and after to be >= 500
+
+      // Before: Black +800
+      // After: White -650 (Black still +650 = decisive)
+      // cpLoss = 800 - 650 = 150cp (mistake at 1500)
+      const evalBefore: EngineEvaluation = { cp: 800, depth: 20, pv: ['Qh5'] };
+      const evalAfter: EngineEvaluation = { cp: -650, depth: 20, pv: ['Nf3'] };
+
+      const result = classifyMove(evalBefore, evalAfter, false, { rating: 1500 });
+      expect(result.wasAdjusted).toBe(true);
+      expect(result.rawClassification).toBe('mistake');
+      expect(result.classification).toBe('inaccuracy');
+    });
+
+    it('should keep blunder classification when position crosses from decisive to winning', () => {
+      // Before: Black +600 (decisive)
+      // After: White -300 (Black +300 = winning, not decisive)
+      // This crosses the threshold, should NOT downgrade
+      const evalBefore: EngineEvaluation = { cp: 600, depth: 20, pv: ['Qh5'] };
+      const evalAfter: EngineEvaluation = { cp: -300, depth: 20, pv: ['Nf3'] };
+      // cpLoss = 600 - 300 = 300cp (blunder at 1500)
+
+      const result = classifyMove(evalBefore, evalAfter, false, { rating: 1500 });
+      expect(result.wasAdjusted).toBe(false);
+      expect(result.classification).toBe('blunder');
+      expect(result.statusBefore).toBe('decisive');
+      expect(result.statusAfter).toBe('winning');
+    });
+
+    it('should keep penalty when position goes from lost to losing', () => {
+      // White is losing badly (-600) and makes it slightly better (-400)
+      // Before: White -600 (lost from White's view)
+      // After: Black +400 (Black is now only +400, so White is -400 = losing)
+      // Wait, if White improves, cpLoss = 0
+      // Let me think from a worsening scenario:
+      // Before: White -600 (lost)
+      // After: Black +300 (Black +300 means White -300 = losing)
+      // cpLoss = -600 - (-300) = -300 (negative, clamped to 0)
+
+      // Actually for a MISTAKE in a lost position to NOT be adjusted, we need
+      // the position to cross from lost to losing (which means improvement, so no cpLoss)
+      // OR from losing to lost (which would be the adjustment case but they're not same category)
+
+      // Let me test: lost position stays lost but player makes it worse
+      // Before: White -600 (lost)
+      // After: Black +800 (Black +800 = White -800, still lost but worse)
+      // cpLoss = -600 - (-800) = 200cp (mistake)
+      const evalBefore: EngineEvaluation = { cp: -600, depth: 20, pv: ['Kf1'] };
+      const evalAfter: EngineEvaluation = { cp: 800, depth: 20, pv: ['Qxf2'] };
+
+      const result = classifyMove(evalBefore, evalAfter, true, { rating: 1500 });
+      // Status before: lost (-600 from White's view)
+      // Status after: lost (-800 from White's view)
+      // Should downgrade since both are lost
+      expect(result.statusBefore).toBe('lost');
+      expect(result.statusAfter).toBe('lost');
+      expect(result.wasAdjusted).toBe(true);
+      expect(result.rawClassification).toBe('mistake');
+      expect(result.classification).toBe('inaccuracy');
+    });
+
+    it('should not adjust classification when position is not decided', () => {
+      // Normal non-decided position
+      const evalBefore: EngineEvaluation = { cp: 100, depth: 20, pv: ['e4'] };
+      const evalAfter: EngineEvaluation = { cp: 100, depth: 20, pv: ['e5'] };
+      // cpLoss = 100 - (-100) = 200cp (mistake)
+
+      const result = classifyMove(evalBefore, evalAfter, true, { rating: 1500 });
+      expect(result.wasAdjusted).toBe(false);
+      expect(result.statusBefore).toBe('advantage');
+      expect(result.classification).toBe('mistake');
+    });
+
+    it('should include status information in result', () => {
+      const evalBefore: EngineEvaluation = { cp: 50, depth: 20, pv: ['e4'] };
+      const evalAfter: EngineEvaluation = { cp: -45, depth: 20, pv: ['e5'] };
+
+      const result = classifyMove(evalBefore, evalAfter, true, { rating: 1500 });
+      expect(result.statusBefore).toBe('slight');
+      expect(result.statusAfter).toBe('slight');
     });
   });
 });

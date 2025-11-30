@@ -217,3 +217,50 @@ export const CRITICAL_MOMENT_THRESHOLDS = {
   /** Minimum interestingness score to be included */
   minInterestingnessScore: 30,
 };
+
+/**
+ * Threshold for considering a position "decided" (game outcome determined)
+ * 500cp = 5 pawns advantage
+ */
+export const DECIDED_THRESHOLD = 500;
+
+/**
+ * Position status from the moving player's perspective
+ * Used for position-aware classification adjustments
+ */
+export type PositionStatus =
+  | 'decisive' // ≥500cp - game is decided
+  | 'winning' // 200-499cp - clear winning advantage
+  | 'advantage' // 100-199cp - significant edge
+  | 'slight' // 30-99cp - small edge
+  | 'equal' // -29 to +29cp
+  | 'slight_worse' // -30 to -99cp
+  | 'worse' // -100 to -199cp
+  | 'losing' // -200 to -499cp
+  | 'lost'; // ≤-500cp - game is decided against
+
+/**
+ * Get the position status based on centipawn evaluation from player's perspective
+ *
+ * @param cp - Centipawn evaluation (positive = good for player)
+ * @returns Position status category
+ */
+export function getPositionStatus(cp: number): PositionStatus {
+  if (cp >= 500) return 'decisive';
+  if (cp >= 200) return 'winning';
+  if (cp >= 100) return 'advantage';
+  if (cp >= 30) return 'slight';
+  if (cp >= -29) return 'equal';
+  if (cp >= -99) return 'slight_worse';
+  if (cp >= -199) return 'worse';
+  if (cp >= -499) return 'losing';
+  return 'lost';
+}
+
+/**
+ * Check if a position status represents a decided game
+ * (either winning decisively or losing decisively)
+ */
+export function isDecidedPosition(status: PositionStatus): boolean {
+  return status === 'decisive' || status === 'lost';
+}

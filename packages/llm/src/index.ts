@@ -446,9 +446,11 @@ export {
 export {
   AgenticVariationExplorer,
   createAgenticExplorer,
+  assessExplorationWorthiness,
   type AgenticExplorerConfig,
   type AgenticExplorerProgress,
   type AgenticExplorerResult,
+  type ExplorationWorthiness,
 } from './explorer/index.js';
 
 // Agentic annotation

@@ -139,9 +139,17 @@ export function assessContinuation(
   switch (resolution.state) {
     case 'winning_white':
     case 'winning_black':
-      // No penalty - explore winning positions to show how to convert
-      // This is valuable for instructional annotations
-      reasons.push(`Position is decisive: ${resolution.reason}`);
+      // Check if there's counterplay before deciding to continue or stop
+      if (hasTension) {
+        // Winning position with counterplay - worth exploring
+        score += 10;
+        reasons.push(`Decisive but has counterplay: ${resolution.reason}`);
+      } else {
+        // Quiet winning position - wrap up soon
+        // The evaluation is already decisive, no need to prove it further
+        score -= 25;
+        reasons.push(`Quiet decided position - wrap up: ${resolution.reason}`);
+      }
       break;
     case 'draw':
       score -= 10; // Reduced penalty (was -20) - drawish positions can still be instructive
