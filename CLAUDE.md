@@ -128,10 +128,12 @@ Common emoji prefixes:
 - Components: `agentic-explorer.ts`, `variation-tree.ts`, `exploration-tools.ts`, `stopping-heuristics.ts`
 - Tree-based architecture: Root = position before move, LLM starts AT the played move
 - Navigation tools: `get_position`, `add_move`, `add_alternative`, `go_to`, `go_to_parent`, `get_tree`
-- Annotation tools: `annotate`, `add_nag`, `set_principal`
+- Annotation tools: `set_comment`, `get_comment`, `add_move_nag`, `set_position_nag`, `get_nags`, `clear_nags`, `set_principal`
 - Work queue: `mark_interesting`, `get_interesting`, `clear_interesting`
-- Analysis tools: `evaluate_position`, `predict_human_moves`, `lookup_opening`, `find_reference_games`
+- Analysis tools: `get_candidate_moves`, `evaluate_position`, `predict_human_moves`, `lookup_opening`, `find_reference_games`
 - Control: `assess_continuation`, `finish_exploration`
+- NAG rules: Move NAGs ($1-$6) use freely, Position NAGs ($10-$19) ONLY at end of variation
+- Side-to-move context: LLM told explicitly which color's alternatives to explore
 - Comment validation: 2-8 words max, lowercase, no meta-commentary
 - Intelligent caching for Stockfish evaluations (depth ≥ 14)
 - Default max 40 tool calls (`--exploration-max-tool-calls`)

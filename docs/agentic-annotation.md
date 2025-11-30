@@ -109,8 +109,12 @@ The tree converts to PGN:
 
 | Tool | Description |
 |------|-------------|
-| `annotate(comment, nags)` | Add comment (2-8 words) and/or NAGs |
-| `add_nag(nag)` | Add single NAG ($1=!, $2=?, etc.) |
+| `set_comment(comment)` | Set/replace comment on current node (2-8 words) |
+| `get_comment` | Get current comment |
+| `add_move_nag(nag)` | Add move quality NAG ($1-$6). Use freely. |
+| `set_position_nag(nag)` | Set position evaluation NAG ($10-$19). **ONLY at END of variation!** |
+| `get_nags` | Get all NAGs on current node |
+| `clear_nags` | Remove all NAGs |
 | `set_principal(san)` | Mark child as main continuation |
 
 ### Work Queue
@@ -125,6 +129,7 @@ The tree converts to PGN:
 
 | Tool | Description |
 |------|-------------|
+| `get_candidate_moves(count)` | Get top N engine moves for side to move. **USE FIRST!** |
 | `evaluate_position` | Engine evaluation (cached) |
 | `predict_human_moves` | Maia predictions for target rating |
 | `lookup_opening` | Opening name and theory |
@@ -136,6 +141,34 @@ The tree converts to PGN:
 |------|-------------|
 | `assess_continuation` | Should exploration continue? |
 | `finish_exploration` | Signal completion |
+
+## NAG Rules
+
+### Move Quality NAGs (use freely)
+
+| NAG | Symbol | Meaning |
+|-----|--------|---------|
+| `$1` | ! | Good move |
+| `$2` | ? | Mistake |
+| `$3` | !! | Brilliant move |
+| `$4` | ?? | Blunder |
+| `$5` | !? | Interesting move |
+| `$6` | ?! | Dubious move |
+
+### Position Evaluation NAGs (ONLY at END of variation!)
+
+| NAG | Symbol | Meaning |
+|-----|--------|---------|
+| `$10` | = | Equal position |
+| `$13` | ∞ | Unclear |
+| `$14` | ⩲ | Slight White advantage |
+| `$15` | ⩱ | Slight Black advantage |
+| `$16` | ± | Moderate White advantage |
+| `$17` | ∓ | Moderate Black advantage |
+| `$18` | +− | Decisive White advantage |
+| `$19` | −+ | Decisive Black advantage |
+
+**⚠️ NEVER put position NAGs mid-variation. Only at the final position of a line.**
 
 ## Comment Guidelines
 

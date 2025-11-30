@@ -135,68 +135,120 @@ export const GET_TREE_TOOL: OpenAITool = {
 // =============================================================================
 
 /**
- * Tool: Annotate current node (comment and/or NAGs)
+ * Tool: Set/replace comment on current node
  */
-export const ANNOTATE_TOOL: OpenAITool = {
+export const SET_COMMENT_TOOL: OpenAITool = {
   type: 'function',
   function: {
-    name: 'annotate',
+    name: 'set_comment',
     description:
-      'Add comment and/or NAGs to the current node. Comments should be SHORT (2-8 words), lowercase, no ending punctuation. NEVER repeat the move notation in comments.',
+      'Set or replace comment on current node. Comments must be SHORT (2-8 words), lowercase, no ending punctuation. NEVER repeat the move notation.',
     parameters: {
       type: 'object',
       properties: {
         comment: {
           type: 'string',
           description:
-            'Short annotation (2-8 words). Example: "wins material", "threatening mate", "the point"',
-        },
-        nags: {
-          type: 'array',
-          items: { type: 'string' },
-          description:
-            'Array of NAGs. Move quality: $1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!. Position eval: $10=drawish, $13=unclear, $14-$15=slight edge, $16-$17=moderate advantage, $18-$19=decisive advantage',
+            'Short annotation (2-8 words). Examples: "wins material", "threatening mate", "strong outpost"',
         },
       },
+      required: ['comment'],
+    },
+  },
+};
+
+/**
+ * Tool: Get current comment on node
+ */
+export const GET_COMMENT_TOOL: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'get_comment',
+    description: 'Get the current comment on this node (if any).',
+    parameters: {
+      type: 'object',
+      properties: {},
       required: [],
     },
   },
 };
 
 /**
- * Tool: Add a single NAG to current node
+ * Tool: Add move quality NAG ($1-$6)
  */
-export const ADD_NAG_TOOL: OpenAITool = {
+export const ADD_MOVE_NAG_TOOL: OpenAITool = {
   type: 'function',
   function: {
-    name: 'add_nag',
-    description: 'Add a single NAG to current node (appends to existing NAGs).',
+    name: 'add_move_nag',
+    description: 'Add a move quality NAG to current node. Use freely to mark good/bad moves.',
     parameters: {
       type: 'object',
       properties: {
         nag: {
           type: 'string',
-          enum: [
-            '$1',
-            '$2',
-            '$3',
-            '$4',
-            '$5',
-            '$6',
-            '$10',
-            '$13',
-            '$14',
-            '$15',
-            '$16',
-            '$17',
-            '$18',
-            '$19',
-          ],
+          enum: ['$1', '$2', '$3', '$4', '$5', '$6'],
           description:
-            '$1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!, $10=drawish, $13=unclear, $14=slight edge white, $15=slight edge black, $16-$17=moderate advantage, $18-$19=decisive advantage',
+            '$1=! (good), $2=? (mistake), $3=!! (brilliant), $4=?? (blunder), $5=!? (interesting), $6=?! (dubious)',
         },
       },
       required: ['nag'],
+    },
+  },
+};
+
+/**
+ * Tool: Set position evaluation NAG ($10-$19)
+ * ONLY use at the END of a variation when position is clarified!
+ */
+export const SET_POSITION_NAG_TOOL: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'set_position_nag',
+    description:
+      'Set position evaluation NAG. ONLY use at the END of a variation when the position is clarified! NEVER mid-variation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nag: {
+          type: 'string',
+          enum: ['$10', '$13', '$14', '$15', '$16', '$17', '$18', '$19'],
+          description:
+            '$10=equal, $13=unclear, $14=slight White advantage, $15=slight Black advantage, $16=moderate White advantage, $17=moderate Black advantage, $18=decisive White advantage, $19=decisive Black advantage',
+        },
+      },
+      required: ['nag'],
+    },
+  },
+};
+
+/**
+ * Tool: Get all NAGs on current node
+ */
+export const GET_NAGS_TOOL: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'get_nags',
+    description: 'Get all NAGs currently on this node.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+};
+
+/**
+ * Tool: Clear all NAGs from current node
+ */
+export const CLEAR_NAGS_TOOL: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'clear_nags',
+    description: 'Remove all NAGs from current node.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
     },
   },
 };
@@ -290,6 +342,29 @@ export const CLEAR_INTERESTING_TOOL: OpenAITool = {
 // =============================================================================
 // ANALYSIS TOOLS
 // =============================================================================
+
+/**
+ * Tool: Get candidate moves from engine
+ * Returns top N moves with evaluations to help LLM choose alternatives
+ */
+export const GET_CANDIDATE_MOVES_TOOL: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'get_candidate_moves',
+    description:
+      'Get the best candidate moves from the engine for the current position. Use this FIRST to know what alternatives to explore. Returns moves for the side to move.',
+    parameters: {
+      type: 'object',
+      properties: {
+        count: {
+          type: 'number',
+          description: 'Number of moves to return (default: 3, max: 5)',
+        },
+      },
+      required: [],
+    },
+  },
+};
 
 /**
  * Tool: Evaluate position with engine
@@ -439,9 +514,13 @@ export const EXPLORATION_TOOLS: OpenAITool[] = [
   GO_TO_PARENT_TOOL,
   GET_TREE_TOOL,
 
-  // Annotation
-  ANNOTATE_TOOL,
-  ADD_NAG_TOOL,
+  // Annotation (separate CRUD operations)
+  SET_COMMENT_TOOL,
+  GET_COMMENT_TOOL,
+  ADD_MOVE_NAG_TOOL,
+  SET_POSITION_NAG_TOOL,
+  GET_NAGS_TOOL,
+  CLEAR_NAGS_TOOL,
   SET_PRINCIPAL_TOOL,
 
   // Work queue
@@ -450,6 +529,7 @@ export const EXPLORATION_TOOLS: OpenAITool[] = [
   CLEAR_INTERESTING_TOOL,
 
   // Analysis
+  GET_CANDIDATE_MOVES_TOOL,
   EVALUATE_POSITION_TOOL,
   PREDICT_HUMAN_MOVES_TOOL,
   LOOKUP_OPENING_TOOL,
