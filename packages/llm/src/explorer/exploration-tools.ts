@@ -82,7 +82,8 @@ export const GO_TO_TOOL: OpenAITool = {
   type: 'function',
   function: {
     name: 'go_to',
-    description: 'Jump to a position in the tree by its FEN. If multiple nodes have this FEN (transposition), prefers the one on the principal path.',
+    description:
+      'Jump to a position in the tree by its FEN. If multiple nodes have this FEN (transposition), prefers the one on the principal path.',
     parameters: {
       type: 'object',
       properties: {
@@ -119,7 +120,8 @@ export const GET_TREE_TOOL: OpenAITool = {
   type: 'function',
   function: {
     name: 'get_tree',
-    description: 'Get ASCII visualization of the entire variation tree. Shows all nodes, principal markers [P], and your current position.',
+    description:
+      'Get ASCII visualization of the entire variation tree. Shows all nodes, principal markers [P], and your current position.',
     parameters: {
       type: 'object',
       properties: {},
@@ -146,7 +148,8 @@ export const ANNOTATE_TOOL: OpenAITool = {
       properties: {
         comment: {
           type: 'string',
-          description: 'Short annotation (2-8 words). Example: "wins material", "threatening mate", "the point"',
+          description:
+            'Short annotation (2-8 words). Example: "wins material", "threatening mate", "the point"',
         },
         nags: {
           type: 'array',
@@ -174,8 +177,20 @@ export const ADD_NAG_TOOL: OpenAITool = {
         nag: {
           type: 'string',
           enum: [
-            '$1', '$2', '$3', '$4', '$5', '$6',
-            '$10', '$13', '$14', '$15', '$16', '$17', '$18', '$19',
+            '$1',
+            '$2',
+            '$3',
+            '$4',
+            '$5',
+            '$6',
+            '$10',
+            '$13',
+            '$14',
+            '$15',
+            '$16',
+            '$17',
+            '$18',
+            '$19',
           ],
           description:
             '$1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!, $10=drawish, $13=unclear, $14=slight edge white, $15=slight edge black, $16-$17=moderate advantage, $18-$19=decisive advantage',
@@ -193,7 +208,8 @@ export const SET_PRINCIPAL_TOOL: OpenAITool = {
   type: 'function',
   function: {
     name: 'set_principal',
-    description: 'Mark a child move as the principal continuation (main line) from current position.',
+    description:
+      'Mark a child move as the principal continuation (main line) from current position.',
     parameters: {
       type: 'object',
       properties: {
@@ -218,7 +234,8 @@ export const MARK_INTERESTING_TOOL: OpenAITool = {
   type: 'function',
   function: {
     name: 'mark_interesting',
-    description: 'Add moves to the "to explore" queue for current position. Use this to track candidates you want to examine.',
+    description:
+      'Add moves to the "to explore" queue for current position. Use this to track candidates you want to examine.',
     parameters: {
       type: 'object',
       properties: {
@@ -281,7 +298,8 @@ export const EVALUATE_POSITION_TOOL: OpenAITool = {
   type: 'function',
   function: {
     name: 'evaluate_position',
-    description: 'Get engine evaluation of current position including best line (PV). Result is cached on the node.',
+    description:
+      'Get engine evaluation of current position including best line (PV). Result is cached on the node.',
     parameters: {
       type: 'object',
       properties: {
