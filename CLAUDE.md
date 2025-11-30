@@ -122,16 +122,19 @@ Common emoji prefixes:
 - Available models: `gpt-5-codex`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
 - Pricing tracked in `packages/llm/src/cost/pricing.ts`
 
-**Agentic Exploration Mode** (see `packages/llm/src/explorer/`):
-- Opt-in via `--agentic-exploration` CLI flag
-- LLM has full control over variation exploration with tool-calling loop
-- Components: `agentic-explorer.ts`, `exploration-state.ts`, `exploration-tools.ts`, `stopping-heuristics.ts`
-- Board visualization: `packages/pgn/src/chess/board-visualizer.ts` provides ASCII representation
-- 14 exploration tools: `get_board`, `push_move`, `pop_move`, `start_branch`, `end_branch`, `add_comment`, `add_nag`, `suggest_nag`, `get_eval_nag`, `evaluate_position`, `predict_human_moves`, `lookup_opening`, `find_reference_games`, `assess_continuation`, `finish_exploration`
-- NAG suggestion tools use same criteria as standard analysis
-- Hybrid stopping heuristics: tactical tension, eval swings, budget awareness
-- Intelligent caching for expensive Stockfish evaluations (depth ≥ 14)
-- Default max 40 tool calls per exploration (`--exploration-max-tool-calls`)
+**Agentic Exploration Mode** (see `packages/llm/src/explorer/` and `docs/agentic-annotation.md`):
+- Opt-in via `--agentic` CLI flag
+- LLM navigates a tree structure with tool-calling loop
+- Components: `agentic-explorer.ts`, `variation-tree.ts`, `exploration-tools.ts`, `stopping-heuristics.ts`
+- Tree-based architecture: Root = position before move, LLM starts AT the played move
+- Navigation tools: `get_position`, `add_move`, `add_alternative`, `go_to`, `go_to_parent`, `get_tree`
+- Annotation tools: `annotate`, `add_nag`, `set_principal`
+- Work queue: `mark_interesting`, `get_interesting`, `clear_interesting`
+- Analysis tools: `evaluate_position`, `predict_human_moves`, `lookup_opening`, `find_reference_games`
+- Control: `assess_continuation`, `finish_exploration`
+- Comment validation: 2-8 words max, lowercase, no meta-commentary
+- Intelligent caching for Stockfish evaluations (depth ≥ 14)
+- Default max 40 tool calls (`--exploration-max-tool-calls`)
 - Default max 50 half-moves depth (`--exploration-max-depth`)
 
 ## Testing Requirements

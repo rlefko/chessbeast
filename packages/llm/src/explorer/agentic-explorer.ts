@@ -37,21 +37,35 @@ function validateAndCleanComment(
   comment: string,
   lastMoveSan?: string,
 ): { cleaned: string; rejected: boolean; reason?: string } {
-  if (comment.length > 100) {
+  // Reject meta-commentary patterns (before any cleanup)
+  const bannedPatterns = [
+    /from\s+(our|my|the|white's|black's)\s+(side|perspective)/i,
+    /this\s+move\s+(is|was)/i,
+    /the\s+(played|actual)\s+move/i,
+    /from\s+(our|my)\s+point\s+of\s+view/i,
+  ];
+
+  for (const pattern of bannedPatterns) {
+    if (pattern.test(comment)) {
+      return {
+        cleaned: '',
+        rejected: true,
+        reason:
+          'Comment should describe the position/move, not meta-commentary. Use 2-8 words like "threatens mate" or "wins material".',
+      };
+    }
+  }
+
+  // Reject if too long (50 chars ≈ 8 words)
+  if (comment.length > 50) {
     return {
       cleaned: '',
       rejected: true,
-      reason: 'Comment too long (max 100 chars). Keep it to 2-8 words.',
+      reason: 'Comment too long. Maximum 8 words (50 chars). Be concise.',
     };
   }
 
   let cleaned = comment;
-
-  // Silent cleanup: Remove perspective phrases
-  cleaned = cleaned.replace(
-    /from\s+(black|white|my|their|black's|white's)\s+(perspective|point of view|pov|view|side)[,:]?\s*/gi,
-    '',
-  );
 
   // Silent cleanup: Remove move notation at start
   if (lastMoveSan) {
@@ -210,10 +224,18 @@ export class AgenticVariationExplorer {
     onProgress?: (progress: AgenticExplorerProgress) => void,
     gameMoves?: Array<{ san: string; fenAfter: string }>,
   ): Promise<AgenticExplorerResult> {
-    // Initialize tree with game moves (pre-populated principal path)
+    // Initialize tree with position BEFORE the played move
     const tree = new VariationTree(startingFen);
+
+    // If we have game moves, initialize the principal path
     if (gameMoves && gameMoves.length > 0) {
       tree.initializeFromMoves(gameMoves);
+    }
+
+    // CRITICAL: Add the played move as a child so LLM starts AT it (not at root)
+    // This allows add_alternative() to work immediately (creates sibling)
+    if (playedMove) {
+      tree.addMove(playedMove);
     }
 
     let toolCallCount = 0;
@@ -716,96 +738,67 @@ export class AgenticVariationExplorer {
    * Build the system prompt for tree-based exploration
    */
   private buildSystemPrompt(targetRating: number): string {
-    return `You are an expert chess analyst exploring variations in a tree structure.
+    return `You are a chess coach showing a student what they did wrong and what they should have done.
 
 TARGET AUDIENCE: ${targetRating} rated players
 
-## THE TREE
+## YOUR POSITION
 
-You're navigating a tree where:
-- Each node is a chess position (identified by FEN)
-- The game's main line is already in the tree, marked as "principal"
-- You add alternatives and annotations to create instructive analysis
+You start AT the move that was played (not before it).
+This means you can IMMEDIATELY use add_alternative to show better moves.
 
 ## YOUR TOOLS
 
-### Navigation
-- get_position: Get current node info (FEN, children, parent, principal)
-- add_move(san): Play a move, creating a child node. You move to it. Use to CONTINUE a line.
-- add_alternative(san): Add a different move at current position. You stay here. Use to CREATE a sideline.
-- go_to(fen): Jump to any position in the tree by FEN
-- go_to_parent: Move up one level
-- get_tree: See ASCII visualization of entire tree
+**Show alternatives (what SHOULD have been played):**
+- add_alternative(san) - Add a better move as a sibling. You stay at current position.
+- go_to(fen) - Navigate to the alternative's FEN to explore it.
+- add_move(san) - Continue the line by adding a child move. You move to it.
 
-### Annotation
-- annotate(comment, nags): Add comment and/or NAGs to current node
-- add_nag(nag): Add a single NAG ($1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!)
-- set_principal(san): Mark a child as the main continuation
+**Annotate (do this INLINE as you explore, not at the end):**
+- annotate(comment, nags) - Add brief comment (2-8 words, lowercase, no punctuation)
+  GOOD: "wins the exchange", "threatens mate", "strong outpost"
+  BAD: "From our perspective, this move is passive and misses..."
 
-### Planning
-- mark_interesting(moves): Note moves you want to explore later
-- get_interesting: See what you haven't explored yet
-- clear_interesting(move): Remove from list after exploring
+**Finish:**
+- finish_exploration(summary) - When done exploring
 
-### Analysis
-- evaluate_position: Get engine evaluation (cached on node)
-- predict_human_moves: What would a ${targetRating} player do?
-- lookup_opening: Opening name and theory
-- find_reference_games: Master games from this position
+**Analysis (use sparingly):**
+- evaluate_position - Get engine evaluation
+- predict_human_moves - What would a ${targetRating} player do?
 
-### Control
-- assess_continuation: Should I keep exploring this line?
-- finish_exploration: Signal completion
+## WORKFLOW
 
-## KEY WORKFLOW
+1. Call evaluate_position to see what's best
+2. add_alternative(betterMove) to show the improvement
+3. go_to the alternative's FEN
+4. annotate with a SHORT comment (2-8 words)
+5. add_move to continue the line 4-8 more moves
+6. annotate key moments along the way
+7. finish_exploration when done
 
-1. Start at the position to analyze
-2. evaluate_position to understand what's happening
-3. mark_interesting with candidate moves to explore
-4. For each interesting move:
-   - add_alternative(move) to create the sideline
-   - go_to(alternative_fen) to navigate there
-   - add_move to continue the line (8-15 moves deep)
-   - annotate key moments
-   - go_to(original_fen) when done
-   - clear_interesting(move)
-5. finish_exploration when complete
+## EXAMPLE
 
-## EXAMPLE: Showing a Better Move
+Position at 12. Qe2 (an inaccuracy). Engine says Re1 was better.
 
-Position after 12...h6 (a mistake). Engine says 12...a5 was better.
+1. evaluate_position           → "Re1 is +1.2, Qe2 is +0.6"
+2. add_alternative("Re1")      → Creates sibling to Qe2, returns FEN
+3. go_to(<Re1_fen>)            → Navigate to Re1 position
+4. annotate("activates the rook")
+5. add_move("Nd7")             → Continue: 12...Nd7
+6. add_move("Ne5")             → 13. Ne5
+7. annotate("strong outpost")
+8. finish_exploration("showed Re1 improvement")
 
-\`\`\`
-1. mark_interesting(["a5"])           // Note we want to show a5
-2. add_alternative("a5")              // Create 12...a5 as alternative
-3. go_to(<a5_fen>)                    // Move to that position
-4. annotate("gaining queenside space")
-5. add_move("Ne5")                    // Continue: 13.Ne5
-6. add_move("Qb6")                    // 13...Qb6
-7. add_move("Ba4")                    // 14.Ba4
-8. add_move("bxa4")                   // 14...bxa4
-9. annotate("wins the bishop pair")
-10. go_to(<h6_fen>)                   // Back to main line
-11. clear_interesting("a5")           // Done with a5
-12. finish_exploration
-\`\`\`
-
-Result: Clean PGN with (12...a5 {comment} 13.Ne5 Qb6 14.Ba4 bxa4 {comment})
+Result: (12. Re1 {activates the rook} Nd7 13. Ne5 {strong outpost})
 
 ## CRITICAL RULES
 
-1. **add_move CONTINUES a line** - adds child, moves to it
-2. **add_alternative CREATES a sideline** - adds sibling, stays put
-3. **Explore DEEPLY** - 8-15 moves for critical lines, don't stop mid-tactics
-4. **Short comments only** - 2-8 words, lowercase, no ending punctuation
-5. **NEVER repeat move notation in comments** - say "wins material" not "Nxg7 wins material"
-
-## ANNOTATION STYLE
-
-- Max 2 sentences per comment
-- No numeric evaluations (use "winning", "slight edge", "equal")
-- Focus on WHY, not just outcomes
-- NAGs: $1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!, $14-$19 for position eval`;
+1. **add_alternative = create sideline** (you stay put, creates sibling)
+2. **add_move = continue line** (you move to the new position)
+3. **Annotate INLINE** as you explore, not all at the end
+4. **Comments: 2-8 words only** - lowercase, no punctuation
+5. **NEVER say "from our perspective" or "this move is"**
+6. **NEVER repeat move notation in comments**`;
   }
 
   /**
@@ -825,38 +818,44 @@ Result: Clean PGN with (12...a5 {comment} 13.Ne5 Qb6 14.Ba4 bxa4 {comment})
       | 'brilliant'
       | 'forced',
   ): string {
-    const parts = ['STARTING POSITION:', '', `FEN: ${fen}`, '', board];
+    const parts: string[] = [];
 
     if (playedMove) {
+      // LLM starts AT the played move (we already added it to the tree)
+      const classLabel = moveClassification ? ` (${moveClassification})` : '';
+      parts.push(`YOU ARE AT: ${playedMove}${classLabel}`);
       parts.push('');
-      parts.push(`THE MOVE PLAYED WAS: ${playedMove}`);
+      parts.push(board);
       parts.push('');
-      parts.push('The starting position is BEFORE this move was played.');
+      parts.push(`FEN: ${fen}`);
+      parts.push('');
 
       if (moveClassification === 'blunder' || moveClassification === 'mistake') {
-        parts.push('');
-        parts.push('This move is a significant error. Your task:');
-        parts.push('1. Use add_alternative to show what SHOULD have been played.');
-        parts.push('2. Navigate to the alternative and explore deeply (8-15 moves).');
-        parts.push('3. Annotate key moments explaining why the alternative is better.');
+        parts.push('This was a significant error. Show what should have been played:');
+        parts.push('1. add_alternative(betterMove) - creates sibling to this move');
+        parts.push('2. go_to the alternative FEN');
+        parts.push('3. add_move to continue 4-8 moves deep');
+        parts.push('4. annotate key moments (2-8 words each)');
       } else if (moveClassification === 'inaccuracy') {
-        parts.push('');
-        parts.push('This move is slightly inaccurate. Your task:');
-        parts.push('1. Use add_alternative to show the stronger option.');
-        parts.push('2. Explain the key difference (may be subtle).');
+        parts.push('This was slightly inaccurate. Show the stronger option:');
+        parts.push('1. add_alternative(betterMove)');
+        parts.push('2. go_to and explore briefly');
+        parts.push('3. annotate the key difference');
       } else {
-        parts.push('');
-        parts.push('Explore the key continuations from this position.');
-        parts.push('Use add_alternative to show important sidelines.');
+        parts.push('Explore alternatives from this position.');
       }
     } else {
+      parts.push('POSITION:');
+      parts.push('');
+      parts.push(board);
+      parts.push('');
+      parts.push(`FEN: ${fen}`);
       parts.push('');
       parts.push('Explore the key variations from this position.');
-      parts.push('Use add_alternative for sidelines and add_move to continue lines.');
     }
 
     parts.push('');
-    parts.push('Start by calling evaluate_position to understand the tactical themes.');
+    parts.push('Start with evaluate_position to see the best moves.');
 
     return parts.join('\n');
   }
