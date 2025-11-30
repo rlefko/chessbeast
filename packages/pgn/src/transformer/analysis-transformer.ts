@@ -70,6 +70,8 @@ export interface ExploredVariation {
   source: 'engine' | 'maia' | 'llm';
   /** Final evaluation at the end of the line (for position NAG) */
   finalEval?: EngineEvaluation;
+  /** Nested sub-variations branching from this line */
+  branches?: ExploredVariation[];
 }
 
 /**
@@ -443,7 +445,7 @@ function buildPvMoves(
  * Transform explored variations from VariationExplorer into MoveInfo arrays
  *
  * Explored variations are deep, LLM-guided lines (10-40 moves) that are more
- * instructive than shallow MultiPV alternatives.
+ * instructive than shallow MultiPV alternatives. Supports nested sub-variations.
  */
 function transformExploredVariations(
   move: MoveAnalysisInput,
@@ -456,104 +458,154 @@ function transformExploredVariations(
   // Limit to 2 explored variations per position (quality over quantity)
   const variationsToShow = move.exploredVariations.slice(0, 2);
 
-  return variationsToShow.map((explored) => {
-    const variationMoves: MoveInfo[] = [];
-    let currentMoveNumber = move.moveNumber;
-    let isWhiteMove = move.isWhiteMove;
+  return variationsToShow.map((explored) =>
+    transformSingleVariation(explored, move.fenBefore, move.moveNumber, move.isWhiteMove, opts, 0),
+  );
+}
 
-    // Track position for FEN generation
-    const pos = new ChessPosition(move.fenBefore);
+/**
+ * Transform a single ExploredVariation into MoveInfo[] with recursive branch handling
+ *
+ * @param explored - The explored variation to transform
+ * @param startingFen - FEN position at the start of the variation
+ * @param startMoveNumber - Move number at the start
+ * @param startsAsWhite - Whether the first move is White's
+ * @param opts - Transform options
+ * @param depth - Current nesting depth (for limiting)
+ */
+function transformSingleVariation(
+  explored: ExploredVariation,
+  startingFen: string,
+  startMoveNumber: number,
+  startsAsWhite: boolean,
+  opts: Required<TransformOptions>,
+  depth: number,
+): MoveInfo[] {
+  // Limit nesting depth
+  if (depth > opts.maxVariationDepth) {
+    return [];
+  }
 
-    // Limit to maxVariationMoves
-    const maxMoves = Math.min(explored.moves.length, opts.maxVariationMoves);
+  const variationMoves: MoveInfo[] = [];
+  let currentMoveNumber = startMoveNumber;
+  let isWhiteMove = startsAsWhite;
 
-    for (let i = 0; i < maxMoves; i++) {
-      const san = explored.moves[i];
-      if (!san) continue;
+  // Track position for FEN generation
+  const pos = new ChessPosition(startingFen);
 
-      const fenBefore = pos.fen();
-      let fenAfter = '';
+  // Limit to maxVariationMoves
+  const maxMoves = Math.min(explored.moves.length, opts.maxVariationMoves);
 
-      try {
-        pos.move(san);
-        fenAfter = pos.fen();
-      } catch {
-        // Invalid move, stop here
-        break;
-      }
+  for (let i = 0; i < maxMoves; i++) {
+    const san = explored.moves[i];
+    if (!san) continue;
 
-      const moveInfo: MoveInfo = {
-        moveNumber: currentMoveNumber,
-        san,
-        isWhiteMove,
-        fenBefore,
-        fenAfter,
-      };
+    const fenBefore = pos.fen();
+    let fenAfter = '';
 
-      // Attach annotation as comment if present for this move index
-      const annotation = explored.annotations?.[i];
-      if (annotation) {
-        moveInfo.commentAfter = annotation;
-      }
-
-      // Attach NAG if present for this move index
-      const nag = explored.nags?.[i];
-      if (nag) {
-        moveInfo.nags = moveInfo.nags ?? [];
-        if (!moveInfo.nags.includes(nag)) {
-          moveInfo.nags.push(nag);
-        }
-      }
-
-      variationMoves.push(moveInfo);
-
-      // Advance move number after Black's move
-      if (!isWhiteMove) {
-        currentMoveNumber++;
-      }
-      isWhiteMove = !isWhiteMove;
+    try {
+      pos.move(san);
+      fenAfter = pos.fen();
+    } catch {
+      // Invalid move, stop here
+      break;
     }
 
-    // Add position NAG at the END of the variation (not on main line)
-    // This shows the consequence of the variation after tension resolves
-    // Use getResolutionState() for comprehensive state detection
-    if (opts.includePositionNags && variationMoves.length > 0) {
-      const lastMove = variationMoves[variationMoves.length - 1]!;
+    const moveInfo: MoveInfo = {
+      moveNumber: currentMoveNumber,
+      san,
+      isWhiteMove,
+      fenBefore,
+      fenAfter,
+    };
 
-      // Get resolution state using final position FEN and evaluation
-      // Build eval object conditionally to satisfy exactOptionalPropertyTypes
-      let evalForResolution: { cp?: number; mate?: number } | undefined;
-      if (explored.finalEval) {
-        evalForResolution = {};
-        if (explored.finalEval.cp !== undefined) {
-          evalForResolution.cp = explored.finalEval.cp;
-        }
-        if (explored.finalEval.mate !== undefined) {
-          evalForResolution.mate = explored.finalEval.mate;
-        }
-      }
-      const resolution = getResolutionState(lastMove.fenAfter, evalForResolution);
+    // Attach annotation as comment if present for this move index
+    const annotation = explored.annotations?.[i];
+    if (annotation) {
+      moveInfo.commentAfter = annotation;
+    }
 
-      // Add NAG based on resolution state
-      if (resolution.nag) {
-        lastMove.nags = lastMove.nags ?? [];
-        // Avoid duplicate NAGs
-        if (!lastMove.nags.includes(resolution.nag)) {
-          lastMove.nags.push(resolution.nag);
-        }
-      }
-
-      // Add fallback ending comment if no annotation present and resolution provides one
-      if (!lastMove.commentAfter && resolution.reason) {
-        // Only add if it's informative (not just "quiet position")
-        if (resolution.state !== 'quiet' || resolution.reason !== 'quiet position') {
-          lastMove.commentAfter = resolution.reason;
-        }
+    // Attach NAG if present for this move index
+    const nag = explored.nags?.[i];
+    if (nag) {
+      moveInfo.nags = moveInfo.nags ?? [];
+      if (!moveInfo.nags.includes(nag)) {
+        moveInfo.nags.push(nag);
       }
     }
 
-    return variationMoves;
-  });
+    variationMoves.push(moveInfo);
+
+    // Advance move number after Black's move
+    if (!isWhiteMove) {
+      currentMoveNumber++;
+    }
+    isWhiteMove = !isWhiteMove;
+  }
+
+  // Add position NAG at the END of the variation (not on main line)
+  // This shows the consequence of the variation after tension resolves
+  // Use getResolutionState() for comprehensive state detection
+  if (opts.includePositionNags && variationMoves.length > 0) {
+    const lastMove = variationMoves[variationMoves.length - 1]!;
+
+    // Get resolution state using final position FEN and evaluation
+    // Build eval object conditionally to satisfy exactOptionalPropertyTypes
+    let evalForResolution: { cp?: number; mate?: number } | undefined;
+    if (explored.finalEval) {
+      evalForResolution = {};
+      if (explored.finalEval.cp !== undefined) {
+        evalForResolution.cp = explored.finalEval.cp;
+      }
+      if (explored.finalEval.mate !== undefined) {
+        evalForResolution.mate = explored.finalEval.mate;
+      }
+    }
+    const resolution = getResolutionState(lastMove.fenAfter, evalForResolution);
+
+    // Add NAG based on resolution state
+    if (resolution.nag) {
+      lastMove.nags = lastMove.nags ?? [];
+      // Avoid duplicate NAGs
+      if (!lastMove.nags.includes(resolution.nag)) {
+        lastMove.nags.push(resolution.nag);
+      }
+    }
+
+    // Add fallback ending comment if no annotation present and resolution provides one
+    if (!lastMove.commentAfter && resolution.reason) {
+      // Only add if it's informative (not just "quiet position")
+      if (resolution.state !== 'quiet' || resolution.reason !== 'quiet position') {
+        lastMove.commentAfter = resolution.reason;
+      }
+    }
+  }
+
+  // Process nested branches recursively
+  // Branches are sub-variations that were explored from within this line
+  if (explored.branches && explored.branches.length > 0 && variationMoves.length > 0) {
+    // Attach branches as sub-variations on the last move of the current line
+    // (where the exploration branched from)
+    const lastMove = variationMoves[variationMoves.length - 1]!;
+
+    for (const branch of explored.branches) {
+      const subVariation = transformSingleVariation(
+        branch,
+        lastMove.fenAfter,
+        lastMove.moveNumber + (lastMove.isWhiteMove ? 0 : 1),
+        !lastMove.isWhiteMove,
+        opts,
+        depth + 1,
+      );
+
+      if (subVariation.length > 0) {
+        lastMove.variations = lastMove.variations ?? [];
+        lastMove.variations.push(subVariation);
+      }
+    }
+  }
+
+  return variationMoves;
 }
 
 /**

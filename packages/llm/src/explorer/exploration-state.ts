@@ -248,6 +248,17 @@ export class ExplorationState {
    * This produces output compatible with the existing variation transformer.
    */
   toExploredLines(): ExploredLine[] {
+    // If root has no moves but has branches, return the branches directly
+    // This happens when LLM starts by creating sub-variations without root moves
+    if (this.root.moves.length === 0 && this.root.branches.size > 0) {
+      const allBranches: ExploredLine[] = [];
+      for (const [_idx, branches] of this.root.branches) {
+        for (const branch of branches) {
+          allBranches.push(...this.branchToExploredLines(branch));
+        }
+      }
+      return allBranches;
+    }
     return this.branchToExploredLines(this.root);
   }
 
@@ -255,8 +266,19 @@ export class ExplorationState {
    * Recursively convert a branch to ExploredLine[]
    */
   private branchToExploredLines(branch: ExploredBranch): ExploredLine[] {
-    if (branch.moves.length === 0) {
+    if (branch.moves.length === 0 && branch.branches.size === 0) {
       return [];
+    }
+
+    // Handle branch with no moves but with sub-branches
+    if (branch.moves.length === 0) {
+      const allBranches: ExploredLine[] = [];
+      for (const [_idx, subBranches] of branch.branches) {
+        for (const subBranch of subBranches) {
+          allBranches.push(...this.branchToExploredLines(subBranch));
+        }
+      }
+      return allBranches;
     }
 
     // Build annotations and NAGs maps from moves

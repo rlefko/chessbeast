@@ -101,23 +101,30 @@ export function renderBoard(fen: string, options?: BoardRenderOptions): string {
 /**
  * Format a board with metadata for inclusion in LLM prompts
  *
+ * FEN is presented as the primary representation since LLMs understand
+ * FEN notation well. The ASCII board is included as a supplementary
+ * visual aid.
+ *
  * @param fen - FEN string of the position
  * @param options - Rendering options
- * @returns Formatted string with board and metadata
+ * @returns Formatted string with FEN (primary) and board (supplementary)
  */
 export function formatBoardForPrompt(
   fen: string,
-  options?: BoardRenderOptions & { includeFen?: boolean },
+  options?: BoardRenderOptions & { includeFen?: boolean; includeBoard?: boolean },
 ): string {
   const parts: string[] = [];
 
-  // Render the board
-  parts.push(renderBoard(fen, options));
-  parts.push('');
-
-  // Add side to move
+  // Parse FEN for metadata
   const pos = new ChessPosition(fen);
   const turn = pos.turn();
+
+  // FEN is primary representation (LLMs understand it well)
+  if (options?.includeFen !== false) {
+    parts.push(`FEN: ${fen}`);
+  }
+
+  // Side to move
   parts.push(`Side to move: ${turn === 'w' ? 'White' : 'Black'}`);
 
   // Add last move if provided
@@ -125,9 +132,11 @@ export function formatBoardForPrompt(
     parts.push(`Last move: ${options.lastMove.san}`);
   }
 
-  // Add FEN if requested
-  if (options?.includeFen !== false) {
-    parts.push(`FEN: ${fen}`);
+  // ASCII board as supplementary visual aid (optional, default: include)
+  if (options?.includeBoard !== false) {
+    parts.push('');
+    parts.push('Board:');
+    parts.push(renderBoard(fen, options));
   }
 
   return parts.join('\n');

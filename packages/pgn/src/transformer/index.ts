@@ -18,4 +18,5 @@ export type {
   AlternativeMove,
   EngineEvaluation,
   AnalysisMetadata,
+  ExploredVariation,
 } from './analysis-transformer.js';

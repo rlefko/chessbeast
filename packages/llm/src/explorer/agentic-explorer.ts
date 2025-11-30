@@ -782,10 +782,20 @@ export class AgenticVariationExplorer {
 
 TARGET AUDIENCE: ${targetRating} rated players
 
+## POSITION REPRESENTATION
+
+The position is given in FEN (Forsyth-Edwards Notation) which you can parse directly:
+- Piece placement from rank 8 to 1 (K=King, Q=Queen, R=Rook, B=Bishop, N=Knight, P=Pawn)
+- Uppercase = White pieces, lowercase = Black pieces
+- Numbers = empty squares
+- Side to move, castling rights, en passant square included
+
+You can use get_board to see an ASCII visualization if needed.
+
 ## YOUR TOOLS
 
 ### Board & Navigation
-- get_board: See the current position visually
+- get_board: See the current position as ASCII (supplementary to FEN)
 - push_move: Play a move forward (SAN format: "Nf3", "e4", "O-O")
 - pop_move: Go back one move
 
@@ -807,37 +817,54 @@ TARGET AUDIENCE: ${targetRating} rated players
 - assess_continuation: Check if position is worth exploring further
 - finish_exploration: Complete exploration
 
-## EXPLORATION GUIDELINES
+## EXPLORATION DEPTH GUIDELINES
 
-1. **Start by understanding the position**
-   - Get the board visualization
-   - Evaluate the position to understand what's happening
+**EXPLORE DEEPLY** - Don't just show 2-3 moves. Critical positions deserve 8-15 move lines.
 
-2. **Explore forcing sequences thoroughly**
-   - Follow checks, captures, and threats
-   - Don't stop in the middle of tactical sequences
+1. **Start by evaluating the position**
+   - The FEN tells you the position - evaluate immediately
+   - Understand tactical themes before exploring
 
-3. **Add comments at KEY moments only**
+2. **Explore forcing sequences THOROUGHLY**
+   - Follow checks, captures, and threats to their conclusion
+   - Don't stop mid-tactics - show the complete winning/defending sequence
+   - If a sacrifice leads to an attack, show the full attack
+
+3. **Use NESTED BRANCHES for interesting sub-variations**
+   - Within a branch, if there's a critical alternative, start ANOTHER branch
+   - Example: After 10...Nxd4, Black might try 10...f5 - show it as a nested sub-variation
+   - Sub-variations show "what if opponent tries something else here?"
+   - Maximum ${this.config.maxBranches} total branches, but use nesting wisely
+
+4. **Follow the tree of alternatives**
+   - After showing main refutation, show why defender's alternatives also fail
+   - Each critical defender resource deserves its own nested branch
+   - This creates PGN like: 1.e4 (1...d5? 2.exd5 (2...Nf6 3.c4) 2...Qxd5)
+
+5. **Add comments at KEY moments only**
    - First move of a branch: WHY this variation ("the engine's choice", "a human error")
    - Critical moves: "the point", "with tempo", "threatening Qxh7"
    - Ending: OUTCOME ("and Black wins material", "with equality")
    - NOTE: Always push_move BEFORE add_comment - comments attach to the last played move
 
-4. **Use NAGs appropriately**
+6. **Use NAGs appropriately**
    - Use suggest_nag after important moves to get engine-based quality assessment
    - ! ($1) = good move, ? ($2) = mistake, !! ($3) = brilliant, ?? ($4) = blunder
    - !? ($5) = interesting - use for creative/tricky moves that aren't objectively best
    - ?! ($6) = dubious - slight inaccuracy but might have practical merit
    - Use get_eval_nag at end of lines to mark the resulting position
 
-5. **Use branches for important alternatives**
-   - Human-likely moves that fail
-   - Alternative winning methods
-   - Maximum ${this.config.maxBranches} branches
-   - WORKFLOW: start_branch → push_move → add_comment → ... → end_branch
+## BRANCHING WORKFLOW
 
-6. **Use assess_continuation when unsure**
-   - It will tell you if the position is worth exploring further
+Main line exploration:
+1. push_move → add_comment → push_move → ...
+
+Creating a variation:
+1. start_branch → push_move → add_comment → ... → end_branch
+
+NESTED variation (sub-variation within a variation):
+1. Inside a branch: start_branch → push_move → ... → end_branch
+2. This creates deeply nested PGN: (main move (alternative1 (sub-alternative)))
 
 ## STOPPING CRITERIA
 
@@ -846,11 +873,13 @@ TARGET AUDIENCE: ${targetRating} rated players
 - Large eval swing just occurred
 - The "point" hasn't been shown yet
 - Position is still unresolved
+- There are interesting alternatives to explore as sub-variations
 
 **STOP** when:
 - Position is quiet and resolved
 - Point has been demonstrated
 - Material outcome is clear
+- All important alternatives have been shown
 - assess_continuation suggests stopping
 
 ## ANNOTATION STYLE
@@ -1042,9 +1071,12 @@ TARGET AUDIENCE: ${targetRating} rated players
 
   /**
    * Build initial context for exploration
+   *
+   * FEN is presented first as the primary representation since LLMs
+   * understand FEN well. The ASCII board is supplementary.
    */
   private buildInitialContext(fen: string, board: string, playedMove?: string): string {
-    const parts = ['STARTING POSITION:', board, '', `FEN: ${fen}`];
+    const parts = ['STARTING POSITION:', '', `FEN: ${fen}`, '', board];
 
     if (playedMove) {
       parts.push('');
@@ -1052,17 +1084,17 @@ TARGET AUDIENCE: ${targetRating} rated players
       parts.push('');
       parts.push('The starting position is BEFORE this move was played.');
       parts.push('First, show what should have been played instead (the better alternative).');
-      parts.push(
-        'Then you may show what happens after the played move to explain why it was suboptimal.',
-      );
+      parts.push('Explore the refutation DEEPLY (8-15 moves) showing why the played move fails.');
+      parts.push('Use nested branches to show why defender alternatives also fail.');
     } else {
       parts.push('');
       parts.push('Explore the key variations from this position.');
       parts.push('Show the best play and common human mistakes.');
+      parts.push('Explore deeply (8-15 moves) with nested sub-variations for alternatives.');
     }
 
     parts.push('');
-    parts.push('Start by getting the board and evaluating the position.');
+    parts.push('Start by evaluating the position to understand the tactical themes.');
 
     return parts.join('\n');
   }
