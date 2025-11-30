@@ -268,11 +268,10 @@ export class AgenticVariationExplorer {
       tree.initializeFromMoves(gameMoves);
     }
 
-    // CRITICAL: Add the played move as a child so LLM starts AT it (not at root)
-    // This allows add_alternative() to work immediately (creates sibling)
-    if (playedMove) {
-      tree.addMove(playedMove);
-    }
+    // NOTE: We do NOT add the played move to the tree.
+    // The LLM starts at the DECISION POINT (root = position BEFORE the move).
+    // This allows the LLM to use add_move to add any alternatives directly.
+    // The playedMove is passed to buildInitialContext for reference only.
 
     let toolCallCount = 0;
     let tokensUsed = 0;
@@ -984,15 +983,18 @@ TARGET AUDIENCE: ${targetRating} rated players
 
 ## YOUR POSITION
 
-You start AT the move that was played (not before it).
-This means you can IMMEDIATELY use add_alternative to show better moves.
+You start at the DECISION POINT - the position BEFORE the move was played.
+The board shows the position where the player had to choose what to do.
+
+Use **add_move** to add better alternatives. Do NOT use add_alternative at the starting position.
 
 ## NAVIGATION TOOLS
 
 - **get_candidate_moves** - Get engine's best moves for the side to move. USE THIS FIRST!
-- **add_alternative(san)** - Add a better move as a sibling. You stay at current position.
-- **go_to(fen)** - Navigate to the alternative's FEN to explore it.
-- **add_move(san)** - Continue the line by adding a child move. You move to it.
+- **add_move(san)** - Add a move as a child and navigate to it. Use this for ALL new moves!
+- **add_alternative(san)** - Add a sibling move (same parent). Only works AFTER you've navigated away from root.
+- **go_to(fen)** - Navigate to any position in the tree by FEN.
+- **go_to_parent** - Navigate back to the parent position.
 
 ## ANNOTATION TOOLS
 
@@ -1038,15 +1040,16 @@ Exception: Obvious opponent responses (recaptures, only legal moves) don't need 
 ## WORKFLOW
 
 1. **get_candidate_moves** - See best moves for the side to move
-2. **add_alternative(betterMove)** - Create the sideline
-3. **go_to** the alternative's FEN
-4. **set_comment** - Brief annotation (2-8 words)
-5. **add_move** - Continue the line (get_candidate_moves every few moves)
-6. **evaluate_position** - Validate the line is going where expected
-7. Repeat add_move + evaluate_position until position is clarified
-8. **mark_for_sub_exploration** if you see interesting branches
-9. **set_position_nag** - ONLY at the very end when position is clarified
-10. **finish_exploration**
+2. **add_move(betterMove)** - Add the better alternative (navigates to it)
+3. **set_comment** - Brief annotation (2-8 words)
+4. **add_move** - Continue the line (get_candidate_moves every few moves)
+5. **evaluate_position** - Validate the line is going where expected
+6. Repeat add_move + evaluate_position until position is clarified
+7. **mark_for_sub_exploration** if you see interesting branches
+8. **set_position_nag** - ONLY at the very end when position is clarified
+9. **go_to_parent** back to root to explore another alternative
+10. Repeat steps 2-9 for other good options
+11. **finish_exploration**
 
 ## DEPTH GUIDANCE
 
@@ -1060,40 +1063,43 @@ Don't stop early just because you've shown a few moves. Show WHY the line is goo
 
 ## EXAMPLE
 
-Position at 12. Qe2 (White's inaccuracy). Context says: "WHITE JUST PLAYED Qe2"
+Position BEFORE 12. Qe2 (White's inaccuracy). Context says: "The player chose: Qe2"
 
 1. get_candidate_moves        → "White's best: Re1 (+1.2), Nc3 (+0.9), Qe2 (+0.6)"
-2. add_alternative("Re1")     → Creates sibling to Qe2, returns FEN
-3. go_to(<Re1_fen>)           → Navigate to Re1 position
-4. set_comment("activates the rook")
-5. add_move_nag("$1")         → Mark Re1 as good move (!)
-6. get_candidate_moves        → "Black's best: Nd7, Be6, Qe7"
-7. add_move("Nd7")            → Black responds: 12...Nd7
-8. get_candidate_moves        → "White's best: Ne5 (+1.3), Bf4 (+1.1)"
-9. add_move("Ne5")            → White: 13. Ne5
-10. evaluate_position         → Confirm +1.3
-11. set_comment("strong outpost")
-12. mark_for_sub_exploration("Bf4 also interesting", "medium")
-13. add_move("Nf6")           → Black: 13...Nf6
-14. add_move("Bf4")           → White: 14. Bf4
-15. ... continue until position is clarified ...
-16. set_position_nag("$14")   → Slight White advantage (at END of line)
-17. finish_exploration("Re1 activates rook with lasting initiative")
+2. add_move("Re1")            → Add better move, navigate to it
+3. set_comment("activates the rook")
+4. add_move_nag("$1")         → Mark Re1 as good move (!)
+5. get_candidate_moves        → "Black's best: Nd7, Be6, Qe7"
+6. add_move("Nd7")            → Black responds: 12...Nd7
+7. get_candidate_moves        → "White's best: Ne5 (+1.3), Bf4 (+1.1)"
+8. add_move("Ne5")            → White: 13. Ne5
+9. evaluate_position          → Confirm +1.3
+10. set_comment("strong outpost")
+11. mark_for_sub_exploration("Bf4 also interesting", "medium")
+12. add_move("Nf6")           → Black: 13...Nf6
+13. add_move("Bf4")           → White: 14. Bf4
+14. ... continue until position is clarified ...
+15. set_position_nag("$14")   → Slight White advantage (at END of line)
+16. go_to_parent (multiple times back to root) → Return to decision point
+17. add_move("Nc3")           → Explore another good alternative
+18. ... explore Nc3 line ...
+19. finish_exploration("Re1 activates rook with lasting initiative")
 
-Result: (12. Re1 $1 {activates the rook} Nd7 13. Ne5 {strong outpost} Nf6 14. Bf4 $14)
+Result: 12. Re1 $1 {activates the rook} Nd7 13. Ne5 {strong outpost} Nf6 14. Bf4 $14 (12. Nc3 ...)
 
 ## CRITICAL RULES
 
 1. **get_candidate_moves FIRST** - Know what moves are legal and good!
 2. **Validate moves** - Check candidates before playing, heed warnings
-3. **add_alternative creates sibling** - Same color as the played move
+3. **Use add_move at root** - Alternatives are children of the decision point
 4. **add_move continues line** - Alternates colors after each move
-5. **Position NAGs ($10-$19) ONLY at the END** - Never mid-variation!
-6. **Move NAGs ($1-$6) anytime** - Use freely to mark good/bad moves
-7. **Comments: 2-8 words** - lowercase, no punctuation
-8. **NEVER say "from our perspective" or "this move is"**
-9. **Explore DEEP** - Don't stop at 3-5 moves, show full variations
-10. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives`;
+5. **add_alternative only after navigating** - Creates siblings deep in a line
+6. **Position NAGs ($10-$19) ONLY at the END** - Never mid-variation!
+7. **Move NAGs ($1-$6) anytime** - Use freely to mark good/bad moves
+8. **Comments: 2-8 words** - lowercase, no punctuation
+9. **NEVER say "from our perspective" or "this move is"**
+10. **Explore DEEP** - Don't stop at 3-5 moves, show full variations
+11. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives`;
 
     // Add winning position focus when position is already decided
     if (evalCp !== undefined && Math.abs(evalCp) >= 500) {
@@ -1142,12 +1148,12 @@ FINISH quickly once the winning idea is clear.`;
     const opponentSide = fenParts[1] === 'w' ? 'BLACK' : 'WHITE';
 
     if (playedMove) {
-      // LLM starts AT the played move (we already added it to the tree)
+      // LLM starts at the DECISION POINT (position BEFORE the move)
       const classLabel = moveClassification ? ` (${moveClassification})` : '';
-      parts.push(`YOU ARE AT: ${playedMove}${classLabel}`);
+      parts.push(`DECISION POINT: ${sideToMove} to move`);
+      parts.push(`**The player chose: ${playedMove}${classLabel}**`);
       parts.push('');
-      parts.push(`**${sideToMove} JUST PLAYED ${playedMove}**`);
-      parts.push(`Alternatives must be ${sideToMove} moves (siblings replace ${playedMove}).`);
+      parts.push(`Show what ${sideToMove} SHOULD have played instead using add_move.`);
       parts.push('');
       parts.push(board);
       parts.push('');
@@ -1157,21 +1163,21 @@ FINISH quickly once the winning idea is clear.`;
       if (moveClassification === 'blunder' || moveClassification === 'mistake') {
         parts.push('This was a significant error. Show what should have been played:');
         parts.push(`1. get_candidate_moves - see ${sideToMove}'s best options`);
-        parts.push('2. add_alternative(betterMove) - creates sibling to this move');
-        parts.push('3. go_to the alternative FEN');
-        parts.push(`4. add_move to continue (${opponentSide} responds, then ${sideToMove}, etc.)`);
-        parts.push('5. set_comment on key moments (2-8 words each)');
-        parts.push('6. evaluate_position every 3-4 moves to validate the line');
-        parts.push('7. set_position_nag ONLY at the END of the line');
+        parts.push('2. add_move(betterMove) - adds the better alternative');
+        parts.push(`3. add_move to continue (${opponentSide} responds, then ${sideToMove}, etc.)`);
+        parts.push('4. set_comment on key moments (2-8 words each)');
+        parts.push('5. evaluate_position every 3-4 moves to validate the line');
+        parts.push('6. set_position_nag ONLY at the END of the line');
+        parts.push('7. go_to_parent back to root to explore other options');
       } else if (moveClassification === 'inaccuracy') {
         parts.push('This was slightly inaccurate. Show the stronger option:');
         parts.push(`1. get_candidate_moves - see ${sideToMove}'s best options`);
-        parts.push('2. add_alternative(betterMove)');
-        parts.push('3. go_to and explore briefly');
+        parts.push('2. add_move(betterMove)');
+        parts.push('3. Continue and explore briefly');
         parts.push('4. set_comment on the key difference');
         parts.push('5. set_position_nag ONLY at the END');
       } else {
-        parts.push('Explore alternatives from this position.');
+        parts.push('Explore alternatives from this position using add_move.');
       }
     } else {
       parts.push('POSITION:');

@@ -213,14 +213,41 @@ export class VariationTree {
   }
 
   /**
-   * Add an alternative move (sibling) but stay at current node
+   * Add an alternative move (sibling) but stay at current node.
+   * At root, this acts like add_move but without navigating (adds a child).
    */
   addAlternative(san: string): TreeOperationResult {
+    // At root: add as child instead of failing (graceful handling)
     if (!this.currentNode.parent) {
-      return {
-        success: false,
-        error: 'Cannot add alternative to root node',
-      };
+      // Check if this move already exists as a child
+      const existingChild = this.currentNode.children.find((c) => c.san === san);
+      if (existingChild) {
+        return {
+          success: true,
+          node: existingChild,
+          message: `Alternative ${san} already exists as a child. Use go_to to navigate to it.`,
+        };
+      }
+
+      // Validate and make the move from current (root) position
+      try {
+        const pos = new ChessPosition(this.currentNode.fen);
+        const result = pos.move(san);
+
+        const child = this.createNode(result.san, result.fenAfter, this.currentNode);
+        this.currentNode.children.push(child);
+
+        return {
+          success: true,
+          node: child,
+          message: `Added ${result.san} as alternative. Use go_to to navigate to it.`,
+        };
+      } catch (e) {
+        return {
+          success: false,
+          error: `Illegal move: ${san}`,
+        };
+      }
     }
 
     const parent = this.currentNode.parent;
