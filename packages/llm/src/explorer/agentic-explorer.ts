@@ -131,6 +131,22 @@ export interface AgenticExplorerProgress {
 }
 
 /**
+ * A position marked for sub-exploration
+ */
+export interface MarkedSubPosition {
+  /** FEN of the position to explore */
+  fen: string;
+  /** Move that led to this position (for reference) */
+  san: string;
+  /** Reason why this position was marked interesting */
+  reason: string;
+  /** Priority for exploration order */
+  priority: 'high' | 'medium' | 'low';
+  /** Depth from root when marked */
+  depthWhenMarked: number;
+}
+
+/**
  * Result of agentic exploration
  */
 export interface AgenticExplorerResult {
@@ -144,6 +160,8 @@ export interface AgenticExplorerResult {
   tokensUsed: number;
   /** Summary from LLM */
   summary?: string;
+  /** Positions marked for sub-exploration */
+  markedSubPositions?: MarkedSubPosition[];
   /** Cache statistics */
   cacheStats?: {
     hits: number;
@@ -154,11 +172,16 @@ export interface AgenticExplorerResult {
 
 /**
  * Default configuration
+ *
+ * Tuned for deep exploration until positions are resolved:
+ * - Higher tool call budget (200 vs 40) for 15-30 move variations
+ * - Higher soft cap (80 vs 25) before wrap-up guidance triggers
+ * - Higher depth limit (100 vs 50) to support very deep variations
  */
 const DEFAULT_CONFIG: Required<AgenticExplorerConfig> = {
-  maxToolCalls: 40,
-  softToolCap: 25,
-  maxDepth: 50,
+  maxToolCalls: 200,
+  softToolCap: 80,
+  maxDepth: 100,
   targetRating: 1500,
   warnCallback: () => {},
 };
@@ -184,6 +207,13 @@ export class AgenticVariationExplorer {
   private readonly evalCache: ResponseCache<EvaluatePositionResult>;
   private cacheHits = 0;
   private cacheMisses = 0;
+
+  // State tracking for soft move validation
+  private lastCandidateMoves: Set<string> = new Set();
+  private lastCandidatesFen: string | null = null;
+
+  // State tracking for sub-exploration positions
+  private markedSubPositions: MarkedSubPosition[] = [];
 
   constructor(
     private readonly llmClient: OpenAIClient,
@@ -226,6 +256,11 @@ export class AgenticVariationExplorer {
   ): Promise<AgenticExplorerResult> {
     // Initialize tree with position BEFORE the played move
     const tree = new VariationTree(startingFen);
+
+    // Reset state for this exploration
+    this.markedSubPositions = [];
+    this.lastCandidateMoves = new Set();
+    this.lastCandidatesFen = null;
 
     // If we have game moves, initialize the principal path
     if (gameMoves && gameMoves.length > 0) {
@@ -397,6 +432,10 @@ export class AgenticVariationExplorer {
       result.summary = summary;
     }
 
+    if (this.markedSubPositions.length > 0) {
+      result.markedSubPositions = this.markedSubPositions;
+    }
+
     if (this.cacheHits > 0 || this.cacheMisses > 0) {
       const total = this.cacheHits + this.cacheMisses;
       result.cacheStats = {
@@ -447,6 +486,19 @@ export class AgenticVariationExplorer {
           return { success: false, error: 'No move provided' };
         }
 
+        // Soft validation: check if move was in recent candidates
+        const parentFen = tree.getCurrentNode().fen;
+        let validationWarning: string | undefined;
+
+        if (this.lastCandidatesFen === parentFen) {
+          if (!this.lastCandidateMoves.has(san)) {
+            validationWarning = `⚠️ Move ${san} was not in the candidate moves. Consider using get_candidate_moves to verify move quality.`;
+          }
+        } else if (this.lastCandidatesFen !== null) {
+          // Different position - warn that no validation was done for this position
+          validationWarning = `⚠️ No candidate moves checked for this position. Use get_candidate_moves to see best options.`;
+        }
+
         const result = tree.addMove(san);
         if (!result.success) {
           const pos = new ChessPosition(tree.getCurrentNode().fen);
@@ -468,6 +520,7 @@ export class AgenticVariationExplorer {
           legalMoves: pos.getLegalMoves().slice(0, 10),
           isCheck: pos.isCheck(),
           isCheckmate: pos.isCheckmate(),
+          ...(validationWarning && { warning: validationWarning }),
         };
       }
 
@@ -475,6 +528,21 @@ export class AgenticVariationExplorer {
         const san = args.san as string;
         if (!san) {
           return { success: false, error: 'No move provided' };
+        }
+
+        // Soft validation: check if move was in recent candidates
+        // For add_alternative, we check the parent position (where alternatives are added)
+        const parentNode = tree.getCurrentNode().parent;
+        const parentFen = parentNode?.fen;
+        let validationWarning: string | undefined;
+
+        if (parentFen && this.lastCandidatesFen === parentFen) {
+          if (!this.lastCandidateMoves.has(san)) {
+            validationWarning = `⚠️ Move ${san} was not in the candidate moves. Consider using get_candidate_moves to verify move quality.`;
+          }
+        } else if (this.lastCandidatesFen !== null && parentFen) {
+          // Different position - warn that no validation was done for this position
+          validationWarning = `⚠️ No candidate moves checked for parent position. Use get_candidate_moves to see best options.`;
         }
 
         const result = tree.addAlternative(san);
@@ -489,6 +557,7 @@ export class AgenticVariationExplorer {
           alternativeSan: result.node?.san,
           currentFen: tree.getCurrentNode().fen,
           note: 'You remain at your current position. Use go_to to navigate to the alternative.',
+          ...(validationWarning && { warning: validationWarning }),
         };
       }
 
@@ -690,6 +759,11 @@ export class AgenticVariationExplorer {
               line: (line.principalVariation as string[])?.slice(0, 4).join(' ') ?? '',
             }),
           );
+
+          // Track candidates for soft validation
+          this.lastCandidatesFen = currentFen;
+          this.lastCandidateMoves = new Set(candidates.map((c) => c.move));
+
           return {
             success: true,
             sideToMove,
@@ -701,6 +775,11 @@ export class AgenticVariationExplorer {
         // Single line result (fallback)
         const pv = evalResult.principalVariation as string[] | undefined;
         const bestMove = pv?.[0] ?? 'unknown';
+
+        // Track candidates for soft validation
+        this.lastCandidatesFen = currentFen;
+        this.lastCandidateMoves = new Set([bestMove]);
+
         return {
           success: true,
           sideToMove,
@@ -831,6 +910,64 @@ export class AgenticVariationExplorer {
         return { finished: true, summary: args.summary };
       }
 
+      // === Sub-Exploration ===
+      case 'mark_for_sub_exploration': {
+        const reason = args.reason as string;
+        if (!reason) {
+          return { success: false, error: 'No reason provided' };
+        }
+
+        const node = tree.getCurrentNode();
+        const priority = (args.priority as 'high' | 'medium' | 'low') ?? 'medium';
+
+        // Calculate depth from root
+        let depth = 0;
+        let current = node;
+        while (current.parent) {
+          depth++;
+          current = current.parent;
+        }
+
+        // Don't mark positions that are too deep (unlikely to be explored)
+        if (depth > 20) {
+          return {
+            success: false,
+            error: 'Position is too deep to mark for sub-exploration. Focus on the main line.',
+            currentDepth: depth,
+          };
+        }
+
+        // Check if already marked
+        const alreadyMarked = this.markedSubPositions.some((p) => p.fen === node.fen);
+        if (alreadyMarked) {
+          return {
+            success: true,
+            message: 'Position was already marked for sub-exploration',
+            fen: node.fen,
+          };
+        }
+
+        // Add to marked positions
+        this.markedSubPositions.push({
+          fen: node.fen,
+          san: node.san ?? '',
+          reason,
+          priority,
+          depthWhenMarked: depth,
+        });
+
+        return {
+          success: true,
+          message: `Marked position for ${priority}-priority sub-exploration`,
+          fen: node.fen,
+          san: node.san,
+          reason,
+          priority,
+          totalMarked: this.markedSubPositions.length,
+          note: 'Continue exploring the main line. This position will be revisited later.',
+        };
+      }
+
       default:
         return { error: `Unknown tool: ${name}` };
     }
@@ -873,17 +1010,52 @@ Position Evaluation NAGs (ONLY at END of variation!):
 - **evaluate_position** - Get engine evaluation (use every 3-4 moves)
 - **predict_human_moves** - What would a ${targetRating} player do?
 
+## SUB-EXPLORATION
+
+- **mark_for_sub_exploration(reason, priority)** - Flag current position for deeper analysis later
+
+Use mark_for_sub_exploration when you encounter an interesting branch point:
+- Multiple candidate moves have similar evaluations (within 30cp)
+- Tactical complications exist (checks, captures, threats)
+- A critical decision point for the player
+
+Do NOT mark when:
+- Position is quiet with one clear best move
+- You're already deep in the variation (depth > 15)
+- Line is nearly resolved (decisive evaluation)
+
+## MOVE VALIDATION (IMPORTANT)
+
+Before playing ANY move with add_move or add_alternative:
+1. Call get_candidate_moves to see the best options
+2. Choose from the candidate list when possible
+3. If you play a move not in candidates, you'll see a warning
+
+This ensures you don't unknowingly play mistakes during analysis.
+Exception: Obvious opponent responses (recaptures, only legal moves) don't need validation.
+
 ## WORKFLOW
 
 1. **get_candidate_moves** - See best moves for the side to move
 2. **add_alternative(betterMove)** - Create the sideline
 3. **go_to** the alternative's FEN
 4. **set_comment** - Brief annotation (2-8 words)
-5. **add_move** - Continue 2-3 moves
+5. **add_move** - Continue the line (get_candidate_moves every few moves)
 6. **evaluate_position** - Validate the line is going where expected
-7. Repeat add_move + evaluate_position every 3-4 moves
-8. **set_position_nag** - ONLY at the very end when position is clarified
-9. **finish_exploration**
+7. Repeat add_move + evaluate_position until position is clarified
+8. **mark_for_sub_exploration** if you see interesting branches
+9. **set_position_nag** - ONLY at the very end when position is clarified
+10. **finish_exploration**
+
+## DEPTH GUIDANCE
+
+Explore variations until the position is RESOLVED:
+- Decisive advantage (±3.0 or more) that's stable
+- Forced sequence completes (tactical combination resolves)
+- Position quiets down with clear evaluation
+- Aim for 10-20+ moves in main variations, not just 3-5
+
+Don't stop early just because you've shown a few moves. Show WHY the line is good/bad.
 
 ## EXAMPLE
 
@@ -894,27 +1066,33 @@ Position at 12. Qe2 (White's inaccuracy). Context says: "WHITE JUST PLAYED Qe2"
 3. go_to(<Re1_fen>)           → Navigate to Re1 position
 4. set_comment("activates the rook")
 5. add_move_nag("$1")         → Mark Re1 as good move (!)
-6. add_move("Nd7")            → Black responds: 12...Nd7
-7. add_move("Ne5")            → White: 13. Ne5
-8. evaluate_position          → Confirm +1.3
-9. set_comment("strong outpost")
-10. add_move("Nf6")           → Black: 13...Nf6
-11. add_move("Bf4")           → White: 14. Bf4
-12. set_position_nag("$14")   → Slight White advantage (at END of line)
-13. finish_exploration("Re1 activates rook with lasting initiative")
+6. get_candidate_moves        → "Black's best: Nd7, Be6, Qe7"
+7. add_move("Nd7")            → Black responds: 12...Nd7
+8. get_candidate_moves        → "White's best: Ne5 (+1.3), Bf4 (+1.1)"
+9. add_move("Ne5")            → White: 13. Ne5
+10. evaluate_position         → Confirm +1.3
+11. set_comment("strong outpost")
+12. mark_for_sub_exploration("Bf4 also interesting", "medium")
+13. add_move("Nf6")           → Black: 13...Nf6
+14. add_move("Bf4")           → White: 14. Bf4
+15. ... continue until position is clarified ...
+16. set_position_nag("$14")   → Slight White advantage (at END of line)
+17. finish_exploration("Re1 activates rook with lasting initiative")
 
 Result: (12. Re1 $1 {activates the rook} Nd7 13. Ne5 {strong outpost} Nf6 14. Bf4 $14)
 
 ## CRITICAL RULES
 
 1. **get_candidate_moves FIRST** - Know what moves are legal and good!
-2. **add_alternative creates sibling** - Same color as the played move
-3. **add_move continues line** - Alternates colors after each move
-4. **Position NAGs ($10-$19) ONLY at the END** - Never mid-variation!
-5. **Move NAGs ($1-$6) anytime** - Use freely to mark good/bad moves
-6. **Comments: 2-8 words** - lowercase, no punctuation
-7. **NEVER say "from our perspective" or "this move is"**
-8. **evaluate_position every 3-4 moves** - Stay on track!`;
+2. **Validate moves** - Check candidates before playing, heed warnings
+3. **add_alternative creates sibling** - Same color as the played move
+4. **add_move continues line** - Alternates colors after each move
+5. **Position NAGs ($10-$19) ONLY at the END** - Never mid-variation!
+6. **Move NAGs ($1-$6) anytime** - Use freely to mark good/bad moves
+7. **Comments: 2-8 words** - lowercase, no punctuation
+8. **NEVER say "from our perspective" or "this move is"**
+9. **Explore DEEP** - Don't stop at 3-5 moves, show full variations
+10. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives`;
   }
 
   /**

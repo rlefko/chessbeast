@@ -109,9 +109,6 @@ Common emoji prefixes:
 
 **Agentic Annotation Mode** (see `packages/llm/src/generator/agentic-generator.ts`):
 - Opt-in via `--agentic` CLI flag
-- LLM can call tools: `evaluate_position`, `predict_human_moves`, `lookup_opening`, `find_reference_games`, `make_move`
-- Tool executor in `packages/llm/src/tools/executor.ts` dispatches to services
-- Default max 5 tool calls per position (`--max-tool-calls` to override)
 - `--agentic-all` annotates all moves (not just critical moments)
 - `--show-costs` displays LLM cost summary at end
 - Cost tracking in `packages/llm/src/cost/` (model pricing per 1M tokens)
@@ -132,12 +129,15 @@ Common emoji prefixes:
 - Work queue: `mark_interesting`, `get_interesting`, `clear_interesting`
 - Analysis tools: `get_candidate_moves`, `evaluate_position`, `predict_human_moves`, `lookup_opening`, `find_reference_games`
 - Control: `assess_continuation`, `finish_exploration`
+- Sub-exploration: `mark_for_sub_exploration` - flag interesting branch points for later analysis
 - NAG rules: Move NAGs ($1-$6) use freely, Position NAGs ($10-$19) ONLY at end of variation
 - Side-to-move context: LLM told explicitly which color's alternatives to explore
 - Comment validation: 2-8 words max, lowercase, no meta-commentary
+- Move validation: Soft warnings if moves not in engine candidates list
 - Intelligent caching for Stockfish evaluations (depth ≥ 14)
-- Default max 40 tool calls (`--exploration-max-tool-calls`)
-- Default max 50 half-moves depth (`--exploration-max-depth`)
+- Default max 200 tool calls, soft cap at 80 (`--exploration-max-tool-calls`)
+- Deep exploration: Continues until positions are resolved (10-30 move variations)
+- Default max 100 half-moves depth (`--exploration-max-depth`)
 
 ## Testing Requirements
 

@@ -499,6 +499,40 @@ export const FINISH_EXPLORATION_TOOL: OpenAITool = {
 };
 
 // =============================================================================
+// SUB-EXPLORATION TOOLS
+// =============================================================================
+
+/**
+ * Tool: Mark current position for sub-exploration
+ * Used to flag interesting branch points for deeper analysis after main line is complete
+ */
+export const MARK_FOR_SUB_EXPLORATION_TOOL: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'mark_for_sub_exploration',
+    description:
+      'Mark the current position for deeper sub-exploration after the main line is complete. Use when you encounter an interesting branch point with multiple good options worth investigating.',
+    parameters: {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          description:
+            'Brief reason why this position is interesting (e.g., "tactical complications", "multiple good options", "critical decision point")',
+        },
+        priority: {
+          type: 'string',
+          enum: ['high', 'medium', 'low'],
+          description:
+            'How important is this sub-variation? high=must explore, medium=valuable, low=nice-to-have',
+        },
+      },
+      required: ['reason'],
+    },
+  },
+};
+
+// =============================================================================
 // TOOL SETS
 // =============================================================================
 
@@ -538,6 +572,9 @@ export const EXPLORATION_TOOLS: OpenAITool[] = [
   // Stopping
   ASSESS_CONTINUATION_TOOL,
   FINISH_EXPLORATION_TOOL,
+
+  // Sub-exploration
+  MARK_FOR_SUB_EXPLORATION_TOOL,
 ];
 
 /**

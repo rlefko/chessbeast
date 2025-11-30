@@ -381,9 +381,78 @@ async function runAgenticAnnotation(
         });
       }
 
+      // Process sub-exploration queue if any positions were marked
+      const subExplorations: ExploredLine[] = [];
+      if (explorationResult.markedSubPositions && explorationResult.markedSubPositions.length > 0) {
+        // Sort by priority: high > medium > low
+        const priorityOrder = { high: 0, medium: 1, low: 2 };
+        const sortedSubPositions = [...explorationResult.markedSubPositions].sort(
+          (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority],
+        );
+
+        // Limit sub-explorations to avoid runaway exploration
+        const maxSubExplorations = 3;
+        const subPositionsToExplore = sortedSubPositions.slice(0, maxSubExplorations);
+
+        if (reporter.isDebug() && subPositionsToExplore.length > 0) {
+          reporter.displayThinking(
+            moveNotation,
+            `Processing ${subPositionsToExplore.length} sub-exploration(s)...`,
+          );
+        }
+
+        for (let subIdx = 0; subIdx < subPositionsToExplore.length; subIdx++) {
+          const subPosition = subPositionsToExplore[subIdx]!;
+
+          reporter.updateMoveProgress(
+            i + 1,
+            positionsToAnnotate.length,
+            `${moveNotation} (sub-exploration ${subIdx + 1}/${subPositionsToExplore.length}: ${subPosition.reason})`,
+          );
+
+          // Explore the sub-position without a played move (exploring from the position itself)
+          const subResult = await agenticExplorer.explore(
+            subPosition.fen,
+            targetRating,
+            undefined, // No played move - exploring branch point
+            undefined, // No classification
+            (progress: AgenticExplorerProgress) => {
+              reporter.updateMoveProgress(
+                i + 1,
+                positionsToAnnotate.length,
+                `${moveNotation} (sub ${subIdx + 1}: ${progress.toolCalls} tools)`,
+              );
+
+              if (reporter.isDebug() && progress.lastTool && progress.toolCalls > 0) {
+                reporter.displayExplorationToolCall(
+                  `${moveNotation} [sub]`,
+                  progress.lastTool,
+                  progress.toolArgs ?? {},
+                  progress.toolCalls,
+                  Math.floor(maxToolCalls / 2), // Reduced budget for sub-explorations
+                  {
+                    currentFen: progress.currentFen,
+                    currentLine: progress.currentSan ? [progress.currentSan] : undefined,
+                    depth: progress.nodeCount,
+                    branchPurpose: `sub: ${subPosition.reason}`,
+                  },
+                );
+              }
+            },
+          );
+
+          // Collect sub-exploration variations
+          if (subResult.variations.length > 0) {
+            subExplorations.push(...subResult.variations);
+          }
+        }
+      }
+
       // Attach explored variations to move analysis (convert Map to Record for type compatibility)
-      if (explorationResult.variations.length > 0) {
-        move.exploredVariations = explorationResult.variations.map(convertExploredLine);
+      // Include both main exploration and sub-explorations
+      const allVariations = [...explorationResult.variations, ...subExplorations];
+      if (allVariations.length > 0) {
+        move.exploredVariations = allVariations.map(convertExploredLine);
       }
     }
   }

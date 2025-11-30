@@ -44,13 +44,18 @@ export interface StoppingConfig {
 
 /**
  * Default stopping configuration
+ *
+ * Tuned for deep exploration until positions are resolved:
+ * - Higher tool call budget (200 vs 40) for 15-30 move variations
+ * - Lower interestingness floor (10 vs 20) to continue exploring longer
+ * - Lower eval swing threshold (80 vs 100) to catch more interesting moments
  */
 export const DEFAULT_STOPPING_CONFIG: StoppingConfig = {
-  maxDepth: 50,
-  maxToolCalls: 40,
-  softToolCap: 25,
-  evalSwingThreshold: 100,
-  interestingnessFloor: 20,
+  maxDepth: 100,
+  maxToolCalls: 200,
+  softToolCap: 80,
+  evalSwingThreshold: 80,
+  interestingnessFloor: 10,
 };
 
 /**
@@ -109,7 +114,7 @@ export function assessContinuation(
     score += 30;
     reasons.push('Position has tactical tension');
   } else {
-    score -= 20;
+    score -= 10; // Reduced penalty (was -20) to explore quieter positions
     reasons.push('Position is quiet');
   }
 
@@ -134,11 +139,12 @@ export function assessContinuation(
   switch (resolution.state) {
     case 'winning_white':
     case 'winning_black':
-      score -= 15;
+      // No penalty - explore winning positions to show how to convert
+      // This is valuable for instructional annotations
       reasons.push(`Position is decisive: ${resolution.reason}`);
       break;
     case 'draw':
-      score -= 20;
+      score -= 10; // Reduced penalty (was -20) - drawish positions can still be instructive
       reasons.push(`Position is drawn: ${resolution.reason}`);
       break;
     case 'unresolved':
@@ -165,11 +171,11 @@ export function assessContinuation(
     reasons.push(`Approaching budget limit`);
   }
 
-  // 6. DEPTH PENALTY
-  if (depth > 20) {
-    const depthPenalty = (depth - 20) * 2;
+  // 6. DEPTH PENALTY - Only apply after depth 30 to allow deeper exploration
+  if (depth > 30) {
+    const depthPenalty = (depth - 30) * 2;
     score -= depthPenalty;
-    reasons.push(`Deep variation (${depth} moves, -${depthPenalty})`);
+    reasons.push(`Very deep variation (${depth} moves, -${depthPenalty})`);
   }
 
   // 7. EARLY GAME BONUS - Don't stop too early

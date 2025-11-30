@@ -142,6 +142,17 @@ The tree converts to PGN:
 | `assess_continuation` | Should exploration continue? |
 | `finish_exploration` | Signal completion |
 
+### Sub-Exploration
+
+| Tool | Description |
+|------|-------------|
+| `mark_for_sub_exploration(reason, priority)` | Flag current position for deeper analysis after main line completes |
+
+Use `mark_for_sub_exploration` when:
+- Multiple candidate moves have similar evaluations (within 30cp)
+- Tactical complications exist (checks, captures, threats)
+- A critical decision point for the player
+
 ## NAG Rules
 
 ### Move Quality NAGs (use freely)
@@ -194,9 +205,11 @@ Comments must be:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `maxToolCalls` | 40 | Hard cap on tool calls |
-| `softToolCap` | 25 | Triggers wrap-up guidance |
-| `maxDepth` | 50 | Maximum variation depth (half-moves) |
+| `maxToolCalls` | 200 | Hard cap on tool calls |
+| `softToolCap` | 80 | Triggers wrap-up guidance |
+| `maxDepth` | 100 | Maximum variation depth (half-moves) |
+
+These limits are tuned for deep exploration that continues until positions are resolved (15-30 move variations with sub-variations).
 
 ### Stopping Heuristics
 
@@ -205,6 +218,24 @@ The system uses intelligent stopping:
 - **Tactical tension**: Continues if position has unresolved tactics
 - **Eval swings**: Explores deeper when evaluation changes significantly
 - **Depth limits**: Prevents infinite exploration
+- **Position resolution**: Stops when positions reach decisive/drawn states
+
+### Move Validation
+
+The LLM is encouraged to validate moves before playing:
+- `get_candidate_moves` should be called before `add_move`/`add_alternative`
+- If a move wasn't in the candidate list, a warning is included in the result
+- This is **soft enforcement** - moves are still allowed, but the LLM sees feedback
+- Helps prevent the LLM from unknowingly playing mistakes in analysis
+
+### Sub-Exploration Queue
+
+When the LLM marks positions with `mark_for_sub_exploration`:
+1. Positions are collected during main exploration
+2. After main line completes, positions are sorted by priority (high > medium > low)
+3. Up to 3 sub-explorations are processed automatically
+4. Each sub-exploration uses a reduced tool budget
+5. Results are merged into the final variations
 
 ## Caching
 
