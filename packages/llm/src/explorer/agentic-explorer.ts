@@ -231,6 +231,7 @@ export class AgenticVariationExplorer {
    * @param startingFen - Position to explore
    * @param targetRating - Target rating for explanations
    * @param playedMove - The move that was actually played (optional, for context)
+   * @param moveClassification - Quality classification of the played move
    * @param onProgress - Progress callback
    * @returns Explored variations
    */
@@ -238,6 +239,15 @@ export class AgenticVariationExplorer {
     startingFen: string,
     targetRating: number,
     playedMove?: string,
+    moveClassification?:
+      | 'book'
+      | 'excellent'
+      | 'good'
+      | 'inaccuracy'
+      | 'mistake'
+      | 'blunder'
+      | 'brilliant'
+      | 'forced',
     onProgress?: (progress: AgenticExplorerProgress) => void,
   ): Promise<AgenticExplorerResult> {
     const state = new ExplorationState(startingFen);
@@ -253,7 +263,12 @@ export class AgenticVariationExplorer {
     // Build initial context
     const systemPrompt = this.buildSystemPrompt(targetRating);
     const initialBoard = formatBoardForPrompt(startingFen);
-    const initialContext = this.buildInitialContext(startingFen, initialBoard, playedMove);
+    const initialContext = this.buildInitialContext(
+      startingFen,
+      initialBoard,
+      playedMove,
+      moveClassification,
+    );
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -784,20 +799,22 @@ TARGET AUDIENCE: ${targetRating} rated players
 
 ## POSITION REPRESENTATION
 
-The position is given in FEN (Forsyth-Edwards Notation) which you can parse directly:
+You have the position in FEN format - parse it directly. You do NOT need to call get_board.
+FEN is your primary reference for piece positions, castling rights, and en passant.
+
+FEN format reminder:
 - Piece placement from rank 8 to 1 (K=King, Q=Queen, R=Rook, B=Bishop, N=Knight, P=Pawn)
 - Uppercase = White pieces, lowercase = Black pieces
-- Numbers = empty squares
-- Side to move, castling rights, en passant square included
-
-You can use get_board to see an ASCII visualization if needed.
+- Numbers = consecutive empty squares
 
 ## YOUR TOOLS
 
-### Board & Navigation
-- get_board: See the current position as ASCII (supplementary to FEN)
-- push_move: Play a move forward (SAN format: "Nf3", "e4", "O-O")
-- pop_move: Go back one move
+### Navigation (Primary)
+- push_move: Play a move (SAN: "Nf3", "e4", "O-O") - returns new FEN
+- pop_move: Go back one move - returns previous FEN
+
+### Visualization (Rarely Needed)
+- get_board: ASCII board visualization - only use if absolutely necessary
 
 ### Branching
 - start_branch: Create a sub-variation for alternatives
@@ -822,7 +839,8 @@ You can use get_board to see an ASCII visualization if needed.
 **EXPLORE DEEPLY** - Don't just show 2-3 moves. Critical positions deserve 8-15 move lines.
 
 1. **Start by evaluating the position**
-   - The FEN tells you the position - evaluate immediately
+   - Parse the FEN to understand the position - no need to call get_board
+   - Call evaluate_position to get engine assessment
    - Understand tactical themes before exploring
 
 2. **Explore forcing sequences THOROUGHLY**
@@ -1074,8 +1092,24 @@ NESTED variation (sub-variation within a variation):
    *
    * FEN is presented first as the primary representation since LLMs
    * understand FEN well. The ASCII board is supplementary.
+   *
+   * Context is tailored based on move classification to avoid assuming
+   * all played moves are mistakes.
    */
-  private buildInitialContext(fen: string, board: string, playedMove?: string): string {
+  private buildInitialContext(
+    fen: string,
+    board: string,
+    playedMove?: string,
+    moveClassification?:
+      | 'book'
+      | 'excellent'
+      | 'good'
+      | 'inaccuracy'
+      | 'mistake'
+      | 'blunder'
+      | 'brilliant'
+      | 'forced',
+  ): string {
     const parts = ['STARTING POSITION:', '', `FEN: ${fen}`, '', board];
 
     if (playedMove) {
@@ -1083,9 +1117,27 @@ NESTED variation (sub-variation within a variation):
       parts.push(`THE MOVE PLAYED WAS: ${playedMove}`);
       parts.push('');
       parts.push('The starting position is BEFORE this move was played.');
-      parts.push('First, show what should have been played instead (the better alternative).');
-      parts.push('Explore the refutation DEEPLY (8-15 moves) showing why the played move fails.');
-      parts.push('Use nested branches to show why defender alternatives also fail.');
+
+      // Tailor guidance based on move quality
+      if (moveClassification === 'blunder' || moveClassification === 'mistake') {
+        parts.push('');
+        parts.push('This move is a significant error. Your task:');
+        parts.push('1. Show what SHOULD have been played instead (the correct move).');
+        parts.push('2. Explore deeply (8-15 moves) demonstrating why the played move fails.');
+        parts.push('3. Use nested branches to show why defender alternatives also fail.');
+      } else if (moveClassification === 'inaccuracy') {
+        parts.push('');
+        parts.push('This move is slightly inaccurate. Your task:');
+        parts.push('1. Show the stronger alternative that was available.');
+        parts.push('2. Explain what the played move misses (without over-dramatizing).');
+        parts.push('3. The difference may be subtle - focus on the key positional or tactical nuance.');
+      } else {
+        // Good, excellent, book, or unknown - explore the position normally
+        parts.push('');
+        parts.push('Explore the key continuations from this position.');
+        parts.push('Show the main ideas, threats, and typical plans for both sides.');
+        parts.push('If there are critical variations, explore them deeply (8-15 moves).');
+      }
     } else {
       parts.push('');
       parts.push('Explore the key variations from this position.');

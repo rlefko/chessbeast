@@ -325,3 +325,82 @@ function findMatchingBrace(text: string, start: number, open: string, close: str
   // If no match found, return end of string
   return text.length - 1;
 }
+
+/**
+ * Result of PGN validation and auto-fix
+ */
+export interface PgnFixResult {
+  /** The fixed game (may be same as input if no fixes needed) */
+  fixed: ParsedGame;
+  /** Warnings about issues that were auto-fixed */
+  warnings: string[];
+}
+
+/**
+ * Validate and auto-fix common PGN structural issues
+ *
+ * Currently fixes:
+ * - Variations that start with the same move as the main line (removes them)
+ * - Empty variations (removes them)
+ *
+ * @param game - The parsed game to validate
+ * @returns Fixed game and list of warnings
+ */
+export function validateAndFixPgn(game: ParsedGame): PgnFixResult {
+  const warnings: string[] = [];
+
+  // Deep clone to avoid mutating input
+  const fixed: ParsedGame = {
+    metadata: { ...game.metadata },
+    moves: game.moves.map((move) => fixMoveVariations(move, warnings)),
+  };
+
+  if (game.gameComment) {
+    fixed.gameComment = game.gameComment;
+  }
+
+  return { fixed, warnings };
+}
+
+/**
+ * Fix variations on a single move, returning the fixed move
+ */
+function fixMoveVariations(move: MoveInfo, warnings: string[]): MoveInfo {
+  // If no variations, return move as-is
+  if (!move.variations || move.variations.length === 0) {
+    return { ...move };
+  }
+
+  const fixedVariations: MoveInfo[][] = [];
+
+  for (const variation of move.variations) {
+    // Skip empty variations
+    if (variation.length === 0) {
+      warnings.push(`Move ${move.moveNumber}: Removed empty variation`);
+      continue;
+    }
+
+    // Skip variations that start with the same move as main line
+    const firstMove = variation[0];
+    if (firstMove && firstMove.san === move.san) {
+      warnings.push(
+        `Move ${move.moveNumber}: Removed variation starting with main line move (${move.san})`,
+      );
+      continue;
+    }
+
+    // Recursively fix nested variations within this variation
+    const fixedVariation = variation.map((m) => fixMoveVariations(m, warnings));
+    fixedVariations.push(fixedVariation);
+  }
+
+  // Return move with fixed variations
+  const result: MoveInfo = { ...move };
+  if (fixedVariations.length > 0) {
+    result.variations = fixedVariations;
+  } else {
+    delete result.variations;
+  }
+
+  return result;
+}
