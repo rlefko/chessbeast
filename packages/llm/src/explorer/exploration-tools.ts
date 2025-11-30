@@ -180,8 +180,7 @@ export const ADD_MOVE_NAG_TOOL: OpenAITool = {
   type: 'function',
   function: {
     name: 'add_move_nag',
-    description:
-      'Add a move quality NAG to current node. Use freely to mark good/bad moves.',
+    description: 'Add a move quality NAG to current node. Use freely to mark good/bad moves.',
     parameters: {
       type: 'object',
       properties: {
