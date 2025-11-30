@@ -42,3 +42,12 @@ export {
   type ContinuationAssessment,
   type StoppingConfig,
 } from './stopping-heuristics.js';
+
+// Tree-based variation structure
+export {
+  VariationTree,
+  type VariationNode,
+  type CachedEval,
+  type TreeOperationResult,
+  type NodeInfo,
+} from './variation-tree.js';

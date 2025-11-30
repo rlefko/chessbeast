@@ -1,17 +1,17 @@
 /**
- * Agentic Variation Explorer
+ * Agentic Variation Explorer (Tree-Based)
  *
- * A fully agentic system where the LLM controls exploration through tools:
- * - Navigate positions with push_move/pop_move
- * - Create sub-variations with start_branch/end_branch
- * - Add annotations with add_comment/add_nag
- * - Query engine/Maia for analysis
- * - Self-regulate stopping with assess_continuation
+ * A fully agentic system where the LLM navigates a variation tree:
+ * - Each node = one move with metadata (comment, NAGs, engine cache)
+ * - One child marked "principal" = main line
+ * - LLM navigates via add_move, add_alternative, go_to
+ * - Tree structure automatically produces correct PGN
  *
- * The LLM decides what to explore, how deep to go, and when to stop.
+ * No more start_branch/end_branch - the tree handles variation nesting.
  */
 
 import { ChessPosition, renderBoard, formatBoardForPrompt } from '@chessbeast/pgn';
+import type { MoveInfo } from '@chessbeast/pgn';
 
 import { ResponseCache } from '../cache/response-cache.js';
 import type { OpenAIClient } from '../client/openai-client.js';
@@ -20,7 +20,6 @@ import type { LLMConfig } from '../config/llm-config.js';
 import { ToolExecutor } from '../tools/executor.js';
 import type { AgenticServices, ToolCall, EvaluatePositionResult } from '../tools/types.js';
 
-import { ExplorationState, type ExploredMove } from './exploration-state.js';
 import { EXPLORATION_TOOLS } from './exploration-tools.js';
 import {
   assessContinuation,
@@ -28,22 +27,21 @@ import {
   type StoppingConfig,
   DEFAULT_STOPPING_CONFIG,
 } from './stopping-heuristics.js';
-import type { ExploredLine, LinePurpose } from './variation-explorer.js';
+import type { ExploredLine, LinePurpose, LineSource } from './variation-explorer.js';
+import { VariationTree } from './variation-tree.js';
 
 /**
  * Validate and clean up LLM comment
- * Silently cleans minor issues, rejects egregious problems
  */
 function validateAndCleanComment(
   comment: string,
   lastMoveSan?: string,
 ): { cleaned: string; rejected: boolean; reason?: string } {
-  // Reject egregiously bad comments first
   if (comment.length > 100) {
     return {
       cleaned: '',
       rejected: true,
-      reason: 'Comment too long (max 100 chars). Keep it to 2-6 words.',
+      reason: 'Comment too long (max 100 chars). Keep it to 2-8 words.',
     };
   }
 
@@ -55,7 +53,7 @@ function validateAndCleanComment(
     '',
   );
 
-  // Silent cleanup: Remove move notation at start (e.g., "Nxg7 wins" -> "wins")
+  // Silent cleanup: Remove move notation at start
   if (lastMoveSan) {
     const escaped = lastMoveSan.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const movePattern = new RegExp(`^${escaped}[!?]*\\s+`, 'i');
@@ -75,7 +73,6 @@ function validateAndCleanComment(
 
   cleaned = cleaned.trim();
 
-  // Reject if empty after cleanup
   if (!cleaned) {
     return {
       cleaned: '',
@@ -97,11 +94,9 @@ export interface AgenticExplorerConfig {
   softToolCap?: number;
   /** Maximum variation depth in moves (default: 50) */
   maxDepth?: number;
-  /** Maximum number of branches/sub-variations (default: 5) */
-  maxBranches?: number;
   /** Target rating for human-move predictions */
   targetRating?: number;
-  /** Callback for warning messages (e.g., parse failures) */
+  /** Callback for warning messages */
   warnCallback?: (message: string) => void;
 }
 
@@ -109,27 +104,25 @@ export interface AgenticExplorerConfig {
  * Progress callback information
  */
 export interface AgenticExplorerProgress {
-  phase: 'starting' | 'exploring' | 'branching' | 'finishing';
+  phase: 'starting' | 'exploring' | 'navigating' | 'finishing';
   toolCalls: number;
-  currentDepth: number;
-  branchCount: number;
+  nodeCount: number;
   lastTool?: string | undefined;
-  /** Rich tool information for debug logging */
   toolArgs?: Record<string, unknown> | undefined;
   toolResult?: unknown;
   toolError?: string | undefined;
   toolDurationMs?: number | undefined;
-  /** Chess context for meaningful display */
   currentFen?: string | undefined;
-  currentLine?: string[] | undefined;
-  branchPurpose?: string | undefined;
+  currentSan?: string | undefined;
 }
 
 /**
  * Result of agentic exploration
  */
 export interface AgenticExplorerResult {
-  /** Explored variations in ExploredLine format */
+  /** MoveInfo array for PGN rendering */
+  moves: MoveInfo[];
+  /** Explored variations in legacy format (for compatibility) */
   variations: ExploredLine[];
   /** Total tool calls used */
   toolCalls: number;
@@ -152,55 +145,29 @@ const DEFAULT_CONFIG: Required<AgenticExplorerConfig> = {
   maxToolCalls: 40,
   softToolCap: 25,
   maxDepth: 50,
-  maxBranches: 5,
   targetRating: 1500,
-  warnCallback: () => {}, // No-op by default
+  warnCallback: () => {},
 };
 
 /**
- * Agentic Variation Explorer
- *
- * Uses an iterative tool-calling loop where the LLM decides how to explore
- * a chess position. The LLM has complete control over:
- * - Which moves to explore
- * - When to branch into alternatives
- * - Where to add comments and annotations
- * - When to stop exploring
- */
-/**
  * Cache key for engine evaluations
- * Uses FEN (normalized to position only) and depth
  */
 function getEvalCacheKey(fen: string, depth: number): string {
-  // Normalize FEN - remove move counters
   const fenParts = fen.split(' ');
   const normalizedFen = fenParts.slice(0, 4).join(' ');
   return `eval:${normalizedFen}:d${depth}`;
 }
 
-/**
- * Minimum depth to cache evaluations
- * Shallow evaluations (< 14) aren't worth caching
- */
 const MIN_CACHE_DEPTH = 14;
 
 /**
- * Agentic Variation Explorer
- *
- * Uses an iterative tool-calling loop where the LLM decides how to explore
- * a chess position. The LLM has complete control over:
- * - Which moves to explore
- * - When to branch into alternatives
- * - Where to add comments and annotations
- * - When to stop exploring
+ * Agentic Variation Explorer (Tree-Based)
  */
 export class AgenticVariationExplorer {
   private readonly config: Required<AgenticExplorerConfig>;
   private readonly stoppingConfig: StoppingConfig;
   private readonly toolExecutor: ToolExecutor;
-  /** Cache for deep engine evaluations */
   private readonly evalCache: ResponseCache<EvaluatePositionResult>;
-  /** Cache stats */
   private cacheHits = 0;
   private cacheMisses = 0;
 
@@ -218,22 +185,14 @@ export class AgenticVariationExplorer {
       maxDepth: this.config.maxDepth,
     };
     this.toolExecutor = new ToolExecutor(services, this.config.targetRating);
-    // Initialize evaluation cache with 1 hour TTL and 500 entries
     this.evalCache = new ResponseCache({
       maxSize: 500,
-      ttlMs: 60 * 60 * 1000, // 1 hour
+      ttlMs: 60 * 60 * 1000,
     });
   }
 
   /**
    * Explore variations from a position
-   *
-   * @param startingFen - Position to explore
-   * @param targetRating - Target rating for explanations
-   * @param playedMove - The move that was actually played (optional, for context)
-   * @param moveClassification - Quality classification of the played move
-   * @param onProgress - Progress callback
-   * @returns Explored variations
    */
   async explore(
     startingFen: string,
@@ -249,8 +208,14 @@ export class AgenticVariationExplorer {
       | 'brilliant'
       | 'forced',
     onProgress?: (progress: AgenticExplorerProgress) => void,
+    gameMoves?: Array<{ san: string; fenAfter: string }>,
   ): Promise<AgenticExplorerResult> {
-    const state = new ExplorationState(startingFen);
+    // Initialize tree with game moves (pre-populated principal path)
+    const tree = new VariationTree(startingFen);
+    if (gameMoves && gameMoves.length > 0) {
+      tree.initializeFromMoves(gameMoves);
+    }
+
     let toolCallCount = 0;
     let tokensUsed = 0;
     let finished = false;
@@ -277,12 +242,12 @@ export class AgenticVariationExplorer {
 
     // Agentic exploration loop
     while (!finished && toolCallCount < this.config.maxToolCalls) {
-      // Report progress
       onProgress?.({
-        phase: state.getCurrentDepth() === 0 ? 'starting' : 'exploring',
+        phase: toolCallCount === 0 ? 'starting' : 'exploring',
         toolCalls: toolCallCount,
-        currentDepth: state.getCurrentDepth(),
-        branchCount: state.getBranchCount(),
+        nodeCount: tree.getAllNodes().length,
+        currentFen: tree.getCurrentNode().fen,
+        currentSan: tree.getCurrentNode().san,
       });
 
       // Add budget guidance if approaching limits
@@ -300,7 +265,6 @@ export class AgenticVariationExplorer {
           ? { type: 'function', function: { name: 'finish_exploration' } }
           : 'auto';
 
-      // Call LLM with tools
       const response = await this.llmClient.chat({
         messages,
         tools: EXPLORATION_TOOLS,
@@ -310,41 +274,34 @@ export class AgenticVariationExplorer {
 
       tokensUsed += response.usage?.totalTokens ?? 0;
 
-      // If no tool calls, we're done
       if (!response.toolCalls || response.toolCalls.length === 0) {
         finished = true;
         break;
       }
 
-      // Add assistant message with tool calls
       messages.push({
         role: 'assistant',
         content: response.content || '',
         toolCalls: response.toolCalls,
       });
 
-      // Process each tool call
       for (const toolCall of response.toolCalls) {
         toolCallCount++;
 
-        // Parse tool arguments for logging
         let toolArgs: Record<string, unknown> = {};
         try {
           toolArgs = JSON.parse(toolCall.function.arguments || '{}') as Record<string, unknown>;
         } catch (e) {
-          // Log parse failure for debugging
           this.config.warnCallback?.(
             `Failed to parse tool arguments for ${toolCall.function.name}: ${toolCall.function.arguments}`,
           );
         }
 
-        // Capture timing
         const toolStartTime = Date.now();
 
-        // Execute the tool
-        const result = await this.executeExplorationTool(
+        const result = await this.executeTreeTool(
           toolCall,
-          state,
+          tree,
           toolCallCount,
           previousEval,
           currentEval,
@@ -361,49 +318,38 @@ export class AgenticVariationExplorer {
           }
         }
 
-        // Add tool result message
         messages.push({
           role: 'tool',
           content: JSON.stringify(result),
           toolCallId: toolCall.id,
         });
 
-        // Determine phase and branch purpose
         const toolName = toolCall.function.name;
         const phase =
-          toolName === 'start_branch'
-            ? 'branching'
+          toolName === 'go_to' || toolName === 'go_to_parent'
+            ? 'navigating'
             : toolName === 'finish_exploration'
               ? 'finishing'
               : 'exploring';
 
-        // Get branch purpose if this is a branching call
-        const branchPurpose =
-          toolName === 'start_branch' ? (toolArgs.purpose as string | undefined) : undefined;
-
-        // Check for tool error
         const toolError =
           typeof result === 'object' && result !== null && 'error' in result
             ? String((result as Record<string, unknown>).error)
             : undefined;
 
-        // Report rich progress with tool details and chess context
         onProgress?.({
           phase,
           toolCalls: toolCallCount,
-          currentDepth: state.getCurrentDepth(),
-          branchCount: state.getBranchCount(),
+          nodeCount: tree.getAllNodes().length,
           lastTool: toolName,
           toolArgs,
           toolResult: result,
           toolError,
           toolDurationMs,
-          currentFen: state.getCurrentFen(),
-          currentLine: state.getMoveHistory(),
-          branchPurpose,
+          currentFen: tree.getCurrentNode().fen,
+          currentSan: tree.getCurrentNode().san,
         });
 
-        // Check for exploration completion
         if (toolName === 'finish_exploration') {
           summary = toolArgs.summary as string | undefined;
           finished = true;
@@ -412,8 +358,15 @@ export class AgenticVariationExplorer {
       }
     }
 
+    // Convert tree to MoveInfo for PGN
+    const moves = tree.toMoveInfo();
+
+    // Convert MoveInfo[] to ExploredLine[] for backward compatibility
+    const variations = convertMoveInfoToExploredLines(moves);
+
     const result: AgenticExplorerResult = {
-      variations: state.toExploredLines(),
+      moves,
+      variations,
       toolCalls: toolCallCount,
       tokensUsed,
     };
@@ -422,7 +375,6 @@ export class AgenticVariationExplorer {
       result.summary = summary;
     }
 
-    // Add cache stats if there were any cache operations
     if (this.cacheHits > 0 || this.cacheMisses > 0) {
       const total = this.cacheHits + this.cacheMisses;
       result.cacheStats = {
@@ -436,13 +388,11 @@ export class AgenticVariationExplorer {
   }
 
   /**
-   * Execute an exploration tool
-   *
-   * Handles exploration-specific tools directly, delegates others to ToolExecutor.
+   * Execute a tree-based exploration tool
    */
-  private async executeExplorationTool(
+  private async executeTreeTool(
     toolCall: ToolCall,
-    state: ExplorationState,
+    tree: VariationTree,
     toolCallsUsed: number,
     previousEval?: number,
     currentEval?: number,
@@ -460,127 +410,134 @@ export class AgenticVariationExplorer {
     }
 
     switch (name) {
-      // === Board visualization ===
-      case 'get_board':
+      // === Navigation ===
+      case 'get_position': {
         return {
-          board: renderBoard(state.getCurrentFen()),
-          fen: state.getCurrentFen(),
-          moveHistory: state.getMoveHistory(),
+          success: true,
+          ...tree.getCurrentNodeInfo(),
+          board: renderBoard(tree.getCurrentNode().fen),
         };
+      }
 
-      // === Move navigation ===
-      case 'push_move': {
-        const moveArg = args.move as string;
-        if (!moveArg) {
+      case 'add_move': {
+        const san = args.san as string;
+        if (!san) {
           return { success: false, error: 'No move provided' };
         }
 
-        try {
-          const pos = new ChessPosition(state.getCurrentFen());
-
-          // Handle UCI format
-          let san = moveArg;
-          if (/^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(moveArg)) {
-            san = pos.uciToSan(moveArg);
-          }
-
-          const result = pos.move(san);
-
-          const exploredMove: ExploredMove = {
-            san: result.san,
-            fenAfter: result.fenAfter,
-          };
-          state.pushMove(exploredMove);
-
-          const newPos = new ChessPosition(result.fenAfter);
-          return {
-            success: true,
-            san: result.san,
-            fenAfter: result.fenAfter,
-            board: renderBoard(result.fenAfter),
-            legalMoves: newPos.getLegalMoves().slice(0, 10),
-            isCheck: newPos.isCheck(),
-            isCheckmate: newPos.isCheckmate(),
-            depth: state.getCurrentDepth(),
-          };
-        } catch (e) {
+        const result = tree.addMove(san);
+        if (!result.success) {
+          const pos = new ChessPosition(tree.getCurrentNode().fen);
           return {
             success: false,
-            error: `Illegal move: ${moveArg}`,
-            legalMoves: new ChessPosition(state.getCurrentFen()).getLegalMoves().slice(0, 10),
+            error: result.error,
+            legalMoves: pos.getLegalMoves().slice(0, 10),
           };
         }
-      }
 
-      case 'pop_move': {
-        const popped = state.popMove();
-        if (!popped) {
-          return { success: false, error: 'No moves to pop' };
-        }
+        const newNode = tree.getCurrentNode();
+        const pos = new ChessPosition(newNode.fen);
         return {
           success: true,
-          poppedMove: popped.san,
-          currentFen: state.getCurrentFen(),
-          board: renderBoard(state.getCurrentFen()),
-          depth: state.getCurrentDepth(),
+          message: result.message,
+          fen: newNode.fen,
+          san: newNode.san,
+          board: renderBoard(newNode.fen),
+          legalMoves: pos.getLegalMoves().slice(0, 10),
+          isCheck: pos.isCheck(),
+          isCheckmate: pos.isCheckmate(),
         };
       }
 
-      // === Branching ===
-      case 'start_branch': {
-        if (state.getBranchCount() >= this.config.maxBranches) {
-          return {
-            success: false,
-            error: `Maximum branches reached (${this.config.maxBranches})`,
-          };
+      case 'add_alternative': {
+        const san = args.san as string;
+        if (!san) {
+          return { success: false, error: 'No move provided' };
         }
 
-        const purpose = (args.purpose as LinePurpose) || 'thematic';
-        state.startBranch(purpose);
+        const result = tree.addAlternative(san);
+        if (!result.success) {
+          return { success: false, error: result.error };
+        }
 
         return {
           success: true,
-          branchPurpose: purpose,
-          branchCount: state.getBranchCount(),
-          nestingDepth: state.getNestingDepth(),
+          message: result.message,
+          alternativeFen: result.node?.fen,
+          alternativeSan: result.node?.san,
+          currentFen: tree.getCurrentNode().fen,
+          note: 'You remain at your current position. Use go_to to navigate to the alternative.',
         };
       }
 
-      case 'end_branch': {
-        const ended = state.endBranch();
-        if (!ended) {
-          return { success: false, error: 'Not in a sub-variation' };
+      case 'go_to': {
+        const fen = args.fen as string;
+        if (!fen) {
+          return { success: false, error: 'No FEN provided' };
         }
+
+        const result = tree.goTo(fen);
+        if (!result.success) {
+          return { success: false, error: result.error };
+        }
+
+        const node = tree.getCurrentNode();
         return {
           success: true,
-          returnedToMainLine: state.getNestingDepth() === 0,
-          currentFen: state.getCurrentFen(),
-          board: renderBoard(state.getCurrentFen()),
+          message: result.message,
+          ...tree.getCurrentNodeInfo(),
+          board: renderBoard(node.fen),
+        };
+      }
+
+      case 'go_to_parent': {
+        const result = tree.goToParent();
+        if (!result.success) {
+          return { success: false, error: result.error };
+        }
+
+        const node = tree.getCurrentNode();
+        return {
+          success: true,
+          message: result.message,
+          ...tree.getCurrentNodeInfo(),
+          board: renderBoard(node.fen),
+        };
+      }
+
+      case 'get_tree': {
+        return {
+          success: true,
+          tree: tree.getAsciiTree(),
+          nodeCount: tree.getAllNodes().length,
         };
       }
 
       // === Annotation ===
-      case 'add_comment': {
-        const rawComment = args.comment as string;
-        if (!rawComment) {
-          return { success: false, error: 'No comment provided' };
+      case 'annotate': {
+        const comment = args.comment as string | undefined;
+        const nags = args.nags as string[] | undefined;
+
+        if (comment) {
+          const { cleaned, rejected, reason } = validateAndCleanComment(
+            comment,
+            tree.getCurrentNode().san,
+          );
+          if (rejected) {
+            return { success: false, error: reason };
+          }
+          tree.setComment(cleaned);
         }
 
-        // Validate and clean up the comment
-        const { cleaned, rejected, reason } = validateAndCleanComment(
-          rawComment,
-          state.getLastMoveSan(),
-        );
-
-        if (rejected) {
-          return { success: false, error: reason };
+        if (nags && nags.length > 0) {
+          tree.setNags(nags);
         }
 
-        const added = state.addComment(cleaned);
-        if (!added) {
-          return { success: false, error: 'No move to annotate (play a move first)' };
-        }
-        return { success: true, comment: cleaned };
+        return {
+          success: true,
+          comment: tree.getCurrentNode().comment,
+          nags: tree.getCurrentNode().nags,
+        };
       }
 
       case 'add_nag': {
@@ -588,146 +545,77 @@ export class AgenticVariationExplorer {
         if (!nag) {
           return { success: false, error: 'No NAG provided' };
         }
-        const added = state.addNag(nag);
-        if (!added) {
-          return { success: false, error: 'No move to annotate (play a move first)' };
-        }
-        return { success: true, nag };
+        tree.addNag(nag);
+        return { success: true, nags: tree.getCurrentNode().nags };
       }
 
-      // === NAG suggestion tools ===
-      case 'suggest_nag': {
-        // Get the move history to find the last move
-        const history = state.getMoveHistory();
-        if (history.length === 0) {
-          return { success: false, error: 'No move to analyze (play a move first)' };
+      case 'set_principal': {
+        const san = args.san as string;
+        if (!san) {
+          return { success: false, error: 'No move provided' };
         }
-
-        const lastMove = history[history.length - 1]!;
-        const currentFen = state.getCurrentFen();
-
-        // We need the FEN before the last move to evaluate both positions
-        // Pop the move, evaluate, push it back
-        const popped = state.popMove();
-        if (!popped) {
-          return { success: false, error: 'Cannot analyze move' };
-        }
-
-        const fenBefore = state.getCurrentFen();
-
-        try {
-          // Evaluate position before the move
-          const evalBefore = await this.toolExecutor.execute({
-            id: 'suggest_nag_before',
-            type: 'function',
-            function: {
-              name: 'evaluate_position',
-              arguments: JSON.stringify({ fen: fenBefore, depth: 16, multipv: 2 }),
-            },
-          });
-
-          // Restore the move
-          state.pushMove(popped);
-
-          // Evaluate position after the move
-          const evalAfter = await this.toolExecutor.execute({
-            id: 'suggest_nag_after',
-            type: 'function',
-            function: {
-              name: 'evaluate_position',
-              arguments: JSON.stringify({ fen: currentFen, depth: 16 }),
-            },
-          });
-
-          // Calculate NAG based on eval difference
-          return this.calculateMoveNag(
-            evalBefore.result as Record<string, unknown>,
-            evalAfter.result as Record<string, unknown>,
-            lastMove,
-            args.context as string | undefined,
-          );
-        } catch (e) {
-          // Restore move if evaluation failed
-          state.pushMove(popped);
-          return { success: false, error: 'Engine evaluation failed' };
-        }
+        const result = tree.setPrincipal(san);
+        return result;
       }
 
-      case 'get_eval_nag': {
-        const currentFen = state.getCurrentFen();
-
-        // Evaluate current position
-        const evalResult = await this.toolExecutor.execute({
-          id: 'get_eval_nag',
-          type: 'function',
-          function: {
-            name: 'evaluate_position',
-            arguments: JSON.stringify({ fen: currentFen, depth: 16 }),
-          },
-        });
-
-        const result = evalResult.result as Record<string, unknown>;
-        if (!result || evalResult.error) {
-          return { success: false, error: 'Engine evaluation failed' };
+      // === Work Queue ===
+      case 'mark_interesting': {
+        const moves = args.moves as string[];
+        if (!moves || moves.length === 0) {
+          return { success: false, error: 'No moves provided' };
         }
-
-        // Determine evaluation NAG
-        const evalNag = this.calculateEvalNag(
-          result.evaluation as number,
-          result.isMate as boolean,
-          result.mateIn as number | undefined,
-          currentFen,
-        );
-
+        tree.markInteresting(moves);
         return {
           success: true,
-          nag: evalNag.nag,
-          description: evalNag.description,
-          evaluation: result.evaluation,
+          interestingMoves: tree.getInteresting(),
         };
       }
 
-      // === Stopping assessment ===
-      case 'assess_continuation': {
-        const assessment = assessContinuation(
-          state.getCurrentFen(),
-          previousEval,
-          currentEval,
-          state.getCurrentDepth(),
-          toolCallsUsed,
-          this.stoppingConfig,
-        );
-        return assessment;
+      case 'get_interesting': {
+        return {
+          success: true,
+          interestingMoves: tree.getInteresting(),
+          fen: tree.getCurrentNode().fen,
+        };
       }
 
-      // === Finish exploration ===
-      case 'finish_exploration': {
-        return { finished: true, summary: args.summary };
+      case 'clear_interesting': {
+        const move = args.move as string;
+        if (!move) {
+          return { success: false, error: 'No move provided' };
+        }
+        tree.clearInteresting(move);
+        return {
+          success: true,
+          remainingInteresting: tree.getInteresting(),
+        };
       }
 
-      // === Delegate to ToolExecutor for analysis tools ===
+      // === Analysis ===
       case 'evaluate_position': {
-        const currentFen = state.getCurrentFen();
-        const depth = (args.depth as number) ?? 16;
+        const currentFen = tree.getCurrentNode().fen;
+        const depth = (args.depth as number) ?? 20;
         const numLines = args.numLines as number | undefined;
 
-        // Check cache for deep evaluations
+        // Check cache
         if (depth >= MIN_CACHE_DEPTH) {
           const cacheKey = getEvalCacheKey(currentFen, depth);
           const cached = this.evalCache.get(cacheKey);
           if (cached) {
             this.cacheHits++;
+            // Also cache on tree node
+            tree.setEngineEval({
+              score: cached.evaluation ?? 0,
+              depth,
+              bestLine: cached.principalVariation ?? [],
+              timestamp: Date.now(),
+            });
             return { result: cached, cached: true };
           }
           this.cacheMisses++;
         }
 
-        // Execute the evaluation
-        const evalArgs = {
-          fen: currentFen,
-          depth,
-          multipv: numLines,
-        };
+        const evalArgs = { fen: currentFen, depth, multipv: numLines };
         const result = await this.toolExecutor.execute({
           ...toolCall,
           function: {
@@ -736,10 +624,19 @@ export class AgenticVariationExplorer {
           },
         });
 
-        // Cache the result if deep enough
+        // Cache result
         if (depth >= MIN_CACHE_DEPTH && result.result && !result.error) {
           const cacheKey = getEvalCacheKey(currentFen, depth);
           this.evalCache.set(cacheKey, result.result as EvaluatePositionResult);
+
+          // Cache on tree node
+          const evalResult = result.result as Record<string, unknown>;
+          tree.setEngineEval({
+            score: (evalResult.evaluation as number) ?? 0,
+            depth,
+            bestLine: (evalResult.principalVariation as string[]) ?? [],
+            timestamp: Date.now(),
+          });
         }
 
         return result;
@@ -747,7 +644,7 @@ export class AgenticVariationExplorer {
 
       case 'predict_human_moves': {
         const predictArgs = {
-          fen: state.getCurrentFen(),
+          fen: tree.getCurrentNode().fen,
           rating: args.rating ?? this.config.targetRating,
         };
         return this.toolExecutor.execute({
@@ -760,7 +657,7 @@ export class AgenticVariationExplorer {
       }
 
       case 'lookup_opening': {
-        const lookupArgs = { fen: state.getCurrentFen() };
+        const lookupArgs = { fen: tree.getCurrentNode().fen };
         return this.toolExecutor.execute({
           ...toolCall,
           function: {
@@ -772,7 +669,7 @@ export class AgenticVariationExplorer {
 
       case 'find_reference_games': {
         const gamesArgs = {
-          fen: state.getCurrentFen(),
+          fen: tree.getCurrentNode().fen,
           limit: args.limit,
         };
         return this.toolExecutor.execute({
@@ -784,317 +681,135 @@ export class AgenticVariationExplorer {
         });
       }
 
+      // === Stopping ===
+      case 'assess_continuation': {
+        const node = tree.getCurrentNode();
+        // Calculate depth from root
+        let depth = 0;
+        let current = node;
+        while (current.parent) {
+          depth++;
+          current = current.parent;
+        }
+
+        const assessment = assessContinuation(
+          node.fen,
+          previousEval,
+          currentEval,
+          depth,
+          toolCallsUsed,
+          this.stoppingConfig,
+        );
+        return assessment;
+      }
+
+      case 'finish_exploration': {
+        return { finished: true, summary: args.summary };
+      }
+
       default:
         return { error: `Unknown tool: ${name}` };
     }
   }
 
   /**
-   * Build the system prompt for exploration
+   * Build the system prompt for tree-based exploration
    */
   private buildSystemPrompt(targetRating: number): string {
-    return `You are an expert chess analyst exploring variations to create instructive annotations.
+    return `You are an expert chess analyst exploring variations in a tree structure.
 
 TARGET AUDIENCE: ${targetRating} rated players
 
-## POSITION REPRESENTATION
+## THE TREE
 
-You have the position in FEN format - parse it directly. You do NOT need to call get_board.
-FEN is your primary reference for piece positions, castling rights, and en passant.
-
-FEN format reminder:
-- Piece placement from rank 8 to 1 (K=King, Q=Queen, R=Rook, B=Bishop, N=Knight, P=Pawn)
-- Uppercase = White pieces, lowercase = Black pieces
-- Numbers = consecutive empty squares
+You're navigating a tree where:
+- Each node is a chess position (identified by FEN)
+- The game's main line is already in the tree, marked as "principal"
+- You add alternatives and annotations to create instructive analysis
 
 ## YOUR TOOLS
 
-### Navigation (Primary)
-- push_move: Play a move (SAN: "Nf3", "e4", "O-O") - returns new FEN
-- pop_move: Go back one move - returns previous FEN
-
-### Visualization (Rarely Needed)
-- get_board: ASCII board visualization - only use if absolutely necessary
-
-### Branching
-- start_branch: Create a sub-variation for alternatives
-- end_branch: Return to parent line
+### Navigation
+- get_position: Get current node info (FEN, children, parent, principal)
+- add_move(san): Play a move, creating a child node. You move to it. Use to CONTINUE a line.
+- add_alternative(san): Add a different move at current position. You stay here. Use to CREATE a sideline.
+- go_to(fen): Jump to any position in the tree by FEN
+- go_to_parent: Move up one level
+- get_tree: See ASCII visualization of entire tree
 
 ### Annotation
-- add_comment: Add annotation to last move (2-6 words: "the point", "threatening mate")
-- add_nag: Add quality symbol manually ($1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!)
-- suggest_nag: Get engine-based NAG suggestion for last move (use this to decide if a move deserves !, ?, etc.)
-- get_eval_nag: Get position evaluation NAG for end of line ($14-$19 for advantage)
+- annotate(comment, nags): Add comment and/or NAGs to current node
+- add_nag(nag): Add a single NAG ($1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!)
+- set_principal(san): Mark a child as the main continuation
+
+### Planning
+- mark_interesting(moves): Note moves you want to explore later
+- get_interesting: See what you haven't explored yet
+- clear_interesting(move): Remove from list after exploring
 
 ### Analysis
-- evaluate_position: Get engine assessment + best line
-- predict_human_moves: See what humans would play at ${targetRating} rating
+- evaluate_position: Get engine evaluation (cached on node)
+- predict_human_moves: What would a ${targetRating} player do?
+- lookup_opening: Opening name and theory
+- find_reference_games: Master games from this position
 
 ### Control
-- assess_continuation: Check if position is worth exploring further
-- finish_exploration: Complete exploration
+- assess_continuation: Should I keep exploring this line?
+- finish_exploration: Signal completion
 
-## EXPLORATION DEPTH GUIDELINES
+## KEY WORKFLOW
 
-**EXPLORE DEEPLY** - Don't just show 2-3 moves. Critical positions deserve 8-15 move lines.
+1. Start at the position to analyze
+2. evaluate_position to understand what's happening
+3. mark_interesting with candidate moves to explore
+4. For each interesting move:
+   - add_alternative(move) to create the sideline
+   - go_to(alternative_fen) to navigate there
+   - add_move to continue the line (8-15 moves deep)
+   - annotate key moments
+   - go_to(original_fen) when done
+   - clear_interesting(move)
+5. finish_exploration when complete
 
-1. **Start by evaluating the position**
-   - Parse the FEN to understand the position - no need to call get_board
-   - Call evaluate_position to get engine assessment
-   - Understand tactical themes before exploring
+## EXAMPLE: Showing a Better Move
 
-2. **Explore forcing sequences THOROUGHLY**
-   - Follow checks, captures, and threats to their conclusion
-   - Don't stop mid-tactics - show the complete winning/defending sequence
-   - If a sacrifice leads to an attack, show the full attack
+Position after 12...h6 (a mistake). Engine says 12...a5 was better.
 
-3. **Use NESTED BRANCHES for interesting sub-variations**
-   - Within a branch, if there's a critical alternative, start ANOTHER branch
-   - Example: After 10...Nxd4, Black might try 10...f5 - show it as a nested sub-variation
-   - Sub-variations show "what if opponent tries something else here?"
-   - Maximum ${this.config.maxBranches} total branches, but use nesting wisely
+\`\`\`
+1. mark_interesting(["a5"])           // Note we want to show a5
+2. add_alternative("a5")              // Create 12...a5 as alternative
+3. go_to(<a5_fen>)                    // Move to that position
+4. annotate("gaining queenside space")
+5. add_move("Ne5")                    // Continue: 13.Ne5
+6. add_move("Qb6")                    // 13...Qb6
+7. add_move("Ba4")                    // 14.Ba4
+8. add_move("bxa4")                   // 14...bxa4
+9. annotate("wins the bishop pair")
+10. go_to(<h6_fen>)                   // Back to main line
+11. clear_interesting("a5")           // Done with a5
+12. finish_exploration
+\`\`\`
 
-4. **Follow the tree of alternatives**
-   - After showing main refutation, show why defender's alternatives also fail
-   - Each critical defender resource deserves its own nested branch
-   - This creates PGN like: 1.e4 (1...d5? 2.exd5 (2...Nf6 3.c4) 2...Qxd5)
+Result: Clean PGN with (12...a5 {comment} 13.Ne5 Qb6 14.Ba4 bxa4 {comment})
 
-5. **Add comments at KEY moments only**
-   - First move of a branch: WHY this variation ("the engine's choice", "a human error")
-   - Critical moves: "the point", "with tempo", "threatening Qxh7"
-   - Ending: OUTCOME ("and Black wins material", "with equality")
-   - NOTE: Always push_move BEFORE add_comment - comments attach to the last played move
+## CRITICAL RULES
 
-6. **Use NAGs appropriately**
-   - Use suggest_nag after important moves to get engine-based quality assessment
-   - ! ($1) = good move, ? ($2) = mistake, !! ($3) = brilliant, ?? ($4) = blunder
-   - !? ($5) = interesting - use for creative/tricky moves that aren't objectively best
-   - ?! ($6) = dubious - slight inaccuracy but might have practical merit
-   - Use get_eval_nag at end of lines to mark the resulting position
-
-## BRANCHING WORKFLOW
-
-Main line exploration:
-1. push_move → add_comment → push_move → ...
-
-Creating a variation:
-1. start_branch → push_move → add_comment → ... → end_branch
-
-NESTED variation (sub-variation within a variation):
-1. Inside a branch: start_branch → push_move → ... → end_branch
-2. This creates deeply nested PGN: (main move (alternative1 (sub-alternative)))
-
-## STOPPING CRITERIA
-
-**CONTINUE** when:
-- Tactical tension exists (hanging pieces, checks, captures)
-- Large eval swing just occurred
-- The "point" hasn't been shown yet
-- Position is still unresolved
-- There are interesting alternatives to explore as sub-variations
-
-**STOP** when:
-- Position is quiet and resolved
-- Point has been demonstrated
-- Material outcome is clear
-- All important alternatives have been shown
-- assess_continuation suggests stopping
+1. **add_move CONTINUES a line** - adds child, moves to it
+2. **add_alternative CREATES a sideline** - adds sibling, stays put
+3. **Explore DEEPLY** - 8-15 moves for critical lines, don't stop mid-tactics
+4. **Short comments only** - 2-8 words, lowercase, no ending punctuation
+5. **NEVER repeat move notation in comments** - say "wins material" not "Nxg7 wins material"
 
 ## ANNOTATION STYLE
 
 - Max 2 sentences per comment
 - No numeric evaluations (use "winning", "slight edge", "equal")
 - Focus on WHY, not just outcomes
-- Keep comments SHORT: 2-6 words preferred
-
-## CRITICAL: AVOID THESE COMMENT MISTAKES
-
-1. **NEVER repeat the move notation** - the move is already shown
-   - BAD: "Nxg7! wins the queen"
-   - GOOD: "wins the queen"
-
-2. **NEVER mention perspective or point of view**
-   - BAD: "From black's perspective, this is crucial"
-   - BAD: "From white's point of view, this wins"
-   - GOOD: "the key resource" or "wins material"
-
-3. **NEVER start comments with "this" or "here"**
-   - BAD: "this threatens mate"
-   - GOOD: "threatening mate"
-
-4. **Keep comments about THE CURRENT MOVE only**
-   - Comments should explain the move they're attached to
-   - Don't discuss future or past moves in the comment
-
-5. **Use lowercase, no punctuation at end**
-   - BAD: "The point!"
-   - GOOD: "the point"`;
-  }
-
-  /**
-   * Calculate move quality NAG based on evaluation comparison
-   *
-   * Thresholds (rating-adaptive, using 1500 as baseline):
-   * - Brilliant ($3 !!): Move finds winning line others miss, often sacrifice
-   * - Good ($1 !): Best move or within 10cp of best
-   * - Interesting ($5 !?): Not best but creative/tricky, might work practically
-   * - Dubious ($6 ?!): Slightly inaccurate (30-80cp loss)
-   * - Mistake ($2 ?): Clear error (80-200cp loss)
-   * - Blunder ($4 ??): Serious error (200+cp loss)
-   */
-  private calculateMoveNag(
-    evalBefore: Record<string, unknown>,
-    evalAfter: Record<string, unknown>,
-    move: string,
-    context?: string,
-  ): { success: boolean; nag?: string; reason: string; cpLoss?: number } {
-    if (!evalBefore || !evalAfter) {
-      return { success: false, reason: 'Missing evaluation data' };
-    }
-
-    const cpBefore = evalBefore.evaluation as number;
-    const cpAfter = evalAfter.evaluation as number;
-    const bestMove = evalBefore.bestMove as string;
-    const alternatives = evalBefore.alternatives as Array<{ evaluation: number }> | undefined;
-
-    // Note: After a move, eval sign flips (opponent's perspective)
-    // So we negate cpAfter to compare from the same perspective
-    const cpAfterNormalized = -cpAfter;
-
-    // Calculate centipawn loss
-    const cpLoss = cpBefore - cpAfterNormalized;
-
-    // Check if this was the best move
-    const isBestMove = move === bestMove;
-
-    // Check if this is a unique winning move (brilliant candidate)
-    const secondBestEval = alternatives?.[0]?.evaluation ?? cpBefore;
-    const uniquelyBest = isBestMove && cpBefore - secondBestEval > 100;
-
-    // Check for sacrifices or creative moves based on context
-    const isSacrifice =
-      context?.toLowerCase().includes('sacrific') || move.includes('x') || context?.includes('!');
-
-    // Determine NAG
-    if (isBestMove) {
-      if (uniquelyBest || (isSacrifice && cpBefore > 100)) {
-        return { success: true, nag: '$3', reason: 'brilliant - unique winning move', cpLoss: 0 };
-      }
-      return { success: true, nag: '$1', reason: 'best move', cpLoss: 0 };
-    }
-
-    if (cpLoss <= 10) {
-      return { success: true, nag: '$1', reason: 'excellent - within 10cp of best', cpLoss };
-    }
-
-    if (cpLoss <= 30) {
-      // Good but not best - might be interesting if it has practical merit
-      if (context || isSacrifice) {
-        return {
-          success: true,
-          nag: '$5',
-          reason: 'interesting alternative',
-          cpLoss,
-        };
-      }
-      // No NAG needed - return without nag property
-      return { success: true, reason: 'acceptable - no NAG needed', cpLoss };
-    }
-
-    if (cpLoss <= 80) {
-      // Dubious but might have practical value
-      if (context?.toLowerCase().includes('practical') || context?.toLowerCase().includes('trap')) {
-        return { success: true, nag: '$5', reason: 'interesting despite inaccuracy', cpLoss };
-      }
-      return { success: true, nag: '$6', reason: 'dubious - 30-80cp loss', cpLoss };
-    }
-
-    if (cpLoss <= 200) {
-      return { success: true, nag: '$2', reason: 'mistake - 80-200cp loss', cpLoss };
-    }
-
-    return { success: true, nag: '$4', reason: 'blunder - 200+cp loss', cpLoss };
-  }
-
-  /**
-   * Calculate evaluation NAG for end of line
-   *
-   * $10 = drawish
-   * $13 = unclear
-   * $14 = slight edge White
-   * $15 = slight edge Black
-   * $16 = moderate advantage White
-   * $17 = moderate advantage Black
-   * $18 = decisive advantage White
-   * $19 = decisive advantage Black
-   */
-  private calculateEvalNag(
-    cp: number,
-    isMate: boolean,
-    mateIn: number | undefined,
-    fen: string,
-  ): { nag: string | undefined; description: string } {
-    // Determine whose perspective (side to move)
-    const pos = new ChessPosition(fen);
-    const sideToMove = pos.turn();
-
-    // Mate situations
-    if (isMate && mateIn !== undefined) {
-      if (mateIn > 0) {
-        // Side to move has mate
-        const winner = sideToMove === 'w' ? 'White' : 'Black';
-        return {
-          nag: winner === 'White' ? '$18' : '$19',
-          description: `${winner} has forced mate in ${Math.abs(mateIn)}`,
-        };
-      } else {
-        // Side to move is getting mated
-        const winner = sideToMove === 'w' ? 'Black' : 'White';
-        return {
-          nag: winner === 'White' ? '$18' : '$19',
-          description: `${winner} has forced mate in ${Math.abs(mateIn)}`,
-        };
-      }
-    }
-
-    // Convert cp to absolute advantage from White's perspective
-    // Engine returns eval from side-to-move's perspective
-    const whiteAdvantage = sideToMove === 'w' ? cp : -cp;
-    const absAdvantage = Math.abs(whiteAdvantage);
-    const advantageSide = whiteAdvantage > 0 ? 'White' : 'Black';
-
-    if (absAdvantage < 15) {
-      return { nag: '$10', description: 'equal position' };
-    }
-
-    if (absAdvantage < 50) {
-      return {
-        nag: advantageSide === 'White' ? '$14' : '$15',
-        description: `slight edge ${advantageSide}`,
-      };
-    }
-
-    if (absAdvantage < 150) {
-      return {
-        nag: advantageSide === 'White' ? '$16' : '$17',
-        description: `${advantageSide} is better`,
-      };
-    }
-
-    return {
-      nag: advantageSide === 'White' ? '$18' : '$19',
-      description: `${advantageSide} is winning`,
-    };
+- NAGs: $1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!, $14-$19 for position eval`;
   }
 
   /**
    * Build initial context for exploration
-   *
-   * FEN is presented first as the primary representation since LLMs
-   * understand FEN well. The ASCII board is supplementary.
-   *
-   * Context is tailored based on move classification to avoid assuming
-   * all played moves are mistakes.
    */
   private buildInitialContext(
     fen: string,
@@ -1118,40 +833,97 @@ NESTED variation (sub-variation within a variation):
       parts.push('');
       parts.push('The starting position is BEFORE this move was played.');
 
-      // Tailor guidance based on move quality
       if (moveClassification === 'blunder' || moveClassification === 'mistake') {
         parts.push('');
         parts.push('This move is a significant error. Your task:');
-        parts.push('1. Show what SHOULD have been played instead (the correct move).');
-        parts.push('2. Explore deeply (8-15 moves) demonstrating why the played move fails.');
-        parts.push('3. Use nested branches to show why defender alternatives also fail.');
+        parts.push('1. Use add_alternative to show what SHOULD have been played.');
+        parts.push('2. Navigate to the alternative and explore deeply (8-15 moves).');
+        parts.push('3. Annotate key moments explaining why the alternative is better.');
       } else if (moveClassification === 'inaccuracy') {
         parts.push('');
         parts.push('This move is slightly inaccurate. Your task:');
-        parts.push('1. Show the stronger alternative that was available.');
-        parts.push('2. Explain what the played move misses (without over-dramatizing).');
-        parts.push(
-          '3. The difference may be subtle - focus on the key positional or tactical nuance.',
-        );
+        parts.push('1. Use add_alternative to show the stronger option.');
+        parts.push('2. Explain the key difference (may be subtle).');
       } else {
-        // Good, excellent, book, or unknown - explore the position normally
         parts.push('');
         parts.push('Explore the key continuations from this position.');
-        parts.push('Show the main ideas, threats, and typical plans for both sides.');
-        parts.push('If there are critical variations, explore them deeply (8-15 moves).');
+        parts.push('Use add_alternative to show important sidelines.');
       }
     } else {
       parts.push('');
       parts.push('Explore the key variations from this position.');
-      parts.push('Show the best play and common human mistakes.');
-      parts.push('Explore deeply (8-15 moves) with nested sub-variations for alternatives.');
+      parts.push('Use add_alternative for sidelines and add_move to continue lines.');
     }
 
     parts.push('');
-    parts.push('Start by evaluating the position to understand the tactical themes.');
+    parts.push('Start by calling evaluate_position to understand the tactical themes.');
 
     return parts.join('\n');
   }
+}
+
+/**
+ * Convert MoveInfo[] to ExploredLine[] for backward compatibility with orchestrator
+ *
+ * The tree produces variations embedded in MoveInfo[]. This extracts them
+ * into the flat ExploredLine format used by the legacy flow.
+ */
+function convertMoveInfoToExploredLines(moves: MoveInfo[]): ExploredLine[] {
+  const exploredLines: ExploredLine[] = [];
+
+  // Find variations in the move list
+  for (const move of moves) {
+    if (move.variations && move.variations.length > 0) {
+      for (const variation of move.variations) {
+        const exploredLine = variationToExploredLine(variation);
+        exploredLines.push(exploredLine);
+      }
+    }
+  }
+
+  return exploredLines;
+}
+
+/**
+ * Convert a single MoveInfo[] variation to ExploredLine format
+ */
+function variationToExploredLine(variation: MoveInfo[]): ExploredLine {
+  const moveSans: string[] = [];
+  const annotations = new Map<number, string>();
+  const nags = new Map<number, string>();
+  const branches: ExploredLine[] = [];
+
+  for (let i = 0; i < variation.length; i++) {
+    const move = variation[i]!;
+    moveSans.push(move.san);
+
+    if (move.commentAfter) {
+      annotations.set(i, move.commentAfter);
+    }
+
+    if (move.nags && move.nags.length > 0) {
+      nags.set(i, move.nags[0]!);
+    }
+
+    // Recursively convert nested variations
+    if (move.variations && move.variations.length > 0) {
+      for (const subVariation of move.variations) {
+        branches.push(variationToExploredLine(subVariation));
+      }
+    }
+  }
+
+  const purpose: LinePurpose = 'thematic'; // Default purpose for tree-generated lines
+  const source: LineSource = 'llm'; // All lines from LLM exploration
+
+  return {
+    moves: moveSans,
+    annotations,
+    nags,
+    branches,
+    purpose,
+    source,
+  };
 }
 
 /**

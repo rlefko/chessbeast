@@ -327,7 +327,7 @@ async function runAgenticAnnotation(
           reporter.updateMoveProgress(
             i + 1,
             positionsToAnnotate.length,
-            `${moveNotation} (exploring: ${progress.toolCalls} tools)`,
+            `${moveNotation} (exploring: ${progress.toolCalls} tools, ${progress.nodeCount} nodes)`,
           );
 
           // Rich debug output with chess-friendly formatting
@@ -341,9 +341,9 @@ async function runAgenticAnnotation(
               maxToolCalls,
               {
                 currentFen: progress.currentFen,
-                currentLine: progress.currentLine,
-                depth: progress.currentDepth,
-                branchPurpose: progress.branchPurpose,
+                currentLine: progress.currentSan ? [progress.currentSan] : undefined,
+                depth: progress.nodeCount,
+                branchPurpose: progress.phase,
               },
             );
 
@@ -366,10 +366,13 @@ async function runAgenticAnnotation(
       if (reporter.isDebug()) {
         const varCount = explorationResult.variations.length;
         const annCount = explorationResult.variations.reduce(
-          (sum, v) => sum + v.annotations.size,
+          (sum, v) => sum + (v.annotations?.size ?? 0),
           0,
         );
-        const nagCount = explorationResult.variations.reduce((sum, v) => sum + v.nags.size, 0);
+        const nagCount = explorationResult.variations.reduce(
+          (sum, v) => sum + (v.nags?.size ?? 0),
+          0,
+        );
         reporter.displayExplorationComplete({
           toolCalls: explorationResult.toolCalls,
           maxToolCalls,
