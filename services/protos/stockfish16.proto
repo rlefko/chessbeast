@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package chessbeast.stockfish16;
+
+// Stockfish 16 classical evaluation service
+// Provides detailed positional breakdown using SF16's classical eval terms
+service Stockfish16Service {
+  // Get classical evaluation breakdown for a position
+  rpc GetClassicalEval(ClassicalEvalRequest) returns (ClassicalEvalResponse);
+
+  // Health check endpoint
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Request for classical evaluation
+message ClassicalEvalRequest {
+  string fen = 1;  // Position in FEN notation
+}
+
+// Middlegame and endgame component scores
+message PhaseScore {
+  float mg = 1;  // Middlegame value in pawns
+  float eg = 2;  // Endgame value in pawns
+}
+
+// Per-side breakdown for a component
+message SideBreakdown {
+  PhaseScore white = 1;
+  PhaseScore black = 2;
+  PhaseScore total = 3;
+}
+
+// Classical evaluation breakdown response
+// All values are in pawns (positive = good for white)
+message ClassicalEvalResponse {
+  // Individual evaluation components
+  SideBreakdown material = 1;
+  SideBreakdown imbalance = 2;
+  SideBreakdown pawns = 3;
+  SideBreakdown knights = 4;
+  SideBreakdown bishops = 5;
+  SideBreakdown rooks = 6;
+  SideBreakdown queens = 7;
+  SideBreakdown mobility = 8;
+  SideBreakdown king_safety = 9;
+  SideBreakdown threats = 10;
+  SideBreakdown passed = 11;
+  SideBreakdown space = 12;
+  SideBreakdown winnable = 13;
+
+  // Total evaluation
+  SideBreakdown total = 14;
+
+  // Final blended evaluation in centipawns (for reference)
+  int32 final_eval_cp = 15;
+}
+
+// Health check request
+message HealthCheckRequest {}
+
+// Health check response
+message HealthCheckResponse {
+  bool healthy = 1;
+  string version = 2;  // Stockfish version string
+}
