@@ -10,6 +10,7 @@
  * No more start_branch/end_branch - the tree handles variation nesting.
  */
 
+import { classifyMoveWithStrategy, type AnnotationResult } from '@chessbeast/core';
 import { ChessPosition, renderBoard, formatBoardForPrompt } from '@chessbeast/pgn';
 import type { MoveInfo } from '@chessbeast/pgn';
 
@@ -536,6 +537,11 @@ export class AgenticVariationExplorer {
           validationWarning = `⚠️ No candidate moves checked for this position. Use get_candidate_moves to see best options.`;
         }
 
+        // Get parent node info before adding move (for auto-NAG)
+        const parentNodeForNag = tree.getCurrentNode();
+        const parentFenForNag = parentNodeForNag.fen;
+        const parentEval = parentNodeForNag.engineEval;
+
         const result = tree.addMove(san);
         if (!result.success) {
           const pos = new ChessPosition(tree.getCurrentNode().fen);
@@ -548,6 +554,34 @@ export class AgenticVariationExplorer {
 
         const newNode = tree.getCurrentNode();
         const pos = new ChessPosition(newNode.fen);
+
+        // Auto-assign NAG based on win probability if we have evals on both positions
+        let autoAnnotation: AnnotationResult | undefined;
+        if (parentEval && newNode.engineEval) {
+          // Determine if white made this move from FEN
+          const isWhiteMove = parentFenForNag.includes(' w ');
+          // Convert CachedEval to EngineEvaluation format
+          const evalBefore = {
+            cp: parentEval.score,
+            depth: parentEval.depth,
+            pv: parentEval.bestLine,
+          };
+          const evalAfter = {
+            cp: newNode.engineEval.score,
+            depth: newNode.engineEval.depth,
+            pv: newNode.engineEval.bestLine,
+          };
+          autoAnnotation = classifyMoveWithStrategy(evalBefore, evalAfter, isWhiteMove, {
+            fenBefore: parentFenForNag,
+            fenAfter: newNode.fen,
+          });
+
+          // Add NAG to the node if one was assigned
+          if (autoAnnotation.nag) {
+            tree.addNag(autoAnnotation.nag);
+          }
+        }
+
         return {
           success: true,
           message: result.message,
@@ -558,6 +592,16 @@ export class AgenticVariationExplorer {
           isCheck: pos.isCheck(),
           isCheckmate: pos.isCheckmate(),
           ...(validationWarning && { warning: validationWarning }),
+          // Include auto-NAG info so LLM knows what was assigned
+          ...(autoAnnotation?.nag && {
+            autoNag: autoAnnotation.nag,
+            autoNagInfo: {
+              winProbDrop: `${autoAnnotation.metadata.winProbDrop > 0 ? '-' : '+'}${Math.abs(autoAnnotation.metadata.winProbDrop).toFixed(1)}%`,
+              classification: autoAnnotation.classification,
+              isSacrifice: autoAnnotation.metadata.isSacrifice,
+            },
+            note: 'Auto-assigned NAG based on win probability. Use add_move_nag to change or clear_nags to remove.',
+          }),
         };
       }
 
@@ -582,9 +626,40 @@ export class AgenticVariationExplorer {
           validationWarning = `⚠️ No candidate moves checked for parent position. Use get_candidate_moves to see best options.`;
         }
 
+        // Get grandparent eval for auto-NAG (parent of current = position where alternative is played)
+        const grandparentNode = tree.getCurrentNode().parent;
+        const grandparentEval = grandparentNode?.engineEval;
+        const grandparentFen = grandparentNode?.fen;
+
         const result = tree.addAlternative(san);
         if (!result.success) {
           return { success: false, error: result.error };
+        }
+
+        // Auto-assign NAG to the alternative if we have evals
+        let autoAnnotation: AnnotationResult | undefined;
+        if (grandparentEval && result.node?.engineEval && grandparentFen) {
+          const isWhiteMove = grandparentFen.includes(' w ');
+          // Convert CachedEval to EngineEvaluation format
+          const evalBefore = {
+            cp: grandparentEval.score,
+            depth: grandparentEval.depth,
+            pv: grandparentEval.bestLine,
+          };
+          const evalAfter = {
+            cp: result.node.engineEval.score,
+            depth: result.node.engineEval.depth,
+            pv: result.node.engineEval.bestLine,
+          };
+          autoAnnotation = classifyMoveWithStrategy(evalBefore, evalAfter, isWhiteMove, {
+            fenBefore: grandparentFen,
+            fenAfter: result.node.fen,
+          });
+
+          // Add NAG to the alternative node
+          if (autoAnnotation.nag && result.node) {
+            result.node.nags.push(autoAnnotation.nag);
+          }
         }
 
         return {
@@ -595,6 +670,15 @@ export class AgenticVariationExplorer {
           currentFen: tree.getCurrentNode().fen,
           note: 'You remain at your current position. Use go_to to navigate to the alternative.',
           ...(validationWarning && { warning: validationWarning }),
+          // Include auto-NAG info for the alternative
+          ...(autoAnnotation?.nag && {
+            autoNag: autoAnnotation.nag,
+            autoNagInfo: {
+              winProbDrop: `${autoAnnotation.metadata.winProbDrop > 0 ? '-' : '+'}${Math.abs(autoAnnotation.metadata.winProbDrop).toFixed(1)}%`,
+              classification: autoAnnotation.classification,
+              isSacrifice: autoAnnotation.metadata.isSacrifice,
+            },
+          }),
         };
       }
 

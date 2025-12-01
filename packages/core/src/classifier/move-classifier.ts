@@ -1,13 +1,14 @@
 /**
  * Move Classification Logic
  *
- * Classifies moves based on centipawn loss and other factors,
- * using rating-dependent thresholds.
+ * Classifies moves based on centipawn loss and other factors.
+ * Now uses win probability-based classification (en-croissant style) by default.
  */
 
 import type { MoveClassification } from '../index.js';
 import type { EngineEvaluation, NormalizedEval } from '../types/analysis.js';
 
+import type { AnnotationResult, AnnotationContext } from './annotation-strategy.js';
 import {
   getInterpolatedThresholds,
   DEFAULT_RATING,
@@ -16,6 +17,7 @@ import {
   type ClassificationThresholds,
   type PositionStatus,
 } from './thresholds.js';
+import { winProbabilityStrategy } from './win-prob-strategy.js';
 
 /**
  * Options for move classification
@@ -392,4 +394,56 @@ export function calculateAccuracy(cpLosses: number[]): number {
   }
 
   return Math.round((totalAccuracy / cpLosses.length) * 10) / 10;
+}
+
+/**
+ * Extended options for classifyMoveWithStrategy
+ * Includes optional FEN fields for sacrifice detection
+ */
+export interface ClassifyMoveWithStrategyOptions extends ClassifyMoveOptions {
+  /** FEN before the move (for sacrifice detection) */
+  fenBefore?: string;
+  /** FEN after the move (for sacrifice detection) */
+  fenAfter?: string;
+}
+
+/**
+ * Classify a move using the win probability strategy (en-croissant style)
+ *
+ * This function uses win probability drop to classify moves, which better
+ * captures positional context than raw centipawn thresholds.
+ *
+ * Win probability thresholds:
+ * - Blunder (??): >20% win chance lost
+ * - Mistake (?): >10% win chance lost
+ * - Dubious (?!): >5% win chance lost
+ * - Brilliant (!!): surprising sacrifice maintaining advantage
+ * - Good (!): >5% win chance gained
+ * - Interesting (!?): sound sacrifice
+ *
+ * @param evalBefore - Evaluation before the move (from moving player's perspective)
+ * @param evalAfter - Evaluation after the move (from opponent's perspective)
+ * @param isWhiteMove - Did white make this move?
+ * @param options - Additional classification options including optional FENs
+ * @returns AnnotationResult with classification, NAG, and metadata
+ */
+export function classifyMoveWithStrategy(
+  evalBefore: EngineEvaluation,
+  evalAfter: EngineEvaluation,
+  isWhiteMove: boolean,
+  options: ClassifyMoveWithStrategyOptions = {},
+): AnnotationResult {
+  const context: AnnotationContext = {
+    evalBefore,
+    evalAfter,
+    isWhiteMove,
+    fenBefore: options.fenBefore,
+    fenAfter: options.fenAfter,
+    humanProbability: options.humanProbability,
+    legalMoveCount: options.legalMoveCount,
+    isBookMove: options.isBookMove,
+    isSacrifice: options.isSacrifice,
+  };
+
+  return winProbabilityStrategy.annotate(context);
 }
