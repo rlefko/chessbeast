@@ -3,6 +3,7 @@
  */
 
 import { ValidationError } from '../errors.js';
+import { COMMENT_LIMITS, type CommentType } from '../explorer/types.js';
 
 import { validateMoveReferences, sanitizeMoveReferences } from './move-validator.js';
 import { filterValidNags } from './nag-validator.js';
@@ -124,48 +125,9 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Maximum number of sentences allowed in a comment
- */
-const MAX_SENTENCES = 2;
-
-/**
- * Count sentences in text (simple heuristic)
- * Looks for sentence-ending punctuation followed by space or end of string
- */
-export function countSentences(text: string): number {
-  const matches = text.match(/[.!?]+(?:\s|$)/g);
-  return matches ? matches.length : text.trim() ? 1 : 0;
-}
-
-/**
- * Truncate text to a maximum number of sentences
- * Preserves complete sentences rather than cutting mid-sentence
- */
-export function truncateToSentences(text: string, max: number): string {
-  if (max <= 0) return '';
-
-  // Match sentences: non-empty text followed by sentence-ending punctuation
-  const matches = text.match(/[^.!?]*[.!?]+/g);
-
-  if (!matches) {
-    return text; // No complete sentences found, return as-is (counts as 1 sentence)
-  }
-
-  // Check if there's remaining text after all matched sentences (trailing fragment)
-  const matchedLength = matches.join('').length;
-  const hasTrailingFragment = text.slice(matchedLength).trim().length > 0;
-
-  // Total sentences = matched sentences + optional trailing fragment
-  const totalSentences = matches.length + (hasTrailingFragment ? 1 : 0);
-
-  if (totalSentences <= max) {
-    return text;
-  }
-
-  // Join only the first max sentences
-  return matches.slice(0, max).join('').trim();
-}
+// Note: Sentence-based limits (countSentences, truncateToSentences, MAX_SENTENCES)
+// were removed in favor of character limits from COMMENT_LIMITS, which are
+// enforced directly in validateComment() for consistency with exploration comments.
 
 /**
  * Regex patterns to match centipawn/evaluation values in text
@@ -229,6 +191,9 @@ const META_CONTENT_PATTERNS = [
 
 /**
  * Strip meta-content patterns that make annotations sound robotic
+ *
+ * Note: Does NOT auto-capitalize. Explorer uses lowercase comments for
+ * "show don't tell" style, so we preserve the original case.
  */
 export function stripMetaContent(comment: string): string {
   let result = comment;
@@ -237,22 +202,22 @@ export function stripMetaContent(comment: string): string {
     result = result.replace(pattern, '');
   }
 
-  // Clean up and capitalize first letter if needed after stripping
-  result = result.replace(/^\s*/, '');
-  if (result.length > 0) {
-    result = result.charAt(0).toUpperCase() + result.slice(1);
-  }
-
   return result.replace(/\s+/g, ' ').trim();
 }
 
 /**
  * Validate and sanitize a generated comment
+ *
+ * @param raw - Raw LLM response to validate
+ * @param legalMoves - Legal moves in position for hallucination detection
+ * @param context - Additional context for validation
+ * @param commentType - Type of comment for character limit enforcement (default: 'initial')
  */
 export function validateComment(
   raw: unknown,
   legalMoves: string[],
   context?: CommentValidationContext,
+  commentType: CommentType = 'initial',
 ): ValidationResult<GeneratedComment> {
   const issues: ValidationIssue[] = [];
   const obj = raw as Record<string, unknown>;
@@ -338,26 +303,28 @@ export function validateComment(
     }
   }
 
-  // Check comment length
-  if (comment.length > 2000) {
-    issues.push({
-      field: 'comment',
-      message: 'Comment exceeds maximum length (2000 chars), truncating',
-      severity: 'warning',
-    });
-    comment = comment.slice(0, 2000) + '...';
-  }
-
-  // Enforce max sentences (max 2 sentences)
+  // Enforce character limits (consistent with exploration comments)
   if (comment) {
-    const sentenceCount = countSentences(comment);
-    if (sentenceCount > MAX_SENTENCES) {
+    const limits = COMMENT_LIMITS[commentType];
+
+    // Hard limit: truncate at last complete word before limit
+    if (comment.length > limits.hard) {
+      const truncated = comment.slice(0, limits.hard).replace(/\s+\S*$/, '').trim();
       issues.push({
         field: 'comment',
-        message: `Comment has ${sentenceCount} sentences, truncating to ${MAX_SENTENCES}`,
+        message: `Comment exceeds ${limits.hard} chars (${comment.length}), truncating`,
         severity: 'warning',
       });
-      comment = truncateToSentences(comment, MAX_SENTENCES);
+      comment = truncated || comment.slice(0, limits.hard);
+    }
+
+    // Soft limit: warn but don't truncate
+    if (comment.length > limits.soft && comment.length <= limits.hard) {
+      issues.push({
+        field: 'comment',
+        message: `Comment is ${comment.length} chars (soft limit: ${limits.soft})`,
+        severity: 'warning',
+      });
     }
   }
 

@@ -455,10 +455,9 @@ function transformExploredVariations(
     return [];
   }
 
-  // Limit to 2 explored variations per position (quality over quantity)
-  const variationsToShow = move.exploredVariations.slice(0, 2);
-
-  return variationsToShow.map((explored) =>
+  // Show all explored variations - the exploration agent has already selected
+  // the most instructive lines, so we don't need to limit them further
+  return move.exploredVariations.map((explored) =>
     transformSingleVariation(explored, move.fenBefore, move.moveNumber, move.isWhiteMove, opts, 0),
   );
 }
