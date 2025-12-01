@@ -418,8 +418,17 @@ export class AgenticVariationExplorer {
     // Convert tree to MoveInfo for PGN
     const moves = tree.toMoveInfo();
 
-    // Convert MoveInfo[] to ExploredLine[] for backward compatibility
-    const variations = convertMoveInfoToExploredLines(moves);
+    // The main exploration line IS a variation (alternative to played move)
+    // Also extract any nested sub-variations within it
+    const variations: ExploredLine[] =
+      moves.length > 0
+        ? [
+            // The exploration itself is the primary variation
+            variationToExploredLine(moves),
+            // Also extract nested variations (branches within the exploration)
+            ...convertMoveInfoToExploredLines(moves),
+          ]
+        : [];
 
     const result: AgenticExplorerResult = {
       moves,
