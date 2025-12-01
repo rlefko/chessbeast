@@ -5,10 +5,10 @@ Tests parsing of Stockfish 16 `eval` command output.
 """
 
 import pytest
-
-from conftest import SAMPLE_EVAL_OUTPUT
 from stockfish16_service.engine import ClassicalEvalResult, PhaseScore
 from stockfish16_service.eval_parser import format_classical_eval, parse_eval_output
+
+from conftest import SAMPLE_EVAL_OUTPUT
 
 
 class TestParseEvalOutput:

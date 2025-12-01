@@ -46,8 +46,6 @@ class Stockfish16Config:
     pool_max_retries: int = 3
 
     # Server settings
-    grpc_port: int = field(
-        default_factory=lambda: int(os.environ.get("STOCKFISH16_PORT", "50053"))
-    )
+    grpc_port: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH16_PORT", "50053")))
     grpc_max_workers: int = 4
     grpc_max_concurrent_rpcs: int = 20

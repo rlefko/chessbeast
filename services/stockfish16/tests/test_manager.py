@@ -8,15 +8,14 @@ import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from conftest import STARTING_FEN
 from stockfish16_service.config import Stockfish16Config
-from stockfish16_service.engine import ClassicalEvalResult, PhaseScore, SideBreakdown
+from stockfish16_service.engine import ClassicalEvalResult, PhaseScore
 from stockfish16_service.pool import (
     EngineUnavailableError,
-    HealthStatus,
     Stockfish16Manager,
 )
+
+from conftest import STARTING_FEN
 
 
 @pytest.fixture
@@ -262,7 +261,5 @@ class TestStockfish16ManagerConcurrency:
 
         # Errors may happen (e.g., start after shutdown) but no crashes
         # Filter out expected errors
-        unexpected_errors = [
-            e for e in errors if not isinstance(e, EngineUnavailableError)
-        ]
+        unexpected_errors = [e for e in errors if not isinstance(e, EngineUnavailableError)]
         assert len(unexpected_errors) == 0, f"Unexpected errors: {unexpected_errors}"

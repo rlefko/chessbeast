@@ -8,8 +8,6 @@ Uses mocked subprocess to avoid requiring an actual SF16 binary.
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from conftest import SAMPLE_EVAL_OUTPUT, STARTING_FEN
 from stockfish16_service.config import Stockfish16Config
 from stockfish16_service.engine import (
     ClassicalEvalResult,
@@ -20,6 +18,8 @@ from stockfish16_service.engine import (
     SideBreakdown,
     Stockfish16Engine,
 )
+
+from conftest import SAMPLE_EVAL_OUTPUT, STARTING_FEN
 
 
 def create_mock_process(responses: list[str]) -> MagicMock:
@@ -72,34 +72,38 @@ class TestStockfish16EngineStart:
         """Engine starts successfully and extracts version."""
         mock_proc = create_mock_process(UCI_STARTUP)
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                engine = Stockfish16Engine()
-                engine.start()
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            engine = Stockfish16Engine()
+            engine.start()
 
-                assert engine.is_alive()
-                assert engine.version == "Stockfish 16"
-                mock_proc.stdin.write.assert_any_call("uci\n")
-                mock_proc.stdin.write.assert_any_call("isready\n")
+            assert engine.is_alive()
+            assert engine.version == "Stockfish 16"
+            mock_proc.stdin.write.assert_any_call("uci\n")
+            mock_proc.stdin.write.assert_any_call("isready\n")
 
-                engine.stop()
+            engine.stop()
 
     def test_start_configures_options(self) -> None:
         """Engine configures threads and hash on startup."""
         mock_proc = create_mock_process(UCI_STARTUP)
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                config = Stockfish16Config(engine_threads=4, engine_hash_mb=256)
-                engine = Stockfish16Engine(config)
-                engine.start()
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            config = Stockfish16Config(engine_threads=4, engine_hash_mb=256)
+            engine = Stockfish16Engine(config)
+            engine.start()
 
-                # Check setoption commands were sent
-                calls = [str(c) for c in mock_proc.stdin.write.call_args_list]
-                assert any("Threads value 4" in c for c in calls)
-                assert any("Hash value 256" in c for c in calls)
+            # Check setoption commands were sent
+            calls = [str(c) for c in mock_proc.stdin.write.call_args_list]
+            assert any("Threads value 4" in c for c in calls)
+            assert any("Hash value 256" in c for c in calls)
 
-                engine.stop()
+            engine.stop()
 
     def test_start_file_not_found(self) -> None:
         """Engine raises error when binary not found."""
@@ -114,19 +118,21 @@ class TestStockfish16EngineStart:
         """Starting already started engine stops it first."""
         mock_proc = create_mock_process(UCI_STARTUP * 2)  # Double for second start
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                engine = Stockfish16Engine()
-                engine.start()
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            engine = Stockfish16Engine()
+            engine.start()
 
-                # Reset mock for second start
-                mock_proc.stdin.reset_mock()
+            # Reset mock for second start
+            mock_proc.stdin.reset_mock()
 
-                # Start again - should stop first
-                engine.start()
+            # Start again - should stop first
+            engine.start()
 
-                assert engine.is_alive()
-                engine.stop()
+            assert engine.is_alive()
+            engine.stop()
 
 
 class TestStockfish16EngineStop:
@@ -136,16 +142,18 @@ class TestStockfish16EngineStop:
         """Engine stops gracefully."""
         mock_proc = create_mock_process(UCI_STARTUP)
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                engine = Stockfish16Engine()
-                engine.start()
-                engine.stop()
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            engine = Stockfish16Engine()
+            engine.start()
+            engine.stop()
 
-                mock_proc.stdin.write.assert_any_call("quit\n")
-                mock_proc.wait.assert_called_once()
-                assert not engine.is_alive()
-                assert engine.version == "not started"
+            mock_proc.stdin.write.assert_any_call("quit\n")
+            mock_proc.wait.assert_called_once()
+            assert not engine.is_alive()
+            assert engine.version == "not started"
 
     def test_stop_not_started(self) -> None:
         """Stopping an unstarted engine is safe."""
@@ -165,25 +173,29 @@ class TestStockfish16EngineIsAlive:
         """Started engine is alive."""
         mock_proc = create_mock_process(UCI_STARTUP)
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                engine = Stockfish16Engine()
-                engine.start()
-                assert engine.is_alive()
-                engine.stop()
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            engine = Stockfish16Engine()
+            engine.start()
+            assert engine.is_alive()
+            engine.stop()
 
     def test_is_alive_after_crash(self) -> None:
         """Engine detects crash via poll() return value."""
         mock_proc = create_mock_process(UCI_STARTUP)
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                engine = Stockfish16Engine()
-                engine.start()
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            engine = Stockfish16Engine()
+            engine.start()
 
-                # Simulate crash - poll() returns exit code when process ends
-                mock_proc.poll.return_value = 1
-                assert not engine.is_alive()
+            # Simulate crash - poll() returns exit code when process ends
+            mock_proc.poll.return_value = 1
+            assert not engine.is_alive()
 
 
 class TestStockfish16EngineGetClassicalEval:
@@ -199,15 +211,17 @@ class TestStockfish16EngineGetClassicalEval:
         """Getting eval fails with invalid FEN."""
         mock_proc = create_mock_process(UCI_STARTUP)
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                engine = Stockfish16Engine()
-                engine.start()
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            engine = Stockfish16Engine()
+            engine.start()
 
-                with pytest.raises(InvalidFenError):
-                    engine.get_classical_eval("invalid fen string")
+            with pytest.raises(InvalidFenError):
+                engine.get_classical_eval("invalid fen string")
 
-                engine.stop()
+            engine.stop()
 
     def test_get_eval_success(self) -> None:
         """Getting eval returns parsed result."""
@@ -215,35 +229,39 @@ class TestStockfish16EngineGetClassicalEval:
         responses = UCI_STARTUP + SAMPLE_EVAL_OUTPUT + [""]
         mock_proc = create_mock_process(responses)
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                engine = Stockfish16Engine()
-                engine.start()
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            engine = Stockfish16Engine()
+            engine.start()
 
-                result = engine.get_classical_eval(STARTING_FEN)
+            result = engine.get_classical_eval(STARTING_FEN)
 
-                assert isinstance(result, ClassicalEvalResult)
-                assert result.mobility.total.mg == pytest.approx(0.45)
-                assert result.king_safety.total.mg == pytest.approx(0.18)
+            assert isinstance(result, ClassicalEvalResult)
+            assert result.mobility.total.mg == pytest.approx(0.45)
+            assert result.king_safety.total.mg == pytest.approx(0.18)
 
-                engine.stop()
+            engine.stop()
 
     def test_get_eval_sends_correct_commands(self) -> None:
         """Getting eval sends position and eval commands."""
         responses = UCI_STARTUP + SAMPLE_EVAL_OUTPUT + [""]
         mock_proc = create_mock_process(responses)
 
-        with patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc):
-            with patch("select.select", return_value=([True], [], [])):
-                engine = Stockfish16Engine()
-                engine.start()
-                engine.get_classical_eval(STARTING_FEN)
+        with (
+            patch("stockfish16_service.engine.subprocess.Popen", return_value=mock_proc),
+            patch("select.select", return_value=([True], [], [])),
+        ):
+            engine = Stockfish16Engine()
+            engine.start()
+            engine.get_classical_eval(STARTING_FEN)
 
-                calls = [str(c) for c in mock_proc.stdin.write.call_args_list]
-                assert any(f"position fen {STARTING_FEN}" in c for c in calls)
-                assert any("'eval" in c for c in calls)
+            calls = [str(c) for c in mock_proc.stdin.write.call_args_list]
+            assert any(f"position fen {STARTING_FEN}" in c for c in calls)
+            assert any("'eval" in c for c in calls)
 
-                engine.stop()
+            engine.stop()
 
 
 class TestPhaseScore:
