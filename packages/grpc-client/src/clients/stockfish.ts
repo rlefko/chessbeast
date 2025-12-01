@@ -56,6 +56,7 @@ export class StockfishClient extends BaseGrpcClient {
       timeLimitMs: options.timeLimitMs ?? 0,
       multipv: options.multipv ?? 1,
       nodes: options.nodes ?? 0,
+      mateMinTimeMs: options.mateMinTimeMs ?? 0,
     };
 
     const response = await this.unaryCall<typeof request, RawEvaluateResponse>('evaluate', request);

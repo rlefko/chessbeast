@@ -40,6 +40,8 @@ export interface AnalysisConfigSchema {
   multiPvCount: number;
   /** Maximum ratio of moves to mark as critical (0.0-1.0) */
   maxCriticalRatio: number;
+  /** Minimum time for mate/winning positions (ms) - ensures deeper search */
+  mateMinTimeMs?: number;
   /** Skip Maia human-likeness analysis */
   skipMaia: boolean;
   /** Skip LLM annotations (template only) */

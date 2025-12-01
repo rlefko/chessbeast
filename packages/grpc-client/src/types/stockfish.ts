@@ -17,6 +17,8 @@ export interface EvaluateRequest {
   multipv?: number;
   /** Node limit (0 = no limit) */
   nodes?: number;
+  /** Minimum time for mate/winning positions (0 = disabled) */
+  mateMinTimeMs?: number;
 }
 
 /**
@@ -56,4 +58,6 @@ export interface EvaluateOptions {
   multipv?: number;
   /** Node limit */
   nodes?: number;
+  /** Minimum time for mate/winning positions (0 = disabled) */
+  mateMinTimeMs?: number;
 }

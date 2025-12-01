@@ -16,6 +16,7 @@ export const ANALYSIS_PROFILES: Record<AnalysisProfile, Partial<AnalysisConfigSc
     deepTimeLimitMs: 5000, // 5 seconds max per position
     multiPvCount: 1,
     maxCriticalRatio: 0.15,
+    mateMinTimeMs: 2000, // 2 seconds minimum for mate/winning positions
   },
   standard: {
     shallowDepth: 14,
@@ -24,6 +25,7 @@ export const ANALYSIS_PROFILES: Record<AnalysisProfile, Partial<AnalysisConfigSc
     deepTimeLimitMs: 10000, // 10 seconds max per position
     multiPvCount: 3,
     maxCriticalRatio: 0.25,
+    mateMinTimeMs: 5000, // 5 seconds minimum for mate/winning positions
   },
   deep: {
     shallowDepth: 18,
@@ -32,6 +34,7 @@ export const ANALYSIS_PROFILES: Record<AnalysisProfile, Partial<AnalysisConfigSc
     deepTimeLimitMs: 20000, // 20 seconds max per position
     multiPvCount: 5,
     maxCriticalRatio: 0.35,
+    mateMinTimeMs: 10000, // 10 seconds minimum for mate/winning positions
   },
 };
 
@@ -46,6 +49,7 @@ export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfigSchema = {
   deepTimeLimitMs: 10000,
   multiPvCount: 3,
   maxCriticalRatio: 0.25,
+  mateMinTimeMs: 5000, // 5 seconds minimum for mate/winning positions
   skipMaia: false,
   skipLlm: false,
 };

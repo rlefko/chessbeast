@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from . import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fstockfish.proto\x12\x14\x63hessbeast.stockfish\x1a\x0c\x63ommon.proto\"d\n\x0f\x45valuateRequest\x12\x0b\n\x03\x66\x65n\x18\x01 \x01(\t\x12\r\n\x05\x64\x65pth\x18\x02 \x01(\x05\x12\x15\n\rtime_limit_ms\x18\x03 \x01(\x05\x12\x0f\n\x07multipv\x18\x04 \x01(\x05\x12\r\n\x05nodes\x18\x05 \x01(\x03\"\x8c\x01\n\x10\x45valuateResponse\x12\n\n\x02\x63p\x18\x01 \x01(\x05\x12\x0c\n\x04mate\x18\x02 \x01(\x05\x12\r\n\x05\x64\x65pth\x18\x03 \x01(\x05\x12\x11\n\tbest_line\x18\x04 \x03(\t\x12<\n\x0c\x61lternatives\x18\x05 \x03(\x0b\x32&.chessbeast.stockfish.EvaluateResponse\"\x14\n\x12HealthCheckRequest\"7\n\x13HealthCheckResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12\x0f\n\x07version\x18\x02 \x01(\t2\xd1\x01\n\x10StockfishService\x12Y\n\x08\x45valuate\x12%.chessbeast.stockfish.EvaluateRequest\x1a&.chessbeast.stockfish.EvaluateResponse\x12\x62\n\x0bHealthCheck\x12(.chessbeast.stockfish.HealthCheckRequest\x1a).chessbeast.stockfish.HealthCheckResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fstockfish.proto\x12\x14\x63hessbeast.stockfish\x1a\x0c\x63ommon.proto\"~\n\x0f\x45valuateRequest\x12\x0b\n\x03\x66\x65n\x18\x01 \x01(\t\x12\r\n\x05\x64\x65pth\x18\x02 \x01(\x05\x12\x15\n\rtime_limit_ms\x18\x03 \x01(\x05\x12\x0f\n\x07multipv\x18\x04 \x01(\x05\x12\r\n\x05nodes\x18\x05 \x01(\x03\x12\x18\n\x10mate_min_time_ms\x18\x06 \x01(\x05\"\x8c\x01\n\x10\x45valuateResponse\x12\n\n\x02\x63p\x18\x01 \x01(\x05\x12\x0c\n\x04mate\x18\x02 \x01(\x05\x12\r\n\x05\x64\x65pth\x18\x03 \x01(\x05\x12\x11\n\tbest_line\x18\x04 \x03(\t\x12<\n\x0c\x61lternatives\x18\x05 \x03(\x0b\x32&.chessbeast.stockfish.EvaluateResponse\"\x14\n\x12HealthCheckRequest\"7\n\x13HealthCheckResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12\x0f\n\x07version\x18\x02 \x01(\t2\xd1\x01\n\x10StockfishService\x12Y\n\x08\x45valuate\x12%.chessbeast.stockfish.EvaluateRequest\x1a&.chessbeast.stockfish.EvaluateResponse\x12\x62\n\x0bHealthCheck\x12(.chessbeast.stockfish.HealthCheckRequest\x1a).chessbeast.stockfish.HealthCheckResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,13 +33,13 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'stockfish_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_EVALUATEREQUEST']._serialized_start=55
-  _globals['_EVALUATEREQUEST']._serialized_end=155
-  _globals['_EVALUATERESPONSE']._serialized_start=158
-  _globals['_EVALUATERESPONSE']._serialized_end=298
-  _globals['_HEALTHCHECKREQUEST']._serialized_start=300
-  _globals['_HEALTHCHECKREQUEST']._serialized_end=320
-  _globals['_HEALTHCHECKRESPONSE']._serialized_start=322
-  _globals['_HEALTHCHECKRESPONSE']._serialized_end=377
-  _globals['_STOCKFISHSERVICE']._serialized_start=380
-  _globals['_STOCKFISHSERVICE']._serialized_end=589
+  _globals['_EVALUATEREQUEST']._serialized_end=181
+  _globals['_EVALUATERESPONSE']._serialized_start=184
+  _globals['_EVALUATERESPONSE']._serialized_end=324
+  _globals['_HEALTHCHECKREQUEST']._serialized_start=326
+  _globals['_HEALTHCHECKREQUEST']._serialized_end=346
+  _globals['_HEALTHCHECKRESPONSE']._serialized_start=348
+  _globals['_HEALTHCHECKRESPONSE']._serialized_end=403
+  _globals['_STOCKFISHSERVICE']._serialized_start=406
+  _globals['_STOCKFISHSERVICE']._serialized_end=615
 # @@protoc_insertion_point(module_scope)

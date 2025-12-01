@@ -61,6 +61,7 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
       // Handle both old signature (depth, numLines) and new signature (options object)
       let depth: number | undefined;
       let timeLimitMs: number | undefined;
+      let mateMinTimeMs: number | undefined;
       let multipv: number;
 
       if (typeof depthOrOptions === 'number') {
@@ -71,13 +72,20 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
         // New signature: evaluateMultiPv(fen, options)
         depth = depthOrOptions.depth;
         timeLimitMs = depthOrOptions.timeLimitMs;
+        mateMinTimeMs = depthOrOptions.mateMinTimeMs;
         multipv = depthOrOptions.numLines ?? 1;
       }
 
       // Build options object, only including defined values (for exactOptionalPropertyTypes)
-      const options: { depth?: number; timeLimitMs?: number; multipv: number } = { multipv };
+      const options: {
+        depth?: number;
+        timeLimitMs?: number;
+        mateMinTimeMs?: number;
+        multipv: number;
+      } = { multipv };
       if (depth !== undefined) options.depth = depth;
       if (timeLimitMs !== undefined) options.timeLimitMs = timeLimitMs;
+      if (mateMinTimeMs !== undefined) options.mateMinTimeMs = mateMinTimeMs;
 
       const result = await client.evaluate(fen, options);
 

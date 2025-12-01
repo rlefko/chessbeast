@@ -8,18 +8,20 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class EvaluateRequest(_message.Message):
-    __slots__ = ("fen", "depth", "time_limit_ms", "multipv", "nodes")
+    __slots__ = ("fen", "depth", "time_limit_ms", "multipv", "nodes", "mate_min_time_ms")
     FEN_FIELD_NUMBER: _ClassVar[int]
     DEPTH_FIELD_NUMBER: _ClassVar[int]
     TIME_LIMIT_MS_FIELD_NUMBER: _ClassVar[int]
     MULTIPV_FIELD_NUMBER: _ClassVar[int]
     NODES_FIELD_NUMBER: _ClassVar[int]
+    MATE_MIN_TIME_MS_FIELD_NUMBER: _ClassVar[int]
     fen: str
     depth: int
     time_limit_ms: int
     multipv: int
     nodes: int
-    def __init__(self, fen: _Optional[str] = ..., depth: _Optional[int] = ..., time_limit_ms: _Optional[int] = ..., multipv: _Optional[int] = ..., nodes: _Optional[int] = ...) -> None: ...
+    mate_min_time_ms: int
+    def __init__(self, fen: _Optional[str] = ..., depth: _Optional[int] = ..., time_limit_ms: _Optional[int] = ..., multipv: _Optional[int] = ..., nodes: _Optional[int] = ..., mate_min_time_ms: _Optional[int] = ...) -> None: ...
 
 class EvaluateResponse(_message.Message):
     __slots__ = ("cp", "mate", "depth", "best_line", "alternatives")
