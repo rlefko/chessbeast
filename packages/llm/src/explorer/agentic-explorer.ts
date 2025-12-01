@@ -829,7 +829,9 @@ export class AgenticVariationExplorer {
         // Extract Maia predictions
         let maiaPredictions: MaiaPrediction[] | undefined;
         if (maiaResult.result) {
-          const maiaData = maiaResult.result as { predictions?: Array<{ move: string; probability: number }> };
+          const maiaData = maiaResult.result as {
+            predictions?: Array<{ move: string; probability: number }>;
+          };
           if (maiaData.predictions && maiaData.predictions.length > 0) {
             maiaPredictions = maiaData.predictions.map((p) => ({
               san: p.move,
@@ -902,7 +904,8 @@ export class AgenticVariationExplorer {
 
         let note = `These are ${sideToMove}'s candidate moves with source classification.`;
         if (hasAttractiveBad) {
-          note += ' **Note: Some moves are "attractive_but_bad" - consider exploring to show refutation!**';
+          note +=
+            ' **Note: Some moves are "attractive_but_bad" - consider exploring to show refutation!**';
         }
 
         return {
