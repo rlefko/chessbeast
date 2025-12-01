@@ -9,6 +9,8 @@ import type {
   CandidateSource,
   ClassifiedCandidate,
   CandidateClassificationConfig,
+  AlternativeCandidate,
+  AlternativeCandidateConfig,
 } from './types.js';
 import { CANDIDATE_SOURCE_PRIORITY, getAttractiveBadThresholds } from './types.js';
 
@@ -287,4 +289,164 @@ export function classifyCandidates(
 
     return result;
   });
+}
+
+/**
+ * Get default config for alternative candidate detection
+ */
+export function getAlternativeCandidateConfig(targetRating: number): AlternativeCandidateConfig {
+  // Lower-rated players: higher thresholds (need more obvious alternatives)
+  // Higher-rated players: can appreciate subtler alternatives
+  const minProb = targetRating <= 1500 ? 0.2 : 0.15;
+  const maxDelta = targetRating <= 1500 ? 150 : 100;
+
+  return {
+    targetRating,
+    minMaiaProb: minProb,
+    maxEvalDelta: maxDelta,
+    maxCandidates: 3,
+  };
+}
+
+/**
+ * Detect alternative candidates worth considering for sideline exploration
+ *
+ * This is called AFTER add_move to identify moves that:
+ * 1. Are human-likely (Maia probability above threshold)
+ * 2. Are objectively reasonable (within eval threshold of best)
+ * 3. Might be "attractive but bad" (high human prob but loses - perfect for refutation)
+ *
+ * The LLM uses its discretion to decide which are worth exploring.
+ *
+ * @param playedMove - The move that was just played (to exclude from alternatives)
+ * @param engineCandidates - Engine candidate moves from multipv analysis
+ * @param maiaPredictions - Maia predictions for the position
+ * @param config - Configuration for detection thresholds
+ * @returns Array of alternative candidates worth considering
+ */
+export function detectAlternativeCandidates(
+  playedMove: string,
+  engineCandidates: EngineCandidate[],
+  maiaPredictions: MaiaPrediction[] | undefined,
+  config: AlternativeCandidateConfig,
+): AlternativeCandidate[] {
+  if (engineCandidates.length < 2) {
+    return [];
+  }
+
+  // Build Maia probability map
+  const maiaMap = new Map<string, number>();
+  let topMaiaMove: string | undefined;
+  let topMaiaProb = 0;
+
+  if (maiaPredictions && maiaPredictions.length > 0) {
+    for (const pred of maiaPredictions) {
+      maiaMap.set(pred.san, pred.probability);
+      if (pred.probability > topMaiaProb) {
+        topMaiaProb = pred.probability;
+        topMaiaMove = pred.san;
+      }
+    }
+  }
+
+  const bestEval = engineCandidates[0]!.evaluation;
+  const alternatives: AlternativeCandidate[] = [];
+  const classConfig = getDefaultConfig(config.targetRating);
+
+  // Process engine candidates (excluding the played move)
+  for (const candidate of engineCandidates) {
+    if (candidate.move === playedMove) {
+      continue;
+    }
+
+    const humanProb = maiaMap.get(candidate.move);
+    const evalDelta = Math.abs(candidate.evaluation - bestEval);
+
+    // Determine if this candidate is worth considering
+    let shouldInclude = false;
+    let source: CandidateSource = 'quiet_improvement';
+    let reason = '';
+
+    // Check for attractive-but-bad (highest priority - shows refutation)
+    if (isAttractiveBad(evalDelta, humanProb, classConfig)) {
+      shouldInclude = true;
+      source = 'attractive_but_bad';
+      const probPercent = Math.round((humanProb ?? 0) * 100);
+      reason = `tempting (${probPercent}% would play) but loses - show refutation`;
+    }
+    // Check if human-popular and reasonable
+    else if (humanProb !== undefined && humanProb >= config.minMaiaProb) {
+      if (evalDelta <= config.maxEvalDelta) {
+        shouldInclude = true;
+        if (candidate.move === topMaiaMove) {
+          source = 'maia_preferred';
+          reason = `human favorite (${Math.round(humanProb * 100)}%) - different approach`;
+        } else {
+          source = 'human_popular';
+          reason = `popular choice (${Math.round(humanProb * 100)}%) - worth showing`;
+        }
+      }
+    }
+    // Check if objectively near-best (even without Maia data)
+    else if (evalDelta <= config.maxEvalDelta / 2) {
+      shouldInclude = true;
+      source = 'near_best';
+      reason = 'objectively strong alternative';
+    }
+
+    // Add tactical flags if applicable
+    if (shouldInclude) {
+      if (isCheck(candidate.move) && source !== 'attractive_but_bad') {
+        source = 'scary_check';
+        reason = reason ? `${reason}, gives check` : 'gives check - forcing';
+      }
+      if (isCapture(candidate.move) && source === 'quiet_improvement') {
+        source = 'scary_capture';
+        reason = reason ? `${reason}, capture` : 'capture - tactical';
+      }
+
+      alternatives.push({
+        san: candidate.move,
+        evaluation: candidate.evaluation,
+        isMate: candidate.isMate,
+        humanProbability: humanProb,
+        source,
+        reason,
+      });
+    }
+  }
+
+  // Also check Maia predictions not in engine top candidates
+  // These might be attractive-but-bad moves worth refuting
+  if (maiaPredictions) {
+    for (const pred of maiaPredictions) {
+      if (pred.san === playedMove) continue;
+      if (alternatives.some((a) => a.san === pred.san)) continue;
+      if (pred.probability < config.minMaiaProb) continue;
+
+      // This is a human-popular move not in engine candidates
+      // It's likely bad - worth showing as a refutation target
+      if (pred.probability >= 0.2) {
+        alternatives.push({
+          san: pred.san,
+          evaluation: 0, // Unknown - needs evaluation
+          isMate: false,
+          humanProbability: pred.probability,
+          source: 'attractive_but_bad',
+          reason: `${Math.round(pred.probability * 100)}% would play this - likely needs refutation`,
+        });
+      }
+    }
+  }
+
+  // Sort by priority: attractive_but_bad first, then by human probability
+  alternatives.sort((a, b) => {
+    // Attractive-but-bad always first (best for refutations)
+    if (a.source === 'attractive_but_bad' && b.source !== 'attractive_but_bad') return -1;
+    if (b.source === 'attractive_but_bad' && a.source !== 'attractive_but_bad') return 1;
+    // Then by human probability
+    return (b.humanProbability ?? 0) - (a.humanProbability ?? 0);
+  });
+
+  return alternatives.slice(0, config.maxCandidates);
 }

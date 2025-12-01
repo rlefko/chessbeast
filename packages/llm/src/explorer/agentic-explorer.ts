@@ -24,6 +24,8 @@ import type { AgenticServices, ToolCall, EvaluatePositionResult } from '../tools
 import {
   classifyCandidates,
   getDefaultConfig,
+  detectAlternativeCandidates,
+  getAlternativeCandidateConfig,
   type EngineCandidate,
   type MaiaPrediction,
 } from './candidate-classifier.js';
@@ -34,7 +36,7 @@ import {
   type StoppingConfig,
   DEFAULT_STOPPING_CONFIG,
 } from './stopping-heuristics.js';
-import { COMMENT_LIMITS, type CommentType } from './types.js';
+import { COMMENT_LIMITS, type CommentType, type AlternativeCandidate } from './types.js';
 import type { ExploredLine, LinePurpose, LineSource } from './variation-explorer.js';
 import { VariationTree } from './variation-tree.js';
 
@@ -582,6 +584,93 @@ export class AgenticVariationExplorer {
           }
         }
 
+        // Detect alternative candidates for the resulting position
+        // This helps the LLM see human-likely alternatives worth exploring
+        let alternativeCandidates: AlternativeCandidate[] | undefined;
+        const treeDepth = tree.getDepthFromRoot();
+
+        // Only detect alternatives if:
+        // 1. Position is not terminal (checkmate/stalemate)
+        // 2. Not too deep in the tree (avoid explosion)
+        // 3. Maia service is available
+        if (!pos.isCheckmate() && !pos.isStalemate() && treeDepth <= 12 && this.services.maia) {
+          try {
+            // Get engine candidates and Maia predictions for the new position
+            const altEvalArgs = { fen: newNode.fen, depth: 16, multipv: 4 };
+            const [altEngineResult, altMaiaResult] = await Promise.all([
+              this.toolExecutor.execute({
+                id: `alt-eval-${Date.now()}`,
+                type: 'function' as const,
+                function: {
+                  name: 'evaluate_position',
+                  arguments: JSON.stringify(altEvalArgs),
+                },
+              }),
+              this.toolExecutor.execute({
+                id: `alt-maia-${Date.now()}`,
+                type: 'function' as const,
+                function: {
+                  name: 'predict_human_moves',
+                  arguments: JSON.stringify({
+                    fen: newNode.fen,
+                    rating: this.config.targetRating,
+                  }),
+                },
+              }),
+            ]);
+
+            if (!altEngineResult.error) {
+              const altEvalResult = altEngineResult.result as Record<string, unknown>;
+
+              // Extract Maia predictions
+              let altMaiaPredictions: MaiaPrediction[] | undefined;
+              if (altMaiaResult.result) {
+                const maiaData = altMaiaResult.result as {
+                  predictions?: Array<{ move: string; probability: number }>;
+                };
+                if (maiaData.predictions && maiaData.predictions.length > 0) {
+                  altMaiaPredictions = maiaData.predictions.map((p) => ({
+                    san: p.move,
+                    probability: p.probability,
+                  }));
+                }
+              }
+
+              // Build engine candidates
+              const altEngineCandidates: EngineCandidate[] = [];
+              if (altEvalResult.lines && Array.isArray(altEvalResult.lines)) {
+                for (const line of altEvalResult.lines as Array<Record<string, unknown>>) {
+                  const pv = line.principalVariation as string[] | undefined;
+                  const move = pv?.[0];
+                  if (move) {
+                    altEngineCandidates.push({
+                      move,
+                      evaluation: (line.evaluation as number) ?? 0,
+                      isMate: (line.isMate as boolean) ?? false,
+                      pv: pv ?? [],
+                    });
+                  }
+                }
+              }
+
+              // Detect alternative candidates worth exploring
+              if (altEngineCandidates.length > 0) {
+                const altConfig = getAlternativeCandidateConfig(this.config.targetRating);
+                // Exclude the engine's best move (which is likely what will be played next)
+                const bestMove = altEngineCandidates[0]?.move ?? '';
+                alternativeCandidates = detectAlternativeCandidates(
+                  bestMove,
+                  altEngineCandidates,
+                  altMaiaPredictions,
+                  altConfig,
+                );
+              }
+            }
+          } catch {
+            // Silent failure - alternative detection is an enhancement, not critical
+          }
+        }
+
         return {
           success: true,
           message: result.message,
@@ -602,6 +691,12 @@ export class AgenticVariationExplorer {
             },
             note: 'Auto-assigned NAG based on win probability. Use add_move_nag to change or clear_nags to remove.',
           }),
+          // Include alternative candidates for the LLM to consider
+          ...(alternativeCandidates &&
+            alternativeCandidates.length > 0 && {
+              alternativeCandidates,
+              alternativesNote: `${alternativeCandidates.length} alternative(s) detected for this position. Use your discretion to explore any that show a NEW instructive idea (different strategy, refutation, human-likely trap).`,
+            }),
         };
       }
 
@@ -1284,6 +1379,70 @@ Do NOT mark when:
 - You're already deep in the variation (depth > 15)
 - Line is nearly resolved (decisive evaluation)
 
+## EXPLORING SIDELINES (BOTH SIDES)
+
+After add_move, you may receive **alternativeCandidates** - human-likely moves worth exploring.
+Use your discretion to explore sidelines that demonstrate NEW IDEAS.
+
+**When to explore a sideline:**
+1. **New tactical idea** - A tactic, trap, or combination not shown in main line
+2. **Different strategic approach** - Solid vs aggressive, prophylaxis vs action
+3. **Refutation of tempting move** - Show WHY an attractive move fails
+4. **Human-likely alternative** - What players at this rating would actually consider
+5. **Critical decision point** - Multiple moves with very different character
+
+**When NOT to explore:**
+1. **Redundant** - Same idea already demonstrated in another line
+2. **Trivial difference** - Just move order or transposition
+3. **Already resolved** - Position evaluation is already decisive
+4. **Too deep** - Already 12+ moves into a variation
+
+**How to explore sidelines:**
+1. After add_move, check if alternativeCandidates are returned
+2. Look for moves with different CHARACTER, not just different eval
+3. Use add_alternative to create the sideline
+4. Navigate to it and show the key idea (usually 3-8 moves)
+5. Return with go_to_parent and continue main line
+
+**Depth guidance for sidelines:**
+- Main line: Full exploration until resolved (10-20+ moves)
+- Key alternative: Medium depth (5-10 moves) - show the idea clearly
+- Secondary alternative: Brief (3-5 moves) - just the point
+
+**Example: Exploring opponent alternatives**
+After 12...a5, alternativeCandidates returns:
+- Bf4 (25% human, +0.8) - aggressive approach
+- a4 (20% human, +0.7) - trying to punish
+
+If Bf4 creates sharp tactics while Re1 is quiet:
+1. Explore Re1 as main line first
+2. Use add_alternative("Bf4") to show the sharp try
+3. Navigate to Bf4 and show how Black handles it
+4. This shows the reader BOTH types of positions
+
+## DISCRETION GUIDELINES
+
+You have judgment about what's instructive. Ask yourself:
+
+**Before adding a sideline:**
+- "Does this show something NEW?" (tactic, strategy, refutation)
+- "Would a human at ${targetRating} Elo consider this move?"
+- "Is the idea already clear from other lines?"
+
+**Prioritize sidelines that:**
+- Refute attractive-but-bad moves (show why traps fail)
+- Show aggressive alternatives when main line is solid
+- Show solid alternatives when main line is sharp
+- Demonstrate different piece placements or pawn structures
+
+**Skip sidelines that:**
+- Lead to the same position type with similar eval
+- Are just move order differences
+- Repeat a tactic already shown
+- Are too deep in the tree (>12 moves into variation)
+
+Trust your judgment. The goal is INSTRUCTIVE annotation, not exhaustive analysis.
+
 ## MOVE VALIDATION (IMPORTANT)
 
 Before playing ANY move with add_move or add_alternative:
@@ -1299,14 +1458,16 @@ Exception: Obvious opponent responses (recaptures, only legal moves) don't need 
 1. **get_candidate_moves** - See best moves for the side to move
 2. **add_move(betterMove)** - Add the better alternative (navigates to it)
 3. **set_comment** - Brief annotation (2-8 words)
-4. **add_move** - Continue the line (get_candidate_moves every few moves)
-5. **evaluate_position** - Validate the line is going where expected
-6. Repeat add_move + evaluate_position until position is clarified
-7. **mark_for_sub_exploration** if you see interesting branches
-8. **set_position_nag** - ONLY at the very end when position is clarified
-9. **go_to_parent** back to root to explore another alternative
-10. Repeat steps 2-9 for other good options
-11. **finish_exploration**
+4. Check **alternativeCandidates** in response - note any interesting alternatives for later
+5. **Continue the main line** - add_move for responses
+6. At each position, ask: "Is there a sideline with a NEW IDEA here?"
+   - Different tactical motif? Different strategic approach? Human-likely move needing refutation?
+7. **evaluate_position** periodically to confirm direction
+8. When main line is resolved, go back and add noted alternatives with **add_alternative**
+9. Briefly explore each alternative (5-10 moves) to show the key idea
+10. **set_position_nag** - ONLY at variation endpoints
+11. **go_to_parent** to explore other branches
+12. **finish_exploration** when all instructive ideas are shown
 
 ## DEPTH GUIDANCE
 
@@ -1322,27 +1483,34 @@ Don't stop early just because you've shown a few moves. Show WHY the line is goo
 
 Position BEFORE 12. Qe2 (White's inaccuracy). Context says: "The player chose: Qe2"
 
-1. get_candidate_moves        → "White's best: Re1 (+1.2), Nc3 (+0.9), Qe2 (+0.6)"
-2. add_move("Re1")            → Add better move, navigate to it
-3. set_comment("activates the rook")
+1. get_candidate_moves        → "White's best: Re1 (+1.2), Nc3 (+0.9), Bf4 (+0.8 aggressive)"
+2. add_move("Re1")            → Main suggestion, navigates to it
+3. set_comment("activates rook, prepares central play")
 4. add_move_nag("$1")         → Mark Re1 as good move (!)
-5. get_candidate_moves        → "Black's best: Nd7, Be6, Qe7"
-6. add_move("Nd7")            → Black responds: 12...Nd7
-7. get_candidate_moves        → "White's best: Ne5 (+1.3), Bf4 (+1.1)"
+5. // Response includes alternativeCandidates: [{san: "c5", humanProb: 20%, source: "human_popular"}]
+6. add_move("Nd7")            → Main opponent response (40% human)
+7. // Note: c5 is sharp alternative - might show later
 8. add_move("Ne5")            → White: 13. Ne5
-9. evaluate_position          → Confirm +1.3
+9. evaluate_position          → Confirm +1.2
 10. set_comment("strong outpost")
-11. mark_for_sub_exploration("Bf4 also interesting", "medium")
-12. add_move("Nf6")           → Black: 13...Nf6
-13. add_move("Bf4")           → White: 14. Bf4
-14. ... continue until position is clarified ...
-15. set_position_nag("$14")   → Slight White advantage (at END of line)
-16. go_to_parent (multiple times back to root) → Return to decision point
-17. add_move("Nc3")           → Explore another good alternative
-18. ... explore Nc3 line ...
-19. finish_exploration("Re1 activates rook with lasting initiative")
+11. add_move("Nf6")           → Black: 13...Nf6
+12. add_move("Bf4")           → White: 14. Bf4
+13. ... continue until position is clarified ...
+14. set_position_nag("$14")   → White slightly better
+15. go_to_parent              → Back to after Re1
+16. // c5 was sharp alternative - show it creates different game
+17. add_alternative("c5")     → Add the aggressive opponent try
+18. go_to(fen after c5)       → Navigate to explore it
+19. add_move("dxc5")          → White captures
+20. set_comment("sharp play, but White keeps edge")
+21. evaluate_position         → +0.9
+22. set_position_nag("$14")   → Still White's favor
+23. go_to(root)               → Back to decision point
+24. add_alternative("Bf4")    → Second suggestion for White (aggressive)
+25. ... briefly explore Bf4 ideas (5-8 moves) ...
+26. finish_exploration
 
-Result: 12. Re1 $1 {activates the rook} Nd7 13. Ne5 {strong outpost} Nf6 14. Bf4 $14 (12. Nc3 ...)
+Result: 12. Re1 $1 {activates rook} Nd7 (12...c5 13. dxc5 {sharp but White keeps edge} $14) 13. Ne5 Nf6 14. Bf4 $14 (12. Bf4 ...)
 
 ## CRITICAL RULES
 
@@ -1359,7 +1527,11 @@ Result: 12. Re1 $1 {activates the rook} Nd7 13. Ne5 {strong outpost} Nf6 14. Bf4
 11. **NEVER say "from our perspective" or "this move is"**
 12. **Explore DEEP** - Don't stop at 3-5 moves, show full variations
 13. **Explore attractive-but-bad moves** - Show WHY tempting moves fail
-14. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives`;
+14. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives
+15. **Explore sidelines with discretion** - Add sidelines that show NEW IDEAS (different strategy, refutation, human-likely trap)
+16. **Both sides matter** - Explore interesting alternatives for player AND opponent
+17. **Avoid redundancy** - Don't repeat ideas already demonstrated elsewhere
+18. **Character over eval** - Sidelines with different character are more instructive than similar evals`;
 
     // Add winning position focus when position is already decided
     if (evalCp !== undefined && Math.abs(evalCp) >= 500) {

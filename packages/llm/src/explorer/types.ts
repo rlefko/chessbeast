@@ -171,3 +171,36 @@ export const COMMENT_LIMITS: Record<CommentType, CommentLimits> = {
   variation_middle: { soft: 50, hard: 100 },
   variation_end: { soft: 100, hard: 150 },
 };
+
+/**
+ * An alternative move worth considering for sideline exploration
+ * Auto-detected after add_move to feed candidates to the LLM
+ */
+export interface AlternativeCandidate {
+  /** Move in SAN notation */
+  san: string;
+  /** Engine evaluation in centipawns */
+  evaluation: number;
+  /** Is this a mate score? */
+  isMate: boolean;
+  /** Maia probability for this move (0-1), undefined if not available */
+  humanProbability: number | undefined;
+  /** Classification source explaining why this is interesting */
+  source: CandidateSource;
+  /** Brief reason for the LLM */
+  reason: string;
+}
+
+/**
+ * Configuration for detecting alternative candidates
+ */
+export interface AlternativeCandidateConfig {
+  /** Target rating for Maia predictions */
+  targetRating: number;
+  /** Minimum Maia probability to consider (default: 0.15) */
+  minMaiaProb: number;
+  /** Maximum eval difference from best to include in centipawns (default: 100) */
+  maxEvalDelta: number;
+  /** Maximum number of alternatives to return (default: 3) */
+  maxCandidates: number;
+}
