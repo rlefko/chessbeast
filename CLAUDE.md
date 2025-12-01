@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ChessBeast is an AI chess annotator that takes PGN input and produces human-friendly annotated PGN output. It combines Stockfish (engine analysis), Maia Chess (human-likeness prediction), LLMs (natural language commentary), and game databases (opening theory).
 
-**Repository**: github.com/rlefko/chessbeast (MIT License)
+**Repository**: github.com/rlefko/chessbeast (GPL-3.0)
 
 ## Architecture
 
