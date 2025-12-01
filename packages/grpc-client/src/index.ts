@@ -3,6 +3,7 @@
  *
  * This package provides TypeScript clients for:
  * - Stockfish service (engine evaluation)
+ * - Stockfish 16 service (classical evaluation breakdown)
  * - Maia service (human-likeness prediction)
  */
 
@@ -11,8 +12,10 @@ export const VERSION = '0.1.0';
 // Re-export clients
 export {
   StockfishClient,
+  Stockfish16Client,
   MaiaClient,
   DEFAULT_STOCKFISH_CONFIG,
+  DEFAULT_STOCKFISH16_CONFIG,
   DEFAULT_MAIA_CONFIG,
   type ClientConfig,
 } from './clients/index.js';
@@ -27,6 +30,12 @@ export type {
   EvaluateResponse,
   EvaluateOptions,
   StockfishHealthCheckResponse,
+  // Stockfish 16 types
+  ClassicalEvalRequest,
+  ClassicalEvalResponse,
+  PhaseScore,
+  SideBreakdown,
+  Stockfish16HealthCheckResponse,
   // Maia types
   PredictRequest,
   PredictResponse,
