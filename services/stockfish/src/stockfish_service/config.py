@@ -16,8 +16,8 @@ class EngineConfig:
     stockfish_path: Path = field(
         default_factory=lambda: Path(os.environ.get("STOCKFISH_PATH", "stockfish"))
     )
-    threads: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH_THREADS", "1")))
-    hash_mb: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH_HASH", "64")))
+    threads: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH_THREADS", "8")))
+    hash_mb: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH_HASH", "2048")))
     startup_timeout: float = 5.0  # seconds to wait for UCI init
 
 
@@ -25,7 +25,7 @@ class EngineConfig:
 class PoolConfig:
     """Configuration for the engine connection pool."""
 
-    size: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH_POOL_SIZE", "4")))
+    size: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH_POOL_SIZE", "2")))
     acquire_timeout: float = 30.0  # seconds to wait for an available engine
     max_retries: int = 3  # retries for failed engines before giving up
 

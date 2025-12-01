@@ -44,7 +44,9 @@ class TestStockfishEngineStart:
 
         assert engine.is_alive()
         assert engine.version == "Stockfish 16 Mock"
-        mock_simple_engine.configure.assert_not_called()  # Default threads=1
+        # Default threads=8 and hash=2048, so configure is called
+        mock_simple_engine.configure.assert_any_call({"Threads": 8})
+        mock_simple_engine.configure.assert_any_call({"Hash": 2048})
 
         engine.stop()
 

@@ -66,6 +66,8 @@ export interface EvaluationOptions {
   timeLimitMs?: number;
   /** Number of principal variations to return */
   numLines?: number;
+  /** Minimum time for mate/winning positions (ms) - ensures deeper search */
+  mateMinTimeMs?: number;
 }
 
 /**
@@ -167,6 +169,8 @@ export interface AnalysisConfig {
   blackRating?: number;
   /** Maximum critical moment ratio (default 0.25) */
   maxCriticalRatio?: number;
+  /** Minimum time for mate/winning positions (ms) - ensures deeper search (default 5000) */
+  mateMinTimeMs?: number;
   /** Skip Maia analysis (for testing) */
   skipMaia?: boolean;
 }
@@ -183,6 +187,7 @@ const DEFAULT_CONFIG: Required<AnalysisConfig> = {
   whiteRating: DEFAULT_RATING,
   blackRating: DEFAULT_RATING,
   maxCriticalRatio: 0.25,
+  mateMinTimeMs: 5000,
   skipMaia: false,
 };
 
@@ -386,6 +391,7 @@ export class AnalysisPipeline {
         depth: this.config.shallowDepth,
         timeLimitMs: this.config.shallowTimeLimitMs,
         numLines: 1,
+        mateMinTimeMs: this.config.mateMinTimeMs,
       });
       const evalBefore = evalResults[0]!;
       const bestMove = evalBefore.pv[0] ?? move.san;
@@ -395,6 +401,7 @@ export class AnalysisPipeline {
         depth: this.config.shallowDepth,
         timeLimitMs: this.config.shallowTimeLimitMs,
         numLines: 1,
+        mateMinTimeMs: this.config.mateMinTimeMs,
       });
       const evalAfter = evalAfterResults[0]!;
 
@@ -456,6 +463,7 @@ export class AnalysisPipeline {
           depth: this.config.deepDepth,
           timeLimitMs: this.config.deepTimeLimitMs,
           numLines: this.config.multiPvCount,
+          mateMinTimeMs: this.config.mateMinTimeMs,
         });
 
         // First PV updates the evaluation

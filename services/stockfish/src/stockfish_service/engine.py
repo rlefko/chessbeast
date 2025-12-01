@@ -8,6 +8,7 @@ depth, time, and node-limited searches, as well as MultiPV analysis.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -20,6 +21,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Threshold for "winning" position (10 pawns = 1000 centipawns)
+WINNING_THRESHOLD_CP = 1000
 
 
 class EngineError(Exception):
@@ -168,6 +172,7 @@ class StockfishEngine:
         time_ms: int | None = None,
         nodes: int | None = None,
         multipv: int = 1,
+        mate_min_time_ms: int | None = None,
     ) -> EvaluationResult:
         """Evaluate a chess position.
 
@@ -177,6 +182,7 @@ class StockfishEngine:
             time_ms: Time limit in milliseconds (None = no limit).
             nodes: Node limit (None = no limit).
             multipv: Number of principal variations to return (default 1).
+            mate_min_time_ms: Minimum time for mate/winning positions (None = disabled).
 
         Returns:
             EvaluationResult with the evaluation data.
@@ -207,6 +213,9 @@ class StockfishEngine:
             limit = chess.engine.Limit(depth=20)
 
         try:
+            # Track time for mate minimum time feature
+            start_time = time.time()
+
             # Run analysis
             multipv = max(1, min(multipv, 10))  # Clamp to reasonable range
             infos = self._engine.analyse(board, limit, multipv=multipv)
@@ -224,6 +233,31 @@ class StockfishEngine:
             if not results:
                 raise EngineError("No evaluation results returned")
 
+            # Check if mate/winning position and minimum time not yet met
+            if mate_min_time_ms and mate_min_time_ms > 0:
+                primary = results[0]
+                if self._is_mate_or_winning(primary):
+                    elapsed_ms = (time.time() - start_time) * 1000
+                    remaining_ms = mate_min_time_ms - elapsed_ms
+                    if remaining_ms > 100:  # At least 100ms remaining to bother
+                        logger.debug(
+                            f"Mate/winning position detected, extending search by {remaining_ms:.0f}ms"
+                        )
+                        extended_limit = chess.engine.Limit(time=remaining_ms / 1000)
+                        extended_infos = self._engine.analyse(
+                            board, extended_limit, multipv=multipv
+                        )
+                        if not isinstance(extended_infos, list):
+                            extended_infos = [extended_infos]
+                        # Update results with extended search
+                        results = []
+                        for info in extended_infos:
+                            result = self._parse_info(info, board.turn)
+                            if result is not None:
+                                results.append(result)
+                        if not results:
+                            raise EngineError("No evaluation results after extended search")
+
             # Primary result with alternatives
             primary = results[0]
             primary.alternatives = results[1:] if len(results) > 1 else []
@@ -236,6 +270,18 @@ class StockfishEngine:
             if "timeout" in str(e).lower():
                 raise EngineTimeoutError(f"Evaluation timed out: {e}") from e
             raise EngineError(f"Evaluation failed: {e}") from e
+
+    def _is_mate_or_winning(self, result: EvaluationResult) -> bool:
+        """Check if position is mate-in-N or winning (|eval| > threshold).
+
+        Args:
+            result: The evaluation result to check.
+
+        Returns:
+            True if mate or winning position, False otherwise.
+        """
+        # Mate detected or winning position (|eval| > threshold)
+        return result.mate != 0 or abs(result.cp) > WINNING_THRESHOLD_CP
 
     def _parse_info(
         self, info: chess.engine.InfoDict, turn: chess.Color
