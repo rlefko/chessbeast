@@ -593,12 +593,7 @@ export class AgenticVariationExplorer {
         // 1. Position is not terminal (checkmate/stalemate)
         // 2. Not too deep in the tree (avoid explosion)
         // 3. Maia service is available
-        if (
-          !pos.isCheckmate() &&
-          !pos.isStalemate() &&
-          treeDepth <= 12 &&
-          this.services.maia
-        ) {
+        if (!pos.isCheckmate() && !pos.isStalemate() && treeDepth <= 12 && this.services.maia) {
           try {
             // Get engine candidates and Maia predictions for the new position
             const altEvalArgs = { fen: newNode.fen, depth: 16, multipv: 4 };
