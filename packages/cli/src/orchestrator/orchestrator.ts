@@ -29,7 +29,7 @@ import {
   type ExploredVariation,
 } from '@chessbeast/pgn';
 
-import type { ChessBeastConfig, OutputVerbosity, AnnotationPerspective } from '../config/schema.js';
+import type { ChessBeastConfig, AnnotationPerspective } from '../config/schema.js';
 import { PgnError, AnalysisError } from '../errors/index.js';
 import type { ProgressReporter } from '../progress/reporter.js';
 import { createPipelineProgressCallback } from '../progress/reporter.js';
@@ -78,18 +78,6 @@ function toAnalysisInput(game: ParsedGame): ParsedGameInput {
       isWhiteMove: move.isWhiteMove,
     })),
   };
-}
-
-/**
- * Map output verbosity to LLM verbosity level
- */
-function mapVerbosity(verbosity: OutputVerbosity): VerbosityLevel {
-  const map: Record<OutputVerbosity, VerbosityLevel> = {
-    summary: 'brief',
-    normal: 'normal',
-    rich: 'detailed',
-  };
-  return map[verbosity];
 }
 
 /**
@@ -623,7 +611,8 @@ export async function orchestrateAnalysis(
         // Regular LLM annotation
         reporter.startPhase('llm_annotation');
         try {
-          const preferredVerbosity = mapVerbosity(config.output.verbosity);
+          // Always use 'normal' verbosity - comments use pointer style
+          const preferredVerbosity: VerbosityLevel = 'normal';
 
           // Create progress callback for annotation updates
           const onProgress = (progress: AnnotationProgress): void => {

@@ -130,29 +130,22 @@ describe('Cache Key Generation', () => {
   describe('generatePositionCacheKey', () => {
     it('should generate consistent keys for same position', () => {
       const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
-      const key1 = generatePositionCacheKey(fen, 1500, 'normal');
-      const key2 = generatePositionCacheKey(fen, 1500, 'normal');
+      const key1 = generatePositionCacheKey(fen, 1500);
+      const key2 = generatePositionCacheKey(fen, 1500);
       expect(key1).toBe(key2);
     });
 
     it('should group ratings into bands', () => {
       const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
-      const key1 = generatePositionCacheKey(fen, 1500, 'normal');
-      const key2 = generatePositionCacheKey(fen, 1550, 'normal');
+      const key1 = generatePositionCacheKey(fen, 1500);
+      const key2 = generatePositionCacheKey(fen, 1550);
       expect(key1).toBe(key2);
     });
 
     it('should differentiate different rating bands', () => {
       const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
-      const key1 = generatePositionCacheKey(fen, 1500, 'normal');
-      const key2 = generatePositionCacheKey(fen, 1700, 'normal');
-      expect(key1).not.toBe(key2);
-    });
-
-    it('should differentiate verbosity levels', () => {
-      const fen = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
-      const key1 = generatePositionCacheKey(fen, 1500, 'normal');
-      const key2 = generatePositionCacheKey(fen, 1500, 'detailed');
+      const key1 = generatePositionCacheKey(fen, 1500);
+      const key2 = generatePositionCacheKey(fen, 1700);
       expect(key1).not.toBe(key2);
     });
   });

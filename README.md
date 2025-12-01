@@ -49,12 +49,11 @@ chessbeast analyze --input game.pgn --output annotated.pgn
 # Quick analysis for faster results
 chessbeast analyze --input game.pgn --profile quick
 
-# Deep analysis with rich commentary for a 1600-rated player
+# Deep analysis with full commentary for a 1600-rated player
 chessbeast analyze \
   --input game.pgn \
   --output annotated.pgn \
   --profile deep \
-  --verbosity rich \
   --target-elo 1600
 
 # Analyze from White's perspective (uses "we" and "they" language)
@@ -90,7 +89,6 @@ chessbeast analyze --show-config
 | `-o, --output <file>` | Output file (default: stdout) |
 | `-c, --config <file>` | Path to configuration file |
 | `-p, --profile <profile>` | Analysis profile: `quick`, `standard`, `deep` (default: standard) |
-| `-v, --verbosity <level>` | Output verbosity: `summary`, `normal`, `rich` (default: normal) |
 | `--perspective <side>` | Annotation perspective: `neutral`, `white`, `black` (default: neutral) |
 | `--target-elo <rating>` | Target audience rating for explanations |
 | `--model <model>` | OpenAI model to use (default: gpt-5-mini) |
