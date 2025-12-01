@@ -81,8 +81,8 @@ export const DEFAULT_AGENTIC_CONFIG = {
   maxToolCalls: 5,
   showCosts: true,
   agenticExploration: false,
-  explorationMaxToolCalls: 40,
-  explorationMaxDepth: 50,
+  explorationMaxToolCalls: 300,
+  explorationMaxDepth: 100,
 };
 
 /**

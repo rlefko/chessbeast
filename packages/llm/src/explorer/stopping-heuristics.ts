@@ -46,14 +46,15 @@ export interface StoppingConfig {
  * Default stopping configuration
  *
  * Tuned for deep exploration until positions are resolved:
- * - Higher tool call budget (200 vs 40) for 15-30 move variations
+ * - Higher tool call budget (300) for thorough exploration with multiple variations
+ * - Soft cap at 200 (67% of hard) to allow deep main lines before wrap-up guidance
  * - Lower interestingness floor (10 vs 20) to continue exploring longer
  * - Lower eval swing threshold (80 vs 100) to catch more interesting moments
  */
 export const DEFAULT_STOPPING_CONFIG: StoppingConfig = {
   maxDepth: 100,
-  maxToolCalls: 200,
-  softToolCap: 80,
+  maxToolCalls: 300,
+  softToolCap: 200,
   evalSwingThreshold: 80,
   interestingnessFloor: 10,
 };
