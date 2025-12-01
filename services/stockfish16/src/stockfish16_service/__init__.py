@@ -20,6 +20,7 @@ from .engine import (
     SideBreakdown,
     Stockfish16Engine,
 )
+from .eval_parser import format_classical_eval, parse_eval_output
 
 __all__ = [
     "Stockfish16Config",
@@ -31,4 +32,6 @@ __all__ = [
     "EngineStartupError",
     "InvalidFenError",
     "EvalNotAvailableError",
+    "parse_eval_output",
+    "format_classical_eval",
 ]
