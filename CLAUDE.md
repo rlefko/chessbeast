@@ -133,7 +133,7 @@ Common emoji prefixes:
 
 - Opt-in via `--agentic` CLI flag
 - LLM navigates a tree structure with tool-calling loop
-- Components: `agentic-explorer.ts`, `variation-tree.ts`, `exploration-tools.ts`, `stopping-heuristics.ts`
+- Components: `agentic-explorer.ts`, `variation-tree.ts`, `exploration-tools.ts`, `stopping-heuristics.ts`, `candidate-classifier.ts`, `types.ts`
 - Tree-based architecture: Root = position before move, LLM starts AT the played move
 - Navigation tools: `get_position`, `add_move`, `add_alternative`, `go_to`, `go_to_parent`, `get_tree`
 - Annotation tools: `set_comment`, `get_comment`, `add_move_nag`, `set_position_nag`, `get_nags`, `clear_nags`, `set_principal`
@@ -143,7 +143,11 @@ Common emoji prefixes:
 - Sub-exploration: `mark_for_sub_exploration` - flag interesting branch points for later analysis
 - NAG rules: Move NAGs ($1-$6) use freely, Position NAGs ($10-$19) ONLY at end of variation
 - Side-to-move context: LLM told explicitly which color's alternatives to explore
-- Comment validation: 2-8 words max, lowercase, no meta-commentary
+- **"Show Don't Tell" Philosophy**: Comments are brief pointers (e.g., "allows Ne5"), variations demonstrate ideas
+- Comment types: `pointer` (default, 50-100 chars) and `summary` (for endings, 100-150 chars)
+- Comment validation: Context-aware limits, lowercase, no meta-commentary
+- **Candidate Source Classification**: `get_candidate_moves` returns sources: `engine_best`, `near_best`, `human_popular`, `maia_preferred`, `attractive_but_bad`, `sacrifice`, `scary_check`, `scary_capture`, `blunder`, `quiet_improvement`
+- **Attractive-But-Bad Detection**: Rating-dependent thresholds identify tempting moves that lose - perfect for showing refutations
 - Move validation: Soft warnings if moves not in engine candidates list
 - Intelligent caching for Stockfish evaluations (depth ≥ 14)
 - Default max 200 tool calls, soft cap at 80 (`--exploration-max-tool-calls`)

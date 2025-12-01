@@ -142,14 +142,20 @@ export const SET_COMMENT_TOOL: OpenAITool = {
   function: {
     name: 'set_comment',
     description:
-      'Set or replace comment on current node. Comments must be SHORT (2-8 words), lowercase, no ending punctuation. NEVER repeat the move notation.',
+      'Set or replace comment on current node. Comments should be brief pointers (5-12 words typical) that let variations show the idea. Longer OK for complex strategic positions. Lowercase, no ending punctuation.',
     parameters: {
       type: 'object',
       properties: {
         comment: {
           type: 'string',
           description:
-            'Short annotation (2-8 words). Examples: "wins material", "threatening mate", "strong outpost"',
+            'Brief pointer to the key idea. Examples: "allows Ne5", "wins material", "tempting but loses to Bxf7+", "central pressure with lasting initiative"',
+        },
+        type: {
+          type: 'string',
+          enum: ['pointer', 'summary'],
+          description:
+            'pointer (default): Brief 5-12 word annotation. summary: Slightly longer summary at variation end (up to 20 words).',
         },
       },
       required: ['comment'],
@@ -344,15 +350,15 @@ export const CLEAR_INTERESTING_TOOL: OpenAITool = {
 // =============================================================================
 
 /**
- * Tool: Get candidate moves from engine
- * Returns top N moves with evaluations to help LLM choose alternatives
+ * Tool: Get candidate moves from engine with source classification
+ * Returns top N moves with evaluations and source classifications to help LLM choose alternatives
  */
 export const GET_CANDIDATE_MOVES_TOOL: OpenAITool = {
   type: 'function',
   function: {
     name: 'get_candidate_moves',
     description:
-      'Get the best candidate moves from the engine for the current position. Use this FIRST to know what alternatives to explore. Returns moves for the side to move.',
+      'Get candidate moves with source classification. Returns moves classified as: engine_best, near_best, human_popular, maia_preferred, attractive_but_bad, scary_check, scary_capture, sacrifice, quiet_improvement, blunder. PAY ATTENTION to "attractive_but_bad" moves - these are tempting but lose, perfect for showing refutations!',
     parameters: {
       type: 'object',
       properties: {
