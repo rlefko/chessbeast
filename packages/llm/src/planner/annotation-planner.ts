@@ -380,14 +380,13 @@ export function buildCommentContext(
   includeNags: boolean = true,
   exploredVariations?: PlannedVariation[],
 ): CommentContext {
-  const { move, criticalMoment, verbosity } = planned;
+  const { move, criticalMoment } = planned;
   const moveNotation = `${move.moveNumber}${move.isWhiteMove ? '.' : '...'} ${move.san}`;
 
   const context: CommentContext = {
     move,
     criticalMoment,
     targetRating,
-    verbosity,
     legalMoves,
     openingName,
     moveNotation,

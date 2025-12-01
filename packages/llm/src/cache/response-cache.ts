@@ -152,11 +152,7 @@ export class ResponseCache<T> {
 /**
  * Generate a cache key for a position annotation
  */
-export function generatePositionCacheKey(
-  fen: string,
-  targetRating: number,
-  verbosity: string,
-): string {
+export function generatePositionCacheKey(fen: string, targetRating: number): string {
   // Normalize FEN by removing move counters (last two numbers)
   const fenParts = fen.split(' ');
   const normalizedFen = fenParts.slice(0, 4).join(' ');
@@ -164,7 +160,7 @@ export function generatePositionCacheKey(
   // Group ratings into bands of 200
   const ratingBand = Math.floor(targetRating / 200) * 200;
 
-  return `pos:${normalizedFen}:${ratingBand}:${verbosity}`;
+  return `pos:${normalizedFen}:${ratingBand}`;
 }
 
 /**

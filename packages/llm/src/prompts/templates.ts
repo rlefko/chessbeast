@@ -47,8 +47,6 @@ export interface CommentContext {
   criticalMoment: CriticalMoment | undefined;
   /** Target rating for explanation level */
   targetRating: number;
-  /** Verbosity level */
-  verbosity: VerbosityLevel;
   /** Legal moves from this position (to prevent hallucination) */
   legalMoves: string[];
   /** Opening name if in opening phase */
@@ -61,25 +59,6 @@ export interface CommentContext {
   hasNag: boolean;
   /** Planned variations that will be shown in the PGN (for coherent commentary) */
   plannedVariations?: PlannedVariation[];
-}
-
-/**
- * Sentence limits by verbosity level
- * All levels use max 2 sentences for critical, 1-2 for non-critical
- */
-const SENTENCE_LIMITS: Record<VerbosityLevel, { critical: number; nonCritical: number }> = {
-  'ultra-brief': { critical: 1, nonCritical: 1 },
-  brief: { critical: 2, nonCritical: 1 },
-  normal: { critical: 2, nonCritical: 1 },
-  detailed: { critical: 2, nonCritical: 2 },
-};
-
-/**
- * Get sentence limit based on verbosity and whether it's a critical moment
- */
-function getSentenceLimit(verbosity: VerbosityLevel, isCritical: boolean): number {
-  const limits = SENTENCE_LIMITS[verbosity];
-  return isCritical ? limits.critical : limits.nonCritical;
 }
 
 /**
@@ -112,7 +91,7 @@ function getMateInfo(
  * - Provide rich context (threats, key continuation)
  */
 export function buildCriticalMomentPrompt(context: CommentContext): string {
-  const { move, criticalMoment, targetRating, verbosity, legalMoves, openingName } = context;
+  const { move, criticalMoment, targetRating, legalMoves, openingName } = context;
   const parts: string[] = [];
 
   // Position context (FEN for understanding)
@@ -177,26 +156,30 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
     parts.push(`PERSPECTIVE: ${side}'s view (${isOurMove ? 'our move' : "opponent's move"})`);
   }
 
-  // Sentence limit - strict
-  const sentenceLimit = getSentenceLimit(verbosity, true);
   parts.push('');
 
-  // Format rules
+  // Format rules - pointer style
   parts.push('FORMAT RULES:');
-  parts.push(`- Maximum ${sentenceLimit} sentence(s)`);
-  parts.push('- No headers, no bullet points, no evaluation numbers');
-  parts.push('- Use verbal evals: "winning", "clear advantage", "slight edge", "equal"');
+  parts.push('- Brief pointer comment (5-12 words typical)');
+  parts.push('- Lowercase start, no ending punctuation');
+  parts.push('- Max ~50 characters');
+  parts.push('- Never start with "we", "this move", "the player"');
+  parts.push('- Never say "because" or explain - let variations show why');
   parts.push('');
 
-  // When variations are present, the comment should explain WHY the move is wrong
-  // since the variations will show WHAT to play instead
+  // When variations are present, the comment just points to the key idea
+  // The variations demonstrate WHY - comment is a brief pointer
   if (context.plannedVariations && context.plannedVariations.length > 0) {
-    parts.push(`TASK: Explain WHY this move is problematic in ${sentenceLimit} sentence(s).`);
-    parts.push('Focus on what threat/tactic it misses or what weakness it creates.');
-    parts.push('Do not describe alternatives - they are shown in variations.');
+    parts.push('TASK: Write a brief POINTER comment (5-12 words).');
+    parts.push('The variations show WHY - your comment just points to the key idea.');
+    parts.push('');
+    parts.push('POINTER STYLE:');
+    parts.push('- "allows {threat}" or "misses {opportunity}"');
+    parts.push('- "drops material" or "loses the exchange"');
+    parts.push('- lowercase, no ending punctuation');
   } else {
-    parts.push(`TASK: Explain WHY this position matters in ${sentenceLimit} sentence(s).`);
-    parts.push('Focus on tactical or strategic ideas. If mate exists, mention key moves.');
+    parts.push('TASK: Write a brief POINTER comment about this position (5-12 words).');
+    parts.push('Focus on tactical or strategic idea. If mate exists, point to key move.');
   }
 
   parts.push('');
@@ -212,7 +195,7 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
  * Most non-critical moves should have NO comment at all.
  */
 export function buildBriefMovePrompt(context: CommentContext): string {
-  const { move, targetRating, legalMoves, verbosity } = context;
+  const { move, targetRating, legalMoves } = context;
   const parts: string[] = [];
 
   parts.push(`POSITION: ${move.fenBefore}`);
@@ -230,11 +213,11 @@ export function buildBriefMovePrompt(context: CommentContext): string {
     parts.push(`PERSPECTIVE: ${side}'s view`);
   }
 
-  // Sentence limit - very strict for non-critical
-  const sentenceLimit = getSentenceLimit(verbosity, false);
+  // Pointer style for non-critical moves
   parts.push('');
-  parts.push(`INSTRUCTIONS: Only comment if truly noteworthy. MAX ${sentenceLimit} sentence(s).`);
+  parts.push('INSTRUCTIONS: Only comment if truly noteworthy.');
   parts.push('Return empty string if nothing important to say.');
+  parts.push('If commenting, use brief pointer style (5-12 words, lowercase, no punctuation).');
   parts.push('No evaluation numbers, no headers, no bullet points.');
 
   parts.push('');

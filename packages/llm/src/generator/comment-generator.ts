@@ -88,11 +88,7 @@ export class CommentGenerator {
     }
 
     // Check cache first
-    const cacheKey = generatePositionCacheKey(
-      context.move.fenBefore,
-      context.targetRating,
-      context.verbosity,
-    );
+    const cacheKey = generatePositionCacheKey(context.move.fenBefore, context.targetRating);
     const cached = this.cache.get(cacheKey);
     if (cached) {
       return cached;

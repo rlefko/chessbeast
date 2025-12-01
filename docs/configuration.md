@@ -74,7 +74,6 @@ You can also specify a config file explicitly with the `--config` flag.
     "lichessPath": "data/lichess_elite.db"
   },
   "output": {
-    "verbosity": "normal",
     "includeVariations": true,
     "includeNags": true,
     "includeSummary": true
@@ -128,7 +127,6 @@ databases:
   lichessPath: data/lichess_elite.db
 
 output:
-  verbosity: normal
   includeVariations: true
   includeNags: true
   includeSummary: true
@@ -287,16 +285,9 @@ The explorer uses intelligent caching for expensive Stockfish evaluations (depth
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `output.verbosity` | `"ultra-brief"` \| `"brief"` \| `"normal"` \| `"detailed"` | `"normal"` | Annotation verbosity level |
 | `output.includeVariations` | boolean | true | Include alternative variations in output |
 | `output.includeNags` | boolean | true | Include NAG symbols ($1, $2, etc.) |
 | `output.includeSummary` | boolean | true | Include game summary comment |
-
-**Verbosity Levels:**
-- `ultra-brief`: 5-8 words max for critical positions, 5 for non-critical (useful for tight token budgets)
-- `brief`: 10-15 words max for critical positions, 10 for non-critical
-- `normal`: 15-25 words max for critical positions, 10 for non-critical
-- `detailed`: 25-40 words max for critical positions, 15 for non-critical
 
 ## Environment Variables
 
@@ -350,11 +341,6 @@ All configuration options can be set via environment variables:
 |----------|-------------|
 | `CHESSBEAST_ECO_DB` | `databases.ecoPath` |
 | `CHESSBEAST_LICHESS_DB` | `databases.lichessPath` |
-
-### Output
-| Variable | Config Path |
-|----------|-------------|
-| `CHESSBEAST_VERBOSITY` | `output.verbosity` |
 
 ## Profile Presets
 

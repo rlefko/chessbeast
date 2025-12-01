@@ -8,7 +8,8 @@
 export type AnalysisProfile = 'quick' | 'standard' | 'deep';
 
 /**
- * Output verbosity levels (maps to LLM VerbosityLevel)
+ * Output verbosity levels (deprecated - no longer affects comment style)
+ * Kept for backwards compatibility
  */
 export type OutputVerbosity = 'summary' | 'normal' | 'rich';
 
