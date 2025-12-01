@@ -144,10 +144,13 @@ typecheck-py:
 # Services
 # ===========================================
 
-run: run-stockfish run-maia  ## Start all services
+run: run-stockfish run-stockfish16 run-maia  ## Start all services
 
 run-stockfish:  ## Start Stockfish service only
 	uv run python -m stockfish_service.server
+
+run-stockfish16:  ## Start Stockfish 16 service only (classical eval)
+	uv run python -m stockfish16_service.server
 
 run-maia:  ## Start Maia service only
 	uv run python -m maia_service.server
