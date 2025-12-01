@@ -4,62 +4,49 @@ ChessBeast is a hybrid TypeScript + Python monorepo that combines multiple analy
 
 ## System Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         CLI (TypeScript)                            │
-│  Input: PGN file + configuration                                    │
-└──────────────────────────┬──────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                    PGN Parser (@chessbeast/pgn)                      │
-│  Parses PGN files into structured game data with FEN positions       │
-└──────────────────────────┬──────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                Analysis Pipeline (@chessbeast/core)                  │
-│                                                                       │
-│  Pass 1 (Shallow): All positions @ depth 14-16                       │
-│    ├─ Stockfish evaluation via gRPC                                  │
-│    ├─ Opening recognition via ECO database                           │
-│    └─ Initial move classification                                    │
-│                                                                       │
-│  Pass 2 (Critical Detection): Identify turning points                │
-│    └─ Score positions by "interestingness", cap at ~25%              │
-│                                                                       │
-│  Pass 3 (Deep): Critical positions @ depth 20-24, multipv=3          │
-│    ├─ Deep engine analysis with alternatives                         │
-│    └─ Maia human-likeness prediction via gRPC                        │
-└──────────────────────────┬──────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│               LLM Annotation (@chessbeast/llm)                       │
-│                                                                       │
-│  Plan: Select positions for annotation (token budget aware)          │
-│  Generate: OpenAI API calls with chess context                       │
-│  Validate: Check NAGs and move references                            │
-│  Fallback: Template-based comments if API fails                      │
-│  Model: Configurable via --model (gpt-5-mini default)                │
-│                                                                       │
-│  Variation Explorer: Iterative engine/Maia/LLM dialogue              │
-│    ├─ Engine: Best line analysis (depth 22, up to 40 moves)          │
-│    ├─ Maia: Human-likely alternative suggestions                     │
-│    └─ LLM: Exploration strategy, key move identification             │
-└──────────────────────────┬──────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                  PGN Renderer (@chessbeast/pgn)                      │
-│  Transforms analysis back to annotated PGN format                    │
-└──────────────────────────┬──────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                         Output                                       │
-│  Annotated PGN file with comments, NAGs, and variations              │
-└──────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Input
+        CLI["CLI (TypeScript)<br/>Input: PGN file + configuration"]
+    end
+
+    subgraph Parser
+        PGN_PARSER["@chessbeast/pgn Parser<br/>Parses PGN into structured game data"]
+    end
+
+    subgraph Analysis["Analysis Pipeline (@chessbeast/core)"]
+        P1["Pass 1 (Shallow)<br/>All positions @ depth 14-16"]
+        P2["Pass 2 (Critical Detection)<br/>Score by interestingness, cap ~25%"]
+        P3["Pass 3 (Deep)<br/>Critical positions @ depth 20-24"]
+    end
+
+    subgraph Services["External Services"]
+        STOCK["Stockfish gRPC<br/>:50051"]
+        MAIA["Maia gRPC<br/>:50052"]
+        ECO["ECO Database"]
+    end
+
+    subgraph LLM["LLM Annotation (@chessbeast/llm)"]
+        PLAN["Plan: Position Selection"]
+        GEN["Generate: OpenAI API"]
+        VAL["Validate: NAGs & Moves"]
+        VAR["Variation Explorer<br/>Engine + Maia + LLM dialogue"]
+    end
+
+    subgraph Output
+        RENDER["@chessbeast/pgn Renderer"]
+        OUT["Annotated PGN<br/>comments, NAGs, variations"]
+    end
+
+    CLI --> PGN_PARSER --> P1
+    P1 --> P2 --> P3
+    P1 <--> STOCK
+    P1 <--> ECO
+    P3 <--> STOCK
+    P3 <--> MAIA
+    P3 --> PLAN --> GEN --> VAL --> RENDER --> OUT
+    VAR <--> STOCK
+    VAR <--> MAIA
 ```
 
 ## Package Structure
@@ -92,28 +79,40 @@ ChessBeast is a hybrid TypeScript + Python monorepo that combines multiple analy
 
 ## Package Dependencies
 
-```
-cli (main entry point)
-├── core
-│   ├── pgn
-│   ├── grpc-client
-│   └── database
-├── pgn
-├── llm
-│   ├── core
-│   └── pgn
-├── grpc-client
-├── database
-└── test-utils
+```mermaid
+flowchart TB
+    subgraph CLI["cli (main entry point)"]
+        CLI_NODE[cli]
+    end
 
-core
-├── pgn
-├── grpc-client
-└── database
+    subgraph Core["core package"]
+        CORE[core]
+    end
 
-llm
-├── core
-└── pgn
+    subgraph LLM_PKG["llm package"]
+        LLM[llm]
+    end
+
+    subgraph Support["support packages"]
+        PGN[pgn]
+        GRPC[grpc-client]
+        DB[database]
+        TEST[test-utils]
+    end
+
+    CLI_NODE --> CORE
+    CLI_NODE --> PGN
+    CLI_NODE --> LLM
+    CLI_NODE --> GRPC
+    CLI_NODE --> DB
+    CLI_NODE --> TEST
+
+    CORE --> PGN
+    CORE --> GRPC
+    CORE --> DB
+
+    LLM --> CORE
+    LLM --> PGN
 ```
 
 ## Key Data Types
@@ -286,11 +285,19 @@ Thresholds are rating-dependent to account for different skill levels:
 
 Services communicate via gRPC with Protocol Buffers:
 
-```
-┌─────────────┐      gRPC       ┌─────────────────┐
-│ TypeScript  │ ◄────────────►  │ Python Services │
-│ Orchestrator│   (protobuf)    │ (Stockfish/Maia)│
-└─────────────┘                 └─────────────────┘
+```mermaid
+flowchart LR
+    subgraph TypeScript
+        TS["TypeScript Orchestrator<br/>(@chessbeast/grpc-client)"]
+    end
+
+    subgraph Python["Python Services"]
+        STOCK["Stockfish Service<br/>:50051"]
+        MAIA["Maia Service<br/>:50052"]
+    end
+
+    TS <-->|"gRPC / Protobuf"| STOCK
+    TS <-->|"gRPC / Protobuf"| MAIA
 ```
 
 Proto definitions are in `services/protos/`:
