@@ -22,8 +22,6 @@ import {
   validateComment,
   validateSummary,
   sanitizePgnComment,
-  countSentences,
-  truncateToSentences,
   stripCentipawnPatterns,
   stripMetaContent,
 } from '../validator/output-validator.js';
@@ -223,49 +221,6 @@ describe('Output Validator', () => {
     });
   });
 
-  describe('countSentences', () => {
-    it('should count single sentence', () => {
-      expect(countSentences('This is one sentence.')).toBe(1);
-    });
-
-    it('should count multiple sentences', () => {
-      expect(countSentences('First sentence. Second sentence! Third?')).toBe(3);
-    });
-
-    it('should handle text without ending punctuation', () => {
-      expect(countSentences('No ending')).toBe(1);
-    });
-
-    it('should handle empty string', () => {
-      expect(countSentences('')).toBe(0);
-    });
-
-    it('should handle multiple punctuation marks', () => {
-      expect(countSentences('Really?! Yes.')).toBe(2);
-    });
-  });
-
-  describe('truncateToSentences', () => {
-    it('should truncate to max sentences', () => {
-      const text = 'First sentence. Second sentence. Third sentence.';
-      expect(truncateToSentences(text, 2)).toBe('First sentence. Second sentence.');
-    });
-
-    it('should preserve text under limit', () => {
-      const text = 'Just one sentence.';
-      expect(truncateToSentences(text, 2)).toBe('Just one sentence.');
-    });
-
-    it('should return empty for zero max', () => {
-      expect(truncateToSentences('Any text.', 0)).toBe('');
-    });
-
-    it('should handle text without ending punctuation', () => {
-      const text = 'First. Second. Third without period';
-      expect(truncateToSentences(text, 2)).toBe('First. Second.');
-    });
-  });
-
   describe('stripCentipawnPatterns', () => {
     it('should strip cp values', () => {
       expect(stripCentipawnPatterns('Lost 150cp here')).toBe('Lost here');
@@ -306,19 +261,19 @@ describe('Output Validator', () => {
 
     it('should strip classification echoes', () => {
       expect(stripMetaContent('This is a blunder because the knight hangs')).toBe(
-        'Because the knight hangs',
+        'because the knight hangs',
       );
       expect(stripMetaContent('A costly mistake. The rook is lost.')).toBe('The rook is lost.');
     });
 
     it('should strip filler starters', () => {
-      expect(stripMetaContent('Interestingly, white wins')).toBe('White wins');
-      expect(stripMetaContent('Notably, the knight is strong')).toBe('The knight is strong');
+      expect(stripMetaContent('Interestingly, white wins')).toBe('white wins');
+      expect(stripMetaContent('Notably, the knight is strong')).toBe('the knight is strong');
     });
 
-    it('should capitalize after stripping', () => {
+    it('should preserve case after stripping', () => {
       const result = stripMetaContent('interestingly, the position is equal');
-      expect(result.charAt(0)).toBe('T');
+      expect(result.charAt(0)).toBe('t');
     });
 
     it('should preserve normal text', () => {
@@ -328,14 +283,28 @@ describe('Output Validator', () => {
     });
   });
 
-  describe('validateComment sentence truncation', () => {
-    it('should truncate comments with more than 2 sentences', () => {
-      const raw = {
-        comment: 'First sentence. Second sentence. Third sentence. Fourth.',
-        nags: [],
-      };
+  describe('validateComment character limits', () => {
+    it('should truncate comments exceeding hard limit (150 chars for initial type)', () => {
+      const longComment = 'A'.repeat(200); // 200 chars, exceeds 150 hard limit
+      const raw = { comment: longComment, nags: [] };
       const result = validateComment(raw, []);
-      expect(countSentences(result.sanitized.comment!)).toBeLessThanOrEqual(2);
+      expect(result.sanitized.comment!.length).toBeLessThanOrEqual(150);
+    });
+
+    it('should warn but not truncate comments between soft and hard limits', () => {
+      const mediumComment = 'A'.repeat(100); // 100 chars, between 75 soft and 150 hard
+      const raw = { comment: mediumComment, nags: [] };
+      const result = validateComment(raw, []);
+      expect(result.sanitized.comment!.length).toBe(100);
+      expect(result.issues.some((i) => i.message.includes('soft limit'))).toBe(true);
+    });
+
+    it('should allow comments under soft limit without warnings', () => {
+      const shortComment = 'allows Nxe5'; // 11 chars, well under 75 soft limit
+      const raw = { comment: shortComment, nags: [] };
+      const result = validateComment(raw, []);
+      expect(result.sanitized.comment).toBe('allows Nxe5');
+      expect(result.issues.some((i) => i.message.includes('chars'))).toBe(false);
     });
   });
 
