@@ -203,13 +203,13 @@ export interface AgenticExplorerResult {
  * Default configuration
  *
  * Tuned for deep exploration until positions are resolved:
- * - Higher tool call budget (200 vs 40) for 15-30 move variations
- * - Higher soft cap (80 vs 25) before wrap-up guidance triggers
- * - Higher depth limit (100 vs 50) to support very deep variations
+ * - Higher tool call budget (300) for thorough exploration with multiple variations
+ * - Soft cap at 200 (67% of hard) to allow deep main lines before wrap-up guidance
+ * - Higher depth limit (100) to support very deep variations
  */
 const DEFAULT_CONFIG: Required<AgenticExplorerConfig> = {
-  maxToolCalls: 200,
-  softToolCap: 80,
+  maxToolCalls: 300,
+  softToolCap: 200,
   maxDepth: 100,
   targetRating: 1500,
   warnCallback: () => {},
@@ -252,10 +252,19 @@ export class AgenticVariationExplorer {
     config?: AgenticExplorerConfig,
   ) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Auto-calculate soft cap as ~67% of hard limit if not explicitly provided
+    // This ensures budget pressure doesn't kick in too early
+    const autoSoftCap = Math.floor(this.config.maxToolCalls * 0.67);
+    const effectiveSoftCap =
+      config?.softToolCap !== undefined
+        ? Math.min(config.softToolCap, this.config.maxToolCalls)
+        : autoSoftCap;
+
     this.stoppingConfig = {
       ...DEFAULT_STOPPING_CONFIG,
       maxToolCalls: this.config.maxToolCalls,
-      softToolCap: this.config.softToolCap,
+      softToolCap: effectiveSoftCap,
       maxDepth: this.config.maxDepth,
     };
     this.services = services;
@@ -1364,6 +1373,17 @@ When get_candidate_moves returns moves with source "attractive_but_bad":
 
 **Why this matters:**
 Players learn more from understanding WHY tempting moves fail than just seeing the best move.
+
+## EXPLORATION DEPTH REMINDER
+
+You have a generous tool budget. Don't rush to finish after one variation.
+
+After completing a main line, consider:
+- Did you show WHY the played move was bad? (not just what's better)
+- Are there attractive_but_bad moves worth refuting?
+- Would a second variation teach something NEW?
+
+Trust your judgment, but lean toward more exploration when in doubt.
 
 ## SUB-EXPLORATION
 
