@@ -221,7 +221,6 @@ describe('Output Validator', () => {
     });
   });
 
-
   describe('stripCentipawnPatterns', () => {
     it('should strip cp values', () => {
       expect(stripCentipawnPatterns('Lost 150cp here')).toBe('Lost here');

@@ -309,7 +309,10 @@ export function validateComment(
 
     // Hard limit: truncate at last complete word before limit
     if (comment.length > limits.hard) {
-      const truncated = comment.slice(0, limits.hard).replace(/\s+\S*$/, '').trim();
+      const truncated = comment
+        .slice(0, limits.hard)
+        .replace(/\s+\S*$/, '')
+        .trim();
       issues.push({
         field: 'comment',
         message: `Comment exceeds ${limits.hard} chars (${comment.length}), truncating`,
