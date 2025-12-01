@@ -21,17 +21,29 @@ from .engine import (
     Stockfish16Engine,
 )
 from .eval_parser import format_classical_eval, parse_eval_output
+from .pool import EngineUnavailableError, Stockfish16Manager
+from .server import create_server, serve
 
 __all__ = [
+    # Config
     "Stockfish16Config",
+    # Engine
     "Stockfish16Engine",
     "ClassicalEvalResult",
     "PhaseScore",
     "SideBreakdown",
+    # Errors
     "EngineError",
     "EngineStartupError",
     "InvalidFenError",
     "EvalNotAvailableError",
+    "EngineUnavailableError",
+    # Parser
     "parse_eval_output",
     "format_classical_eval",
+    # Manager
+    "Stockfish16Manager",
+    # Server
+    "create_server",
+    "serve",
 ]
