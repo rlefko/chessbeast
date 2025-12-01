@@ -57,3 +57,31 @@ export {
   assessExplorationWorthiness,
   type ExplorationWorthiness,
 } from './winning-position-filter.js';
+
+// Candidate classification types
+export {
+  type CandidateSource,
+  type ClassifiedCandidate,
+  type CandidateClassificationConfig,
+  type CommentType,
+  type CommentLimits,
+  CANDIDATE_SOURCE_PRIORITY,
+  ATTRACTIVE_BAD_THRESHOLDS,
+  COMMENT_LIMITS,
+  PIECE_VALUES,
+  getAttractiveBadThresholds,
+} from './types.js';
+
+// Candidate classifier
+export {
+  classifyCandidates,
+  getDefaultConfig,
+  isCheck,
+  isCapture,
+  getPieceType,
+  isAttractiveBad,
+  getPrimarySource,
+  generateSourceReason,
+  type EngineCandidate,
+  type MaiaPrediction,
+} from './candidate-classifier.js';

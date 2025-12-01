@@ -134,6 +134,19 @@ export class VariationTree {
   }
 
   /**
+   * Get depth of current node from root (root = 0)
+   */
+  getDepthFromRoot(): number {
+    let depth = 0;
+    let node: VariationNode | undefined = this.currentNode;
+    while (node && node.parent) {
+      depth++;
+      node = node.parent;
+    }
+    return depth;
+  }
+
+  /**
    * Get serializable info about current node
    */
   getCurrentNodeInfo(): NodeInfo {

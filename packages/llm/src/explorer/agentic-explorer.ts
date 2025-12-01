@@ -20,6 +20,12 @@ import type { LLMConfig } from '../config/llm-config.js';
 import { ToolExecutor } from '../tools/executor.js';
 import type { AgenticServices, ToolCall, EvaluatePositionResult } from '../tools/types.js';
 
+import {
+  classifyCandidates,
+  getDefaultConfig,
+  type EngineCandidate,
+  type MaiaPrediction,
+} from './candidate-classifier.js';
 import { EXPLORATION_TOOLS } from './exploration-tools.js';
 import {
   assessContinuation,
@@ -27,16 +33,24 @@ import {
   type StoppingConfig,
   DEFAULT_STOPPING_CONFIG,
 } from './stopping-heuristics.js';
+import { COMMENT_LIMITS, type CommentType } from './types.js';
 import type { ExploredLine, LinePurpose, LineSource } from './variation-explorer.js';
 import { VariationTree } from './variation-tree.js';
 
 /**
- * Validate and clean up LLM comment
+ * Validate and clean up LLM comment with context-aware limits
+ *
+ * Comment types:
+ * - 'initial': Comment on the played move (brief pointer, 75-150 chars)
+ * - 'variation_start': First comment in a variation line (50-100 chars)
+ * - 'variation_middle': Comments during variation exploration (50-100 chars)
+ * - 'variation_end': Summary comment at end of variation (100-150 chars)
  */
 function validateAndCleanComment(
   comment: string,
   lastMoveSan?: string,
-): { cleaned: string; rejected: boolean; reason?: string } {
+  commentType: CommentType = 'variation_middle',
+): { cleaned: string; rejected: boolean; reason?: string; warning?: string } {
   // Reject meta-commentary patterns (before any cleanup)
   const bannedPatterns = [
     /from\s+(our|my|the|white's|black's)\s+(side|perspective)/i,
@@ -51,17 +65,20 @@ function validateAndCleanComment(
         cleaned: '',
         rejected: true,
         reason:
-          'Comment should describe the position/move, not meta-commentary. Use 2-8 words like "threatens mate" or "wins material".',
+          'Comment should describe the position/move, not meta-commentary. Brief pointers like "allows Ne5" or "wins material".',
       };
     }
   }
 
-  // Reject if too long (50 chars ≈ 8 words)
-  if (comment.length > 50) {
+  // Get limits for this comment type
+  const limits = COMMENT_LIMITS[commentType];
+
+  // Hard reject if exceeds hard limit
+  if (comment.length > limits.hard) {
     return {
       cleaned: '',
       rejected: true,
-      reason: 'Comment too long. Maximum 8 words (50 chars). Be concise.',
+      reason: `Comment too long (${comment.length} chars). Maximum ${limits.hard} chars for ${commentType}. Be more concise.`,
     };
   }
 
@@ -92,6 +109,15 @@ function validateAndCleanComment(
       cleaned: '',
       rejected: true,
       reason: 'Comment empty after cleanup. Provide meaningful annotation.',
+    };
+  }
+
+  // Soft warning if exceeds soft limit but under hard limit
+  if (cleaned.length > limits.soft) {
+    return {
+      cleaned,
+      rejected: false,
+      warning: `Comment is ${cleaned.length} chars (soft limit: ${limits.soft}). Consider being more concise.`,
     };
   }
 
@@ -204,6 +230,7 @@ export class AgenticVariationExplorer {
   private readonly config: Required<AgenticExplorerConfig>;
   private readonly stoppingConfig: StoppingConfig;
   private readonly toolExecutor: ToolExecutor;
+  private readonly services: AgenticServices;
   private readonly evalCache: ResponseCache<EvaluatePositionResult>;
   private cacheHits = 0;
   private cacheMisses = 0;
@@ -228,6 +255,7 @@ export class AgenticVariationExplorer {
       softToolCap: this.config.softToolCap,
       maxDepth: this.config.maxDepth,
     };
+    this.services = services;
     this.toolExecutor = new ToolExecutor(services, this.config.targetRating);
     this.evalCache = new ResponseCache({
       maxSize: 500,
@@ -620,19 +648,45 @@ export class AgenticVariationExplorer {
           return { success: false, error: 'No comment provided' };
         }
 
-        const { cleaned, rejected, reason } = validateAndCleanComment(
+        // Determine comment type based on tree position
+        const currentNode = tree.getCurrentNode();
+        const depth = tree.getDepthFromRoot();
+        const hasChildren = currentNode.children && currentNode.children.length > 0;
+        const commentTypeArg = args.type as string | undefined;
+
+        let commentType: CommentType;
+        if (depth === 0) {
+          // At root = initial comment on played move
+          commentType = 'initial';
+        } else if (depth === 1) {
+          // First move in variation
+          commentType = 'variation_start';
+        } else if (!hasChildren && commentTypeArg === 'summary') {
+          // Leaf node with summary type = variation end
+          commentType = 'variation_end';
+        } else {
+          // Default for mid-variation
+          commentType = 'variation_middle';
+        }
+
+        const { cleaned, rejected, reason, warning } = validateAndCleanComment(
           comment,
-          tree.getCurrentNode().san,
+          currentNode.san,
+          commentType,
         );
         if (rejected) {
           return { success: false, error: reason };
         }
         tree.setComment(cleaned);
 
-        return {
+        const result: Record<string, unknown> = {
           success: true,
           comment: tree.getCurrentNode().comment,
         };
+        if (warning) {
+          result.warning = warning;
+        }
+        return result;
       }
 
       case 'get_comment': {
@@ -741,66 +795,124 @@ export class AgenticVariationExplorer {
         const fenParts = currentFen.split(' ');
         const sideToMove = fenParts[1] === 'w' ? 'White' : 'Black';
 
-        // Use multipv analysis to get top N moves
+        // Get engine candidates and Maia predictions in parallel
         const evalArgs = { fen: currentFen, depth: 18, multipv: count };
-        const result = await this.toolExecutor.execute({
-          ...toolCall,
-          function: {
-            name: 'evaluate_position',
-            arguments: JSON.stringify(evalArgs),
-          },
-        });
+        const [engineResult, maiaResult] = await Promise.all([
+          this.toolExecutor.execute({
+            ...toolCall,
+            function: {
+              name: 'evaluate_position',
+              arguments: JSON.stringify(evalArgs),
+            },
+          }),
+          // Maia predictions (optional service)
+          this.services.maia
+            ? this.toolExecutor.execute({
+                ...toolCall,
+                function: {
+                  name: 'predict_human_moves',
+                  arguments: JSON.stringify({
+                    fen: currentFen,
+                    rating: this.config.targetRating,
+                  }),
+                },
+              })
+            : Promise.resolve({ result: null, toolCallId: toolCall.id }),
+        ]);
 
-        // Extract the moves from the result
-        if (result.error) {
-          return { success: false, error: result.error };
+        if (engineResult.error) {
+          return { success: false, error: engineResult.error };
         }
 
-        const evalResult = result.result as Record<string, unknown>;
+        const evalResult = engineResult.result as Record<string, unknown>;
 
-        // Check if we got multiple lines (multipv result)
+        // Extract Maia predictions
+        let maiaPredictions: MaiaPrediction[] | undefined;
+        if (maiaResult.result) {
+          const maiaData = maiaResult.result as {
+            predictions?: Array<{ move: string; probability: number }>;
+          };
+          if (maiaData.predictions && maiaData.predictions.length > 0) {
+            maiaPredictions = maiaData.predictions.map((p) => ({
+              san: p.move,
+              probability: p.probability,
+            }));
+          }
+        }
+
+        // Build engine candidates for classification
+        const engineCandidates: EngineCandidate[] = [];
+
         if (evalResult.lines && Array.isArray(evalResult.lines)) {
-          const candidates = (evalResult.lines as Array<Record<string, unknown>>).map(
-            (line, idx) => ({
-              rank: idx + 1,
-              move: (line.principalVariation as string[])?.[0] ?? 'unknown',
-              evaluation: line.evaluation as number,
-              line: (line.principalVariation as string[])?.slice(0, 4).join(' ') ?? '',
-            }),
-          );
+          for (const line of evalResult.lines as Array<Record<string, unknown>>) {
+            const pv = line.principalVariation as string[] | undefined;
+            const move = pv?.[0];
+            if (move) {
+              const candidate: EngineCandidate = {
+                move,
+                evaluation: (line.evaluation as number) ?? 0,
+                isMate: (line.isMate as boolean) ?? false,
+                pv: pv ?? [],
+              };
+              if (typeof line.mateIn === 'number') {
+                candidate.mateIn = line.mateIn;
+              }
+              engineCandidates.push(candidate);
+            }
+          }
+        } else {
+          // Single line result (fallback)
+          const pv = evalResult.principalVariation as string[] | undefined;
+          const move = pv?.[0];
+          if (move) {
+            const candidate: EngineCandidate = {
+              move,
+              evaluation: (evalResult.evaluation as number) ?? 0,
+              isMate: (evalResult.isMate as boolean) ?? false,
+              pv: pv ?? [],
+            };
+            if (typeof evalResult.mateIn === 'number') {
+              candidate.mateIn = evalResult.mateIn;
+            }
+            engineCandidates.push(candidate);
+          }
+        }
 
-          // Track candidates for soft validation
-          this.lastCandidatesFen = currentFen;
-          this.lastCandidateMoves = new Set(candidates.map((c) => c.move));
-
+        if (engineCandidates.length === 0) {
           return {
-            success: true,
-            sideToMove,
-            candidates,
-            note: `These are ${sideToMove}'s best moves. Use add_alternative to explore them.`,
+            success: false,
+            error: 'No engine candidates found',
           };
         }
 
-        // Single line result (fallback)
-        const pv = evalResult.principalVariation as string[] | undefined;
-        const bestMove = pv?.[0] ?? 'unknown';
+        // Classify candidates with source information
+        const classificationConfig = getDefaultConfig(this.config.targetRating);
+        const classifiedCandidates = classifyCandidates(
+          engineCandidates,
+          maiaPredictions,
+          classificationConfig,
+        );
 
         // Track candidates for soft validation
         this.lastCandidatesFen = currentFen;
-        this.lastCandidateMoves = new Set([bestMove]);
+        this.lastCandidateMoves = new Set(classifiedCandidates.map((c) => c.move));
+
+        // Check for attractive-but-bad moves
+        const hasAttractiveBad = classifiedCandidates.some(
+          (c) => c.primarySource === 'attractive_but_bad',
+        );
+
+        let note = `These are ${sideToMove}'s candidate moves with source classification.`;
+        if (hasAttractiveBad) {
+          note +=
+            ' **Note: Some moves are "attractive_but_bad" - consider exploring to show refutation!**';
+        }
 
         return {
           success: true,
           sideToMove,
-          candidates: [
-            {
-              rank: 1,
-              move: bestMove,
-              evaluation: evalResult.evaluation as number,
-              line: pv?.slice(0, 4).join(' ') ?? '',
-            },
-          ],
-          note: `This is ${sideToMove}'s best move. Use add_alternative to explore it.`,
+          candidates: classifiedCandidates,
+          note,
         };
       }
 
@@ -1008,7 +1120,9 @@ Use **add_move** to add better alternatives. Do NOT use add_alternative at the s
 ## ANNOTATION TOOLS
 
 Comments:
-- **set_comment(comment)** - Add/replace comment (2-8 words, lowercase, no punctuation)
+- **set_comment(comment, type?)** - Add comment. type='pointer' (default) or 'summary' for variation endings
+- 5-12 words typical, longer OK for complex strategic positions
+- lowercase, no ending punctuation, no move notation
 
 Move Quality NAGs (use freely on any move):
 - **add_move_nag(nag)** - $1=!, $2=?, $3=!!, $4=??, $5=!?, $6=?!
@@ -1017,10 +1131,60 @@ Position Evaluation NAGs (ONLY at END of variation!):
 - **set_position_nag(nag)** - $10=equal, $14/15=slight edge, $16/17=clear advantage, $18/19=winning
 - ⚠️ NEVER use position NAGs mid-variation. ONLY at the final position!
 
+## SHOW DON'T TELL PHILOSOPHY
+
+Your primary job is to SHOW through variations, not TELL through long explanations.
+
+**Played move comment pattern:**
+- OPTIONAL: Only add if it clarifies something the variation doesn't show
+- Keep it a POINTER: "allows Ne5" not "this allows the strong Ne5 maneuver"
+- Let the variation DEMONSTRATE the idea
+
+**Good examples:**
+- 12. Qe2?! {allows Ne5} (12. Re1 $1 Nd7 13. Ne5 $14 {central pressure})
+- 15. f3?? {drops the queen} (15. Qd2 Nc6 $10)
+- 8. Bb5? (8. d4! $1 {opens the center} exd4 9. e5 $16)
+
+**Bad examples (too verbose):**
+- {This move is inaccurate because it allows White to play Ne5...}
+- {The problem with this queen move is that it fails to address...}
+
 ## ANALYSIS TOOLS
 
 - **evaluate_position** - Get engine evaluation (use every 3-4 moves)
 - **predict_human_moves** - What would a ${targetRating} player do?
+
+## CANDIDATE MOVE SOURCES
+
+get_candidate_moves now returns classified candidates with sources like:
+- **engine_best** - Engine's top choice
+- **near_best** - Strong alternative (within 50cp of best)
+- **human_popular** - High probability move for ${targetRating} players
+- **attractive_but_bad** - **IMPORTANT**: Looks good to humans but actually loses!
+- **scary_check/capture** - Tactical moves that look forcing
+- **sacrifice** - Material sacrifice with compensation
+
+## EXPLORING ATTRACTIVE-BUT-BAD MOVES
+
+When get_candidate_moves returns moves with source "attractive_but_bad":
+
+1. These are TRAPS - moves that look good but fail to a specific refutation
+2. Consider exploring these moves to show WHY they fail (highly encouraged!)
+3. Use add_move to play the tempting move, then show the punishment
+4. Comment style: "{tempting but...}" at start, "{the point}" at refutation
+
+**Example workflow:**
+1. get_candidate_moves returns Nxe4 as attractive_but_bad (35% would play, loses to Bxf7+)
+2. add_move("Nxe4")
+3. add_move_nag("$6")  // dubious
+4. set_comment("tempting but loses material")
+5. add_move("Bxf7+")   // the refutation
+6. set_comment("the point")
+7. Continue until punishment is clear
+8. set_position_nag at end showing decisive advantage
+
+**Why this matters:**
+Players learn more from understanding WHY tempting moves fail than just seeing the best move.
 
 ## SUB-EXPLORATION
 
@@ -1105,10 +1269,13 @@ Result: 12. Re1 $1 {activates the rook} Nd7 13. Ne5 {strong outpost} Nf6 14. Bf4
 5. **add_alternative only after navigating** - Creates siblings deep in a line
 6. **Position NAGs ($10-$19) ONLY at the END** - Never mid-variation!
 7. **Move NAGs ($1-$6) anytime** - Use freely to mark good/bad moves
-8. **Comments: 2-8 words** - lowercase, no punctuation
-9. **NEVER say "from our perspective" or "this move is"**
-10. **Explore DEEP** - Don't stop at 3-5 moves, show full variations
-11. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives`;
+8. **SHOW DON'T TELL** - Variations demonstrate, comments just point
+9. **Comments: 5-12 words typical** - Longer OK for complex positions
+10. **Played move comment is OPTIONAL** - Skip if variation is self-explanatory
+11. **NEVER say "from our perspective" or "this move is"**
+12. **Explore DEEP** - Don't stop at 3-5 moves, show full variations
+13. **Explore attractive-but-bad moves** - Show WHY tempting moves fail
+14. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives`;
 
     // Add winning position focus when position is already decided
     if (evalCp !== undefined && Math.abs(evalCp) >= 500) {
