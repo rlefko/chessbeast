@@ -7,18 +7,18 @@ Comprehensive refactoring to follow SOLID and DRY principles.
 ---
 
 ## PR 1: Foundation Packages + Interface Segregation
-**Status:** 🔄 In Progress
+**Status:** ✅ Complete
 **Phases:** 1-2
 **Commits:** 1-6
 
 | # | Task | Status | Commit |
 |---|------|--------|--------|
-| 1 | Create `@chessbeast/types` package | ⬜ | - |
-| 2 | Create `@chessbeast/utils` package | ⬜ | - |
-| 3 | Update package dependencies | ⬜ | - |
-| 4 | Segregate MoveAnalysis interface (ISP) | ⬜ | - |
-| 5 | Segregate GameAnalysis interface | ⬜ | - |
-| 6 | Consolidate service interfaces | ⬜ | - |
+| 1 | Create `@chessbeast/types` package | ✅ | f1d1e04 |
+| 2 | Create `@chessbeast/utils` package | ✅ | 01e8e9d |
+| 3 | Update package dependencies | ✅ | f1d1e04 |
+| 4 | Segregate MoveAnalysis interface (ISP) | ✅ | f1d1e04 |
+| 5 | Segregate GameAnalysis interface | ✅ | f1d1e04 |
+| 6 | Consolidate service interfaces | ✅ | f1d1e04 |
 
 ---
 
