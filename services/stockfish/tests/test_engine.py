@@ -8,7 +8,6 @@ import chess
 import chess.engine
 import pytest
 
-from conftest import MATE_IN_1_FEN, STARTING_FEN
 from stockfish_service.config import EngineConfig
 from stockfish_service.engine import (
     EngineError,
@@ -144,11 +143,11 @@ class TestStockfishEngineIsAlive:
 class TestStockfishEngineEvaluate:
     """Tests for position evaluation."""
 
-    def test_evaluate_not_started(self) -> None:
+    def test_evaluate_not_started(self, starting_fen: str) -> None:
         """Evaluation fails if engine not started."""
         engine = StockfishEngine()
         with pytest.raises(EngineError, match="not started"):
-            engine.evaluate(STARTING_FEN)
+            engine.evaluate(starting_fen)
 
     def test_evaluate_invalid_fen(self, mock_simple_engine: MagicMock) -> None:
         """Evaluation fails with invalid FEN."""
@@ -160,7 +159,9 @@ class TestStockfishEngineEvaluate:
 
         engine.stop()
 
-    def test_evaluate_starting_position(self, mock_simple_engine: MagicMock) -> None:
+    def test_evaluate_starting_position(
+        self, mock_simple_engine: MagicMock, starting_fen: str
+    ) -> None:
         """Evaluate starting position."""
         # Setup mock response
         mock_score = MagicMock()
@@ -176,7 +177,7 @@ class TestStockfishEngineEvaluate:
         engine = StockfishEngine()
         engine.start()
 
-        result = engine.evaluate(STARTING_FEN, depth=20)
+        result = engine.evaluate(starting_fen, depth=20)
 
         assert result.cp == 25
         assert result.mate == 0
@@ -186,7 +187,9 @@ class TestStockfishEngineEvaluate:
 
         engine.stop()
 
-    def test_evaluate_mate_position(self, mock_simple_engine: MagicMock) -> None:
+    def test_evaluate_mate_position(
+        self, mock_simple_engine: MagicMock, mate_in_1_fen: str
+    ) -> None:
         """Evaluate position with mate score."""
         mock_score = MagicMock()
         mock_score.white.return_value.is_mate.return_value = True
@@ -201,7 +204,7 @@ class TestStockfishEngineEvaluate:
         engine = StockfishEngine()
         engine.start()
 
-        result = engine.evaluate(MATE_IN_1_FEN, depth=10)
+        result = engine.evaluate(mate_in_1_fen, depth=10)
 
         assert result.cp == 0
         assert result.mate == 1
@@ -233,7 +236,9 @@ class TestStockfishEngineEvaluate:
 
         engine.stop()
 
-    def test_evaluate_with_time_limit(self, mock_simple_engine: MagicMock) -> None:
+    def test_evaluate_with_time_limit(
+        self, mock_simple_engine: MagicMock, starting_fen: str
+    ) -> None:
         """Evaluation respects time limit."""
         mock_score = MagicMock()
         mock_score.white.return_value.is_mate.return_value = False
@@ -248,7 +253,7 @@ class TestStockfishEngineEvaluate:
         engine = StockfishEngine()
         engine.start()
 
-        engine.evaluate(STARTING_FEN, time_ms=1000)
+        engine.evaluate(starting_fen, time_ms=1000)
 
         # Check that time limit was passed
         call_args = mock_simple_engine.analyse.call_args
@@ -257,7 +262,9 @@ class TestStockfishEngineEvaluate:
 
         engine.stop()
 
-    def test_evaluate_with_node_limit(self, mock_simple_engine: MagicMock) -> None:
+    def test_evaluate_with_node_limit(
+        self, mock_simple_engine: MagicMock, starting_fen: str
+    ) -> None:
         """Evaluation respects node limit."""
         mock_score = MagicMock()
         mock_score.white.return_value.is_mate.return_value = False
@@ -272,7 +279,7 @@ class TestStockfishEngineEvaluate:
         engine = StockfishEngine()
         engine.start()
 
-        engine.evaluate(STARTING_FEN, nodes=100000)
+        engine.evaluate(starting_fen, nodes=100000)
 
         call_args = mock_simple_engine.analyse.call_args
         limit = call_args[0][1]
@@ -280,7 +287,7 @@ class TestStockfishEngineEvaluate:
 
         engine.stop()
 
-    def test_evaluate_default_depth(self, mock_simple_engine: MagicMock) -> None:
+    def test_evaluate_default_depth(self, mock_simple_engine: MagicMock, starting_fen: str) -> None:
         """Default to depth 20 when no limits specified."""
         mock_score = MagicMock()
         mock_score.white.return_value.is_mate.return_value = False
@@ -295,7 +302,7 @@ class TestStockfishEngineEvaluate:
         engine = StockfishEngine()
         engine.start()
 
-        engine.evaluate(STARTING_FEN)
+        engine.evaluate(starting_fen)
 
         call_args = mock_simple_engine.analyse.call_args
         limit = call_args[0][1]
@@ -303,7 +310,7 @@ class TestStockfishEngineEvaluate:
 
         engine.stop()
 
-    def test_evaluate_multipv(self, mock_simple_engine: MagicMock) -> None:
+    def test_evaluate_multipv(self, mock_simple_engine: MagicMock, starting_fen: str) -> None:
         """Evaluation with MultiPV returns alternatives."""
         mock_score_1 = MagicMock()
         mock_score_1.white.return_value.is_mate.return_value = False
@@ -326,7 +333,7 @@ class TestStockfishEngineEvaluate:
         engine = StockfishEngine()
         engine.start()
 
-        result = engine.evaluate(STARTING_FEN, depth=16, multipv=3)
+        result = engine.evaluate(starting_fen, depth=16, multipv=3)
 
         assert result.cp == 30
         assert result.best_line == ["e2e4"]
@@ -342,7 +349,9 @@ class TestStockfishEngineEvaluate:
 
         engine.stop()
 
-    def test_evaluate_multipv_clamped(self, mock_simple_engine: MagicMock) -> None:
+    def test_evaluate_multipv_clamped(
+        self, mock_simple_engine: MagicMock, starting_fen: str
+    ) -> None:
         """MultiPV is clamped to reasonable range."""
         mock_score = MagicMock()
         mock_score.white.return_value.is_mate.return_value = False
@@ -358,13 +367,13 @@ class TestStockfishEngineEvaluate:
         engine.start()
 
         # Request too many PVs
-        engine.evaluate(STARTING_FEN, multipv=100)
+        engine.evaluate(starting_fen, multipv=100)
 
         call_args = mock_simple_engine.analyse.call_args
         assert call_args.kwargs["multipv"] == 10  # Clamped to max
 
         # Request negative
-        engine.evaluate(STARTING_FEN, multipv=-1)
+        engine.evaluate(starting_fen, multipv=-1)
 
         call_args = mock_simple_engine.analyse.call_args
         assert call_args.kwargs["multipv"] == 1  # Clamped to min

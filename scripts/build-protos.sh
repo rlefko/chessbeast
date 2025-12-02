@@ -12,6 +12,7 @@ PROTO_DIR="$ROOT_DIR/services/protos"
 # Output directories
 TS_OUT_DIR="$ROOT_DIR/packages/grpc-client/src/generated"
 PY_STOCKFISH_OUT="$ROOT_DIR/services/stockfish/src/stockfish_service/generated"
+PY_STOCKFISH16_OUT="$ROOT_DIR/services/stockfish16/src/stockfish16_service/generated"
 PY_MAIA_OUT="$ROOT_DIR/services/maia/src/maia_service/generated"
 
 echo "Building gRPC stubs from protobuf definitions..."
@@ -20,6 +21,7 @@ echo "Proto directory: $PROTO_DIR"
 # Create output directories
 mkdir -p "$TS_OUT_DIR"
 mkdir -p "$PY_STOCKFISH_OUT"
+mkdir -p "$PY_STOCKFISH16_OUT"
 mkdir -p "$PY_MAIA_OUT"
 
 # Check for required tools
@@ -57,9 +59,17 @@ $PYTHON_CMD -m grpc_tools.protoc \
     "$PROTO_DIR/common.proto" \
     "$PROTO_DIR/maia.proto"
 
+# For Stockfish 16 service
+$PYTHON_CMD -m grpc_tools.protoc \
+    -I"$PROTO_DIR" \
+    --python_out="$PY_STOCKFISH16_OUT" \
+    --pyi_out="$PY_STOCKFISH16_OUT" \
+    --grpc_python_out="$PY_STOCKFISH16_OUT" \
+    "$PROTO_DIR/stockfish16.proto"
+
 # Fix imports to be relative (grpc_tools generates absolute imports)
 echo "Fixing Python imports to be relative..."
-for dir in "$PY_STOCKFISH_OUT" "$PY_MAIA_OUT"; do
+for dir in "$PY_STOCKFISH_OUT" "$PY_STOCKFISH16_OUT" "$PY_MAIA_OUT"; do
     for file in "$dir"/*_pb2*.py; do
         if [[ -f "$file" ]]; then
             # Replace 'import xxx_pb2' with 'from . import xxx_pb2'
@@ -84,6 +94,12 @@ from .maia_pb2 import *
 from .maia_pb2_grpc import *
 EOF
 
+cat > "$PY_STOCKFISH16_OUT/__init__.py" << 'EOF'
+"""Generated gRPC stubs for Stockfish 16 service."""
+from .stockfish16_pb2 import *
+from .stockfish16_pb2_grpc import *
+EOF
+
 echo "Python stubs generated successfully"
 
 # Generate TypeScript stubs (if grpc-tools is available)
@@ -97,6 +113,7 @@ if command -v grpc_tools_node_protoc &> /dev/null; then
         --ts_out=grpc_js:"$TS_OUT_DIR" \
         "$PROTO_DIR/common.proto" \
         "$PROTO_DIR/stockfish.proto" \
+        "$PROTO_DIR/stockfish16.proto" \
         "$PROTO_DIR/maia.proto"
 
     echo "TypeScript stubs generated successfully"

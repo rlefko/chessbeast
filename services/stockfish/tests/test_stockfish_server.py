@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 import grpc
 import pytest
 
-from conftest import STARTING_FEN
 from stockfish_service.config import EngineConfig, PoolConfig, ServerConfig
 from stockfish_service.engine import (
     EngineError,
@@ -55,6 +54,7 @@ class TestStockfishServiceImpl:
         mock_pool: MagicMock,
         mock_engine: MagicMock,
         mock_context: MagicMock,
+        starting_fen: str,
     ) -> None:
         """Evaluate returns correct response on success."""
         mock_engine.evaluate.return_value = EvaluationResult(
@@ -67,7 +67,7 @@ class TestStockfishServiceImpl:
         mock_pool.engine.return_value.__enter__ = MagicMock(return_value=mock_engine)
         mock_pool.engine.return_value.__exit__ = MagicMock(return_value=False)
 
-        request = EvaluateRequest(fen=STARTING_FEN, depth=20)
+        request = EvaluateRequest(fen=starting_fen, depth=20)
         response = servicer.Evaluate(request, mock_context)
 
         assert response.cp == 25
@@ -82,6 +82,7 @@ class TestStockfishServiceImpl:
         mock_pool: MagicMock,
         mock_engine: MagicMock,
         mock_context: MagicMock,
+        starting_fen: str,
     ) -> None:
         """Evaluate returns alternatives for MultiPV."""
         mock_engine.evaluate.return_value = EvaluationResult(
@@ -97,7 +98,7 @@ class TestStockfishServiceImpl:
         mock_pool.engine.return_value.__enter__ = MagicMock(return_value=mock_engine)
         mock_pool.engine.return_value.__exit__ = MagicMock(return_value=False)
 
-        request = EvaluateRequest(fen=STARTING_FEN, depth=16, multipv=3)
+        request = EvaluateRequest(fen=starting_fen, depth=16, multipv=3)
         response = servicer.Evaluate(request, mock_context)
 
         assert response.cp == 30
@@ -129,13 +130,14 @@ class TestStockfishServiceImpl:
         servicer: StockfishServiceImpl,
         mock_pool: MagicMock,
         mock_context: MagicMock,
+        starting_fen: str,
     ) -> None:
         """Evaluate aborts with RESOURCE_EXHAUSTED when pool is full."""
         mock_pool.engine.return_value.__enter__ = MagicMock(
             side_effect=PoolExhaustedError("timeout")
         )
 
-        request = EvaluateRequest(fen=STARTING_FEN, depth=10)
+        request = EvaluateRequest(fen=starting_fen, depth=10)
         servicer.Evaluate(request, mock_context)
 
         mock_context.abort.assert_called_once()
@@ -147,13 +149,14 @@ class TestStockfishServiceImpl:
         servicer: StockfishServiceImpl,
         mock_pool: MagicMock,
         mock_context: MagicMock,
+        starting_fen: str,
     ) -> None:
         """Evaluate aborts with UNAVAILABLE when pool is shut down."""
         mock_pool.engine.return_value.__enter__ = MagicMock(
             side_effect=PoolShutdownError("shutdown")
         )
 
-        request = EvaluateRequest(fen=STARTING_FEN, depth=10)
+        request = EvaluateRequest(fen=starting_fen, depth=10)
         servicer.Evaluate(request, mock_context)
 
         mock_context.abort.assert_called_once()
@@ -166,13 +169,14 @@ class TestStockfishServiceImpl:
         mock_pool: MagicMock,
         mock_engine: MagicMock,
         mock_context: MagicMock,
+        starting_fen: str,
     ) -> None:
         """Evaluate aborts with DEADLINE_EXCEEDED on timeout."""
         mock_engine.evaluate.side_effect = EngineTimeoutError("timeout")
         mock_pool.engine.return_value.__enter__ = MagicMock(return_value=mock_engine)
         mock_pool.engine.return_value.__exit__ = MagicMock(return_value=False)
 
-        request = EvaluateRequest(fen=STARTING_FEN, depth=10)
+        request = EvaluateRequest(fen=starting_fen, depth=10)
         servicer.Evaluate(request, mock_context)
 
         mock_context.abort.assert_called_once()
@@ -185,13 +189,14 @@ class TestStockfishServiceImpl:
         mock_pool: MagicMock,
         mock_engine: MagicMock,
         mock_context: MagicMock,
+        starting_fen: str,
     ) -> None:
         """Evaluate aborts with INTERNAL on engine error."""
         mock_engine.evaluate.side_effect = EngineError("crash")
         mock_pool.engine.return_value.__enter__ = MagicMock(return_value=mock_engine)
         mock_pool.engine.return_value.__exit__ = MagicMock(return_value=False)
 
-        request = EvaluateRequest(fen=STARTING_FEN, depth=10)
+        request = EvaluateRequest(fen=starting_fen, depth=10)
         servicer.Evaluate(request, mock_context)
 
         mock_context.abort.assert_called_once()
