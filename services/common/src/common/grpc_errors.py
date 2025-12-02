@@ -16,6 +16,7 @@ import grpc
 from .exceptions import (
     EngineError,
     EngineTimeoutError,
+    EngineUnavailableError,
     EvalNotAvailableError,
     InvalidFenError,
     InvalidRatingError,
@@ -23,6 +24,8 @@ from .exceptions import (
     ModelInferenceError,
     ModelLoadError,
     ModelNotLoadedError,
+    PoolExhaustedError,
+    PoolShutdownError,
 )
 
 if TYPE_CHECKING:
@@ -38,7 +41,11 @@ EXCEPTION_STATUS_MAP: list[tuple[type[Exception], grpc.StatusCode, str]] = [
     # Argument errors
     (InvalidFenError, grpc.StatusCode.INVALID_ARGUMENT, "Invalid FEN"),
     (InvalidRatingError, grpc.StatusCode.INVALID_ARGUMENT, "Invalid rating"),
+    # Pool errors
+    (PoolExhaustedError, grpc.StatusCode.RESOURCE_EXHAUSTED, "Pool exhausted"),
+    (PoolShutdownError, grpc.StatusCode.UNAVAILABLE, "Pool shutdown"),
     # Unavailable errors
+    (EngineUnavailableError, grpc.StatusCode.UNAVAILABLE, "Engine unavailable"),
     (ModelNotLoadedError, grpc.StatusCode.UNAVAILABLE, "Model not loaded"),
     (ModelLoadError, grpc.StatusCode.UNAVAILABLE, "Model load failed"),
     # Timeout errors

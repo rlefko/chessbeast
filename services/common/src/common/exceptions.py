@@ -33,6 +33,23 @@ class EvalNotAvailableError(EngineError):
     """Classical eval not available (e.g., SF17+ uses pure NNUE)."""
 
 
+class EngineUnavailableError(EngineError):
+    """Engine is not available (not started or shutting down)."""
+
+
+# =============================================================================
+# Pool Exceptions (moved from stockfish/pool.py)
+# =============================================================================
+
+
+class PoolExhaustedError(EngineError):
+    """No engines available in the pool within timeout."""
+
+
+class PoolShutdownError(EngineError):
+    """Pool is shutting down, cannot acquire engine."""
+
+
 # =============================================================================
 # Common Exceptions
 # =============================================================================

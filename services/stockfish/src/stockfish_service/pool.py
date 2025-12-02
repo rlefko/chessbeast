@@ -15,8 +15,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, TypedDict
 
+from common import PoolExhaustedError, PoolShutdownError
+
 from .config import EngineConfig, PoolConfig
-from .engine import EngineError, StockfishEngine
+from .engine import StockfishEngine
 
 
 class HealthStatus(TypedDict):
@@ -33,13 +35,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-class PoolExhaustedError(EngineError):
-    """No engines available in the pool within timeout."""
-
-
-class PoolShutdownError(EngineError):
-    """Pool is shutting down, cannot acquire engine."""
+# Re-export for backwards compatibility
+__all__ = ["PoolExhaustedError", "PoolShutdownError", "EnginePool"]
 
 
 class EnginePool:

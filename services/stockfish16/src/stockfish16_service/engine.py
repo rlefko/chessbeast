@@ -20,6 +20,9 @@ from typing import TYPE_CHECKING
 
 import chess
 
+# Import exceptions from common package
+from common import EngineError, EngineStartupError, EvalNotAvailableError, InvalidFenError
+
 from .config import Stockfish16Config
 
 if TYPE_CHECKING:
@@ -27,21 +30,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-class EngineError(Exception):
-    """Base exception for engine errors."""
-
-
-class EngineStartupError(EngineError):
-    """Engine failed to start or initialize."""
-
-
-class InvalidFenError(EngineError):
-    """Invalid FEN position provided."""
-
-
-class EvalNotAvailableError(EngineError):
-    """Classical eval not available (likely using SF17+ which is NNUE-only)."""
+# Re-export for backwards compatibility
+__all__ = [
+    "EngineError",
+    "EngineStartupError",
+    "InvalidFenError",
+    "EvalNotAvailableError",
+    "PhaseScore",
+    "SideBreakdown",
+    "ClassicalEvalResult",
+    "Stockfish16Engine",
+]
 
 
 @dataclass

@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import logging
 import os
-import signal
 from concurrent import futures
 from typing import TYPE_CHECKING
 
 import grpc
+from common import GracefulServer, grpc_error_handler
 
 from .config import ModelConfig, ServerConfig
 from .generated import (
@@ -26,14 +26,7 @@ from .generated import (
     PredictResponse,
     add_MaiaServiceServicer_to_server,
 )
-from .model import (
-    InvalidFenError,
-    InvalidRatingError,
-    Maia2Model,
-    MaiaError,
-    ModelInferenceError,
-    ModelNotLoadedError,
-)
+from .model import Maia2Model
 
 if TYPE_CHECKING:
     pass
@@ -53,6 +46,7 @@ class MaiaServiceImpl(MaiaServiceServicer):
         """
         self._model = model
 
+    @grpc_error_handler(default_response=lambda: PredictResponse())
     def PredictMoves(
         self,
         request: PredictRequest,
@@ -69,44 +63,22 @@ class MaiaServiceImpl(MaiaServiceServicer):
         """
         logger.debug(f"PredictMoves request: fen={request.fen}, rating={request.rating_band}")
 
-        try:
-            predictions = self._model.predict(
-                fen=request.fen,
-                elo_self=request.rating_band,
-                top_k=5,
+        predictions = self._model.predict(
+            fen=request.fen,
+            elo_self=request.rating_band,
+            top_k=5,
+        )
+
+        # Convert to proto response
+        response = PredictResponse()
+        for pred in predictions:
+            response.predictions.append(
+                MovePrediction(move=pred.move, probability=pred.probability)
             )
 
-            # Convert to proto response
-            response = PredictResponse()
-            for pred in predictions:
-                response.predictions.append(
-                    MovePrediction(move=pred.move, probability=pred.probability)
-                )
+        return response
 
-            return response
-
-        except InvalidFenError as e:
-            logger.warning(f"Invalid FEN: {e}")
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
-        except InvalidRatingError as e:
-            logger.warning(f"Invalid rating: {e}")
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
-        except ModelNotLoadedError as e:
-            logger.warning(f"Model not loaded: {e}")
-            context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
-        except ModelInferenceError as e:
-            logger.error(f"Inference error: {e}")
-            context.abort(grpc.StatusCode.INTERNAL, str(e))
-        except MaiaError as e:
-            logger.error(f"Maia error: {e}")
-            context.abort(grpc.StatusCode.INTERNAL, str(e))
-        except Exception as e:
-            logger.exception(f"Unexpected error: {e}")
-            context.abort(grpc.StatusCode.INTERNAL, f"Internal error: {e}")
-
-        # This line is never reached due to context.abort, but needed for type checker
-        return PredictResponse()
-
+    @grpc_error_handler(default_response=lambda: EstimateRatingResponse())
     def EstimateRating(
         self,
         request: EstimateRatingRequest,
@@ -123,43 +95,23 @@ class MaiaServiceImpl(MaiaServiceServicer):
         """
         logger.debug(f"EstimateRating request: {len(request.moves)} moves")
 
-        try:
-            # Convert proto moves to tuples
-            moves = [(m.fen, m.played_move) for m in request.moves]
+        # Convert proto moves to tuples
+        moves = [(m.fen, m.played_move) for m in request.moves]
 
-            # Validate we have moves
-            if not moves:
-                context.abort(
-                    grpc.StatusCode.INVALID_ARGUMENT,
-                    "At least one move is required for rating estimation",
-                )
-
-            estimated, low, high = self._model.estimate_rating(moves)
-
-            return EstimateRatingResponse(
-                estimated_rating=estimated,
-                confidence_low=low,
-                confidence_high=high,
+        # Validate we have moves
+        if not moves:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "At least one move is required for rating estimation",
             )
 
-        except InvalidFenError as e:
-            logger.warning(f"Invalid FEN: {e}")
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
-        except ModelNotLoadedError as e:
-            logger.warning(f"Model not loaded: {e}")
-            context.abort(grpc.StatusCode.UNAVAILABLE, str(e))
-        except ModelInferenceError as e:
-            logger.error(f"Inference error: {e}")
-            context.abort(grpc.StatusCode.INTERNAL, str(e))
-        except MaiaError as e:
-            logger.error(f"Maia error: {e}")
-            context.abort(grpc.StatusCode.INTERNAL, str(e))
-        except Exception as e:
-            logger.exception(f"Unexpected error: {e}")
-            context.abort(grpc.StatusCode.INTERNAL, f"Internal error: {e}")
+        estimated, low, high = self._model.estimate_rating(moves)
 
-        # This line is never reached due to context.abort, but needed for type checker
-        return EstimateRatingResponse()
+        return EstimateRatingResponse(
+            estimated_rating=estimated,
+            confidence_low=low,
+            confidence_high=high,
+        )
 
     def HealthCheck(
         self,
@@ -237,33 +189,16 @@ def serve(
     # Load model first
     model.load()
 
-    # Start server
-    server.start()
+    # Use GracefulServer for proper signal handling (fixes shutdown_event bug)
+    graceful = GracefulServer(server, on_shutdown=model.shutdown)
+    graceful.start()
+
     logger.info(f"Maia gRPC server started on port {server_config.port}")
 
-    # Handle shutdown signals
-    shutdown_event = None
-
-    def shutdown_handler(signum: int, frame: object) -> None:
-        nonlocal shutdown_event
-        logger.info(f"Received signal {signum}, shutting down...")
-        if shutdown_event is not None:
-            shutdown_event.set()
-
-    signal.signal(signal.SIGTERM, shutdown_handler)
-    signal.signal(signal.SIGINT, shutdown_handler)
-
-    try:
-        server.wait_for_termination()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        logger.info("Shutting down...")
-        server.stop(grace=5)
-        model.shutdown()
-        logger.info("Shutdown complete")
+    # Wait for shutdown signal
+    graceful.wait()
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("GRPC_PORT", "50052"))
+    port = int(os.environ.get("MAIA_PORT", "50052"))
     serve(ServerConfig(port=port))

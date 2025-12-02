@@ -8,6 +8,7 @@ dependencies = [
     "protobuf>=4.25",
     "chess>=1.10",
     "maia2>=0.1.0",
+    "chessbeast-common",
     # maia2 has undeclared dependencies, adding them explicitly:
     "numpy>=1.26",
     "torch>=2.0",
@@ -19,6 +20,9 @@ dependencies = [
     "pandas>=2.0",
     "einops>=0.7",
 ]
+
+[tool.uv.sources]
+chessbeast-common = { path = "../common" }
 
 [build-system]
 requires = ["hatchling"]

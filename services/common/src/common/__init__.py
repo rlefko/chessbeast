@@ -5,6 +5,7 @@ from .exceptions import (
     EngineError,
     EngineStartupError,
     EngineTimeoutError,
+    EngineUnavailableError,
     EvalNotAvailableError,
     InvalidFenError,
     MaiaError,
@@ -12,6 +13,8 @@ from .exceptions import (
     ModelInferenceError,
     ModelNotLoadedError,
     InvalidRatingError,
+    PoolExhaustedError,
+    PoolShutdownError,
 )
 from .grpc_errors import grpc_error_handler, map_exception_to_grpc_status
 from .server import GracefulServer
@@ -22,6 +25,7 @@ __all__ = [
     "EngineError",
     "EngineStartupError",
     "EngineTimeoutError",
+    "EngineUnavailableError",
     "EvalNotAvailableError",
     "InvalidFenError",
     "MaiaError",
@@ -29,6 +33,8 @@ __all__ = [
     "ModelInferenceError",
     "ModelNotLoadedError",
     "InvalidRatingError",
+    "PoolExhaustedError",
+    "PoolShutdownError",
     # gRPC utilities
     "grpc_error_handler",
     "map_exception_to_grpc_status",
