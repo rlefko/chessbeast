@@ -4,7 +4,7 @@
  * Calculates EXPLORE / BRIEF / SKIP recommendations based on position characteristics.
  */
 
-import type { CandidateMove, ExplorationRecommendation } from './types.js';
+import type { CandidateMove, CardTier, ExplorationRecommendation } from './types.js';
 
 export interface RecommendationInput {
   candidates: CandidateMove[];
@@ -81,4 +81,43 @@ export function calculateRecommendation(input: RecommendationInput): {
 
   // Default = EXPLORE for early positions
   return { action: 'EXPLORE', reason: 'position worth investigating' };
+}
+
+/**
+ * Select appropriate card tier based on exploration context
+ *
+ * Tiers reduce analysis depth for deep variations to improve performance:
+ * - Initial positions get full analysis
+ * - Shallow depths get standard analysis
+ * - Deeper variations get progressively lighter analysis
+ *
+ * @param treeDepth - Depth in the variation tree (0 = root)
+ * @param isInitialPosition - Whether this is the initial position being explored
+ * @param recommendation - Optional recommendation (SKIP triggers minimal tier)
+ * @returns The appropriate card tier for this context
+ */
+export function selectCardTier(
+  treeDepth: number,
+  isInitialPosition: boolean = false,
+  recommendation?: ExplorationRecommendation,
+): CardTier {
+  // Initial position always gets full analysis
+  if (isInitialPosition) {
+    return 'full';
+  }
+
+  // SKIP recommendation = minimal card (just for stopping heuristics)
+  if (recommendation === 'SKIP') {
+    return 'minimal';
+  }
+
+  // Depth-based tier selection
+  if (treeDepth <= 6) {
+    return 'standard';
+  }
+  if (treeDepth <= 12) {
+    return 'shallow';
+  }
+
+  return 'minimal';
 }

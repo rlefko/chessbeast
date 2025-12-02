@@ -5,6 +5,7 @@
 import type { ReferenceGame } from '@chessbeast/database';
 import { ChessPosition } from '@chessbeast/pgn';
 
+import type { EvaluationCache, CachedEvaluation } from '../cache/evaluation-cache.js';
 import { TOOL_NAMES } from './definitions.js';
 import type {
   AgenticServices,
@@ -36,12 +37,14 @@ const DEFAULT_GAME_LIMIT = 3;
  */
 export class ToolExecutor {
   private stats: ToolExecutionStats[] = [];
-  /** FEN-based cache for position evaluations */
-  private evalCache = new Map<string, EvaluatePositionResult>();
+  /** Local fallback cache for position evaluations (used if shared cache not provided) */
+  private localEvalCache = new Map<string, EvaluatePositionResult>();
 
   constructor(
     private readonly services: AgenticServices,
     private readonly defaultRating: number = DEFAULT_RATING,
+    /** Optional shared evaluation cache (preferred over local cache) */
+    private readonly evaluationCache?: EvaluationCache,
   ) {}
 
   /**
@@ -127,17 +130,47 @@ export class ToolExecutor {
     const depth = params.depth ?? DEFAULT_DEPTH;
     const multipv = Math.min(Math.max(params.multipv ?? DEFAULT_MULTIPV, 1), 5);
 
-    // Check cache first (keyed by FEN + depth + multipv)
-    const cacheKey = `${params.fen}:${depth}:${multipv}`;
-    const cached = this.evalCache.get(cacheKey);
-    if (cached) {
-      return cached;
+    // Check shared cache first (depth-aware)
+    if (this.evaluationCache) {
+      const cached = this.evaluationCache.get(params.fen, depth, multipv);
+      if (cached) {
+        return this.transformCachedToResult(cached, params.fen);
+      }
+    } else {
+      // Fall back to local cache (exact match only)
+      const cacheKey = `${params.fen}:${depth}:${multipv}`;
+      const cached = this.localEvalCache.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
     }
 
     const response = await this.services.stockfish.evaluate(params.fen, {
       depth,
       multipv,
     });
+
+    // Store in shared cache (raw data)
+    if (this.evaluationCache) {
+      const cacheEntry: CachedEvaluation = {
+        cp: response.cp,
+        mate: response.mate,
+        depth: response.depth,
+        bestLine: response.bestLine || [],
+        multipv,
+        timestamp: Date.now(),
+      };
+
+      if (response.alternatives && response.alternatives.length > 0) {
+        cacheEntry.alternatives = response.alternatives.map((alt) => ({
+          cp: alt.cp,
+          mate: alt.mate,
+          bestLine: alt.bestLine || [],
+        }));
+      }
+
+      this.evaluationCache.set(params.fen, cacheEntry);
+    }
 
     // Convert UCI PV to SAN notation
     const pvSan =
@@ -179,8 +212,60 @@ export class ToolExecutor {
       );
     }
 
-    // Cache the result
-    this.evalCache.set(cacheKey, result);
+    // Cache in local fallback cache if no shared cache
+    if (!this.evaluationCache) {
+      const cacheKey = `${params.fen}:${depth}:${multipv}`;
+      this.localEvalCache.set(cacheKey, result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Transform cached evaluation to tool result format
+   * Converts UCI moves to SAN notation
+   */
+  private transformCachedToResult(
+    cached: CachedEvaluation,
+    fen: string,
+  ): EvaluatePositionResult {
+    // Convert UCI PV to SAN notation
+    const pvSan =
+      cached.bestLine.length > 0
+        ? ChessPosition.convertPvToSan(cached.bestLine, fen)
+        : [];
+
+    const result: EvaluatePositionResult = {
+      evaluation: cached.cp,
+      isMate: cached.mate !== 0,
+      bestMove: pvSan[0] ?? cached.bestLine[0] ?? '',
+      principalVariation: pvSan,
+      depth: cached.depth,
+    };
+
+    if (cached.mate !== 0) {
+      result.mateIn = cached.mate;
+    }
+
+    // Process alternatives
+    if (cached.alternatives && cached.alternatives.length > 0) {
+      result.alternatives = cached.alternatives.map((alt) => {
+        const altPvSan =
+          alt.bestLine.length > 0 ? ChessPosition.convertPvToSan(alt.bestLine, fen) : [];
+
+        const altResult: NonNullable<EvaluatePositionResult['alternatives']>[number] = {
+          evaluation: alt.cp,
+          isMate: alt.mate !== 0,
+          principalVariation: altPvSan,
+        };
+
+        if (alt.mate !== 0) {
+          altResult.mateIn = alt.mate;
+        }
+
+        return altResult;
+      });
+    }
 
     return result;
   }

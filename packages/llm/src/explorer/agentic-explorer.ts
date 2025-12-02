@@ -14,7 +14,8 @@ import { classifyMoveWithStrategy, type AnnotationResult } from '@chessbeast/cor
 import { ChessPosition, renderBoard, formatBoardForPrompt } from '@chessbeast/pgn';
 import type { MoveInfo } from '@chessbeast/pgn';
 
-import { PositionCardBuilder, formatPositionCard } from '../cards/index.js';
+import { EvaluationCache } from '../cache/evaluation-cache.js';
+import { PositionCardBuilder, formatPositionCard, selectCardTier } from '../cards/index.js';
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { ChatMessage, ToolChoice } from '../client/types.js';
 import type { LLMConfig } from '../config/llm-config.js';
@@ -218,6 +219,8 @@ export class AgenticVariationExplorer {
   private readonly toolExecutor: ToolExecutor;
   private readonly services: AgenticServices;
   private readonly cardBuilder: PositionCardBuilder;
+  /** Shared evaluation cache for reducing redundant Stockfish calls */
+  private readonly evaluationCache: EvaluationCache;
 
   // State tracking for soft move validation
   private lastCandidateMoves: Set<string> = new Set();
@@ -249,9 +252,21 @@ export class AgenticVariationExplorer {
       maxDepth: this.config.maxDepth,
     };
     this.services = services;
-    this.toolExecutor = new ToolExecutor(services, this.config.targetRating);
 
-    // Initialize the Position Card builder
+    // Create shared evaluation cache for reducing redundant Stockfish calls
+    this.evaluationCache = new EvaluationCache({
+      maxSize: 1000,
+      ttlMs: 3600000, // 1 hour
+    });
+
+    // Pass shared cache to both ToolExecutor and PositionCardBuilder
+    this.toolExecutor = new ToolExecutor(
+      services,
+      this.config.targetRating,
+      this.evaluationCache,
+    );
+
+    // Initialize the Position Card builder with shared cache
     this.cardBuilder = new PositionCardBuilder(
       {
         stockfish: services.stockfish,
@@ -259,11 +274,25 @@ export class AgenticVariationExplorer {
         maia: services.maia,
         eco: services.eco,
         lichess: services.lichess,
+        evaluationCache: this.evaluationCache,
       },
       {
         targetRating: this.config.targetRating,
       },
     );
+  }
+
+  /**
+   * Get evaluation cache statistics (useful for debugging/logging)
+   */
+  getEvalCacheStats(): {
+    hits: number;
+    misses: number;
+    hitRate: number;
+    size: number;
+    maxSize: number;
+  } {
+    return this.evaluationCache.getStats();
   }
 
   /**
@@ -328,9 +357,9 @@ export class AgenticVariationExplorer {
       { role: 'user', content: initialContext },
     ];
 
-    // Deliver initial Position Card for the starting position
+    // Deliver initial Position Card for the starting position (always 'full' tier)
     try {
-      const initialCard = await this.cardBuilder.build(startingFen, 0);
+      const initialCard = await this.cardBuilder.build(startingFen, 0, 'full');
       const initialCardText = formatPositionCard(initialCard);
       messages.push({
         role: 'system',
@@ -450,7 +479,9 @@ export class AgenticVariationExplorer {
           try {
             const currentFen = tree.getCurrentNode().fen;
             const treeDepth = tree.getDepthFromRoot();
-            const card = await this.cardBuilder.build(currentFen, treeDepth);
+            // Select tier based on depth (deeper = lighter analysis)
+            const tier = selectCardTier(treeDepth, false);
+            const card = await this.cardBuilder.build(currentFen, treeDepth, tier);
             const cardText = formatPositionCard(card);
 
             messages.push({
