@@ -16,10 +16,9 @@ export * from './analysis/index.js';
 // Re-export annotation types
 export * from './annotation/index.js';
 
-// Re-export service types (excluding MaiaPrediction to avoid conflict with core's MaiaPrediction)
+// Re-export service types (excluding EngineEvaluation/NormalizedEval already from analysis,
+// and MaiaPrediction to avoid conflict with core's MaiaPrediction)
 export type {
-  EngineEvaluation,
-  NormalizedEval,
   OpeningInfo,
   OpeningLookupResult,
   ReferenceGame,
