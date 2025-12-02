@@ -8,7 +8,6 @@ import chess
 import chess.engine
 import pytest
 
-from conftest import MATE_IN_1_FEN, STARTING_FEN
 from stockfish_service.config import EngineConfig
 from stockfish_service.engine import (
     EngineError,
@@ -17,6 +16,8 @@ from stockfish_service.engine import (
     InvalidFenError,
     StockfishEngine,
 )
+
+from .conftest import MATE_IN_1_FEN, STARTING_FEN
 
 
 class TestStockfishEngineInit:

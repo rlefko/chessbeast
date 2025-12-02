@@ -15,7 +15,7 @@ from stockfish16_service.pool import (
     Stockfish16Manager,
 )
 
-from conftest import STARTING_FEN
+from .conftest import STARTING_FEN
 
 
 @pytest.fixture
