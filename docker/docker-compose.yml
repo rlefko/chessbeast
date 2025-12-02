@@ -1,53 +1,182 @@
-version: '3.8'
+# =============================================================================
+# ChessBeast Docker Compose
+# =============================================================================
+# Orchestrates all ChessBeast gRPC services with proper dependency management.
+#
+# Architecture:
+#   - Builder services compile Stockfish binaries (run once, then exit)
+#   - Service containers depend on builders completing successfully
+#   - Binaries are stored in persistent volumes to avoid rebuilding
+#
+# Usage:
+#   docker compose up -d              # Start all services
+#   docker compose up -d stockfish    # Start specific service
+#   docker compose logs -f            # View logs
+#   docker compose down               # Stop all services
+#
+# Force rebuild Stockfish (latest):
+#   FORCE_REBUILD=1 docker compose up stockfish-builder
+#
+# Environment:
+#   Copy .env.example to .env and customize as needed
+# =============================================================================
 
 services:
+  # ===========================================================================
+  # BUILDERS (run once, build binaries, exit)
+  # ===========================================================================
+
+  stockfish-builder:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.stockfish-builder
+    container_name: chessbeast-stockfish-builder
+    volumes:
+      - stockfish-bin:/stockfish-bin
+    environment:
+      - FORCE_REBUILD=${FORCE_REBUILD:-0}
+    # Builder exits after completion
+
+  stockfish16-builder:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.stockfish16-builder
+    container_name: chessbeast-stockfish16-builder
+    volumes:
+      - stockfish16-bin:/stockfish16-bin
+    # Builder exits after completion (one-time for fixed version)
+
+  # ===========================================================================
+  # SERVICES (long-running gRPC servers)
+  # ===========================================================================
+
   stockfish:
     build:
       context: ..
       dockerfile: docker/Dockerfile.stockfish
+    container_name: chessbeast-stockfish
+    depends_on:
+      stockfish-builder:
+        condition: service_completed_successfully
+    volumes:
+      - stockfish-bin:/stockfish-bin:ro
     ports:
-      - "50051:50051"
+      - "${STOCKFISH_PORT:-50051}:50051"
     environment:
-      - STOCKFISH_THREADS=4
-      - STOCKFISH_HASH=256
+      - STOCKFISH_PATH=/stockfish-bin/stockfish
+      - STOCKFISH_THREADS=${STOCKFISH_THREADS:-8}
+      - STOCKFISH_HASH=${STOCKFISH_HASH:-2048}
+      - STOCKFISH_POOL_SIZE=${STOCKFISH_POOL_SIZE:-2}
       - GRPC_PORT=50051
     healthcheck:
       test: ["CMD", "python", "-c", "import grpc; ch = grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)"]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '${STOCKFISH_CPU_LIMIT:-8}'
+          memory: ${STOCKFISH_MEMORY_LIMIT:-4G}
+        reservations:
+          cpus: '${STOCKFISH_CPU_RESERVE:-4}'
+          memory: ${STOCKFISH_MEMORY_RESERVE:-2G}
+    networks:
+      - chessbeast
+
+  stockfish16:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.stockfish16
+    container_name: chessbeast-stockfish16
+    depends_on:
+      stockfish16-builder:
+        condition: service_completed_successfully
+    volumes:
+      - stockfish16-bin:/stockfish16-bin:ro
+    ports:
+      - "${STOCKFISH16_PORT:-50053}:50053"
+    environment:
+      - STOCKFISH16_PATH=/stockfish16-bin/stockfish16
+      - STOCKFISH16_THREADS=${STOCKFISH16_THREADS:-1}
+      - STOCKFISH16_HASH=${STOCKFISH16_HASH:-128}
+      - STOCKFISH16_POOL_SIZE=${STOCKFISH16_POOL_SIZE:-1}
+      - STOCKFISH16_PORT=50053
+    healthcheck:
+      test: ["CMD", "python", "-c", "import grpc; ch = grpc.insecure_channel('localhost:50053'); grpc.channel_ready_future(ch).result(timeout=5)"]
+      interval: 30s
+      timeout: 10s
       retries: 3
       start_period: 10s
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: '4'
-          memory: 2G
+          cpus: '${STOCKFISH16_CPU_LIMIT:-2}'
+          memory: ${STOCKFISH16_MEMORY_LIMIT:-512M}
+        reservations:
+          cpus: '${STOCKFISH16_CPU_RESERVE:-1}'
+          memory: ${STOCKFISH16_MEMORY_RESERVE:-256M}
+    networks:
+      - chessbeast
 
   maia:
     build:
       context: ..
       dockerfile: docker/Dockerfile.maia
-    ports:
-      - "50052:50052"
+    container_name: chessbeast-maia
     volumes:
       - maia-models:/app/models
+    ports:
+      - "${MAIA_PORT:-50052}:50052"
     environment:
       - MAIA_MODELS_PATH=/app/models
+      - MAIA_MODEL_TYPE=${MAIA_MODEL_TYPE:-rapid}
+      - MAIA_DEVICE=${MAIA_DEVICE:-cpu}
       - GRPC_PORT=50052
+      - OMP_NUM_THREADS=${MAIA_OMP_THREADS:-2}
+      - MKL_NUM_THREADS=${MAIA_MKL_THREADS:-2}
+      - TORCH_NUM_THREADS=${MAIA_TORCH_THREADS:-2}
     healthcheck:
-      test: ["CMD", "python", "-c", "import grpc; ch = grpc.insecure_channel('localhost:50052'); grpc.channel_ready_future(ch).result(timeout=5)"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "python", "-c", "import grpc; ch = grpc.insecure_channel('localhost:50052'); grpc.channel_ready_future(ch).result(timeout=10)"]
+      interval: 30s
+      timeout: 15s
       retries: 3
-      start_period: 10s
+      start_period: 60s
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 4G
+          cpus: '${MAIA_CPU_LIMIT:-4}'
+          memory: ${MAIA_MEMORY_LIMIT:-6G}
+        reservations:
+          cpus: '${MAIA_CPU_RESERVE:-2}'
+          memory: ${MAIA_MEMORY_RESERVE:-4G}
+    networks:
+      - chessbeast
 
+# =============================================================================
+# Volumes
+# =============================================================================
 volumes:
+  stockfish-bin:
+    name: chessbeast-stockfish-bin
+    # Persists built Stockfish binary (latest from master)
+
+  stockfish16-bin:
+    name: chessbeast-stockfish16-bin
+    # Persists built SF16 binary (fixed sf_16 tag)
+
   maia-models:
-    driver: local
+    name: chessbeast-maia-models
+    # Persists Maia model files
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  chessbeast:
+    name: chessbeast-network
+    driver: bridge

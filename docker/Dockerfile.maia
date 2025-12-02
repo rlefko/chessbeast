@@ -1,4 +1,30 @@
-# Multi-stage build for Maia gRPC service
+# =============================================================================
+# Maia gRPC Service (Human-likeness Prediction)
+# =============================================================================
+# This image runs the Maia gRPC service for human move prediction and rating
+# estimation. It uses the Maia2 neural network model.
+#
+# Models are stored in a volume at /app/models to persist across container
+# restarts and avoid re-downloading.
+#
+# Ports:
+#   50052 - gRPC service
+#
+# Environment Variables:
+#   MAIA_MODELS_PATH - Path to model directory (default: /app/models)
+#   MAIA_MODEL_TYPE  - Model type: rapid, blitz, bullet (default: rapid)
+#   MAIA_DEVICE      - PyTorch device: cpu, cuda (default: cpu)
+#   GRPC_PORT        - gRPC server port (default: 50052)
+#
+# PyTorch Threading (tune based on available cores):
+#   OMP_NUM_THREADS   - OpenMP threads (default: 2)
+#   MKL_NUM_THREADS   - MKL threads (default: 2)
+#   TORCH_NUM_THREADS - PyTorch threads (default: 2)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build Python dependencies
+# -----------------------------------------------------------------------------
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
@@ -6,18 +32,22 @@ WORKDIR /app
 # Install uv for fast dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Copy dependency files first for caching
+# Copy dependency files first for better caching
 COPY pyproject.toml ./
+COPY services/common/pyproject.toml ./services/common/
 COPY services/maia/pyproject.toml ./services/maia/
 COPY services/protos ./services/protos
 
-# Install dependencies
-RUN uv venv && uv sync --package chessbeast-maia --no-dev
-
-# Copy source code
+# Copy source code (needed for editable installs)
+COPY services/common ./services/common
 COPY services/maia ./services/maia
 
-# Final stage
+# Install dependencies (includes PyTorch CPU)
+RUN uv venv && uv sync --package chessbeast-maia --no-dev
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime
+# -----------------------------------------------------------------------------
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -26,16 +56,29 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 
 # Copy source code
+COPY --from=builder /app/services/common ./services/common
 COPY --from=builder /app/services/maia ./services/maia
 COPY --from=builder /app/services/protos ./services/protos
 
-ENV PATH="/app/.venv/bin:$PATH"
-ENV MAIA_MODELS_PATH="/app/models"
-ENV PYTHONUNBUFFERED=1
-
-# Create models directory
+# Create models directory (will be volume mounted)
 RUN mkdir -p /app/models
 
+# Environment configuration - optimize PyTorch for CPU inference
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    MAIA_MODELS_PATH="/app/models" \
+    MAIA_MODEL_TYPE="rapid" \
+    MAIA_DEVICE="cpu" \
+    GRPC_PORT=50052 \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2 \
+    TORCH_NUM_THREADS=2
+
 EXPOSE 50052
+
+# Health check - verify gRPC service is responding
+# Longer start period for model loading
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
+    CMD python -c "import grpc; ch = grpc.insecure_channel('localhost:50052'); grpc.channel_ready_future(ch).result(timeout=10)"
 
 CMD ["python", "-m", "maia_service.server"]

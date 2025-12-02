@@ -1,4 +1,9 @@
-.PHONY: all setup install build test lint clean run help setup-db download-eco download-lichess-elite build-db download-stockfish
+.PHONY: all setup install build test lint clean run help setup-db download-eco download-lichess-elite build-db download-stockfish \
+	docker-build docker-build-stockfish docker-build-stockfish16 docker-build-maia \
+	docker-up docker-down docker-restart docker-rebuild-stockfish \
+	docker-logs docker-logs-stockfish docker-logs-stockfish16 docker-logs-maia \
+	docker-ps docker-health docker-clean docker-prune \
+	docker-shell-stockfish docker-shell-stockfish16 docker-shell-maia
 
 # Default target
 all: help
@@ -159,17 +164,76 @@ run-maia:  ## Start Maia service only
 # Docker
 # ===========================================
 
-docker-build:  ## Build Docker images
-	docker compose -f docker/docker-compose.yml build
+DOCKER_COMPOSE = docker compose -f docker/docker-compose.yml
 
-docker-up:  ## Start services via docker-compose
-	docker compose -f docker/docker-compose.yml up -d
+# Build targets
+docker-build:  ## Build all Docker images
+	$(DOCKER_COMPOSE) build
 
-docker-down:  ## Stop services
-	docker compose -f docker/docker-compose.yml down
+docker-build-stockfish:  ## Build Stockfish service image only
+	$(DOCKER_COMPOSE) build stockfish-builder stockfish
 
-docker-logs:  ## View service logs
-	docker compose -f docker/docker-compose.yml logs -f
+docker-build-stockfish16:  ## Build Stockfish16 service image only
+	$(DOCKER_COMPOSE) build stockfish16-builder stockfish16
+
+docker-build-maia:  ## Build Maia service image only
+	$(DOCKER_COMPOSE) build maia
+
+# Start/stop targets
+docker-up:  ## Start all services (builds binaries if needed)
+	$(DOCKER_COMPOSE) up -d
+
+docker-down:  ## Stop all services
+	$(DOCKER_COMPOSE) down
+
+docker-restart:  ## Restart all services
+	$(DOCKER_COMPOSE) down
+	$(DOCKER_COMPOSE) up -d
+
+# Force rebuild Stockfish from latest master
+docker-rebuild-stockfish:  ## Force rebuild Stockfish from latest master
+	$(DOCKER_COMPOSE) run --rm -e FORCE_REBUILD=1 stockfish-builder
+	$(DOCKER_COMPOSE) restart stockfish
+
+# Logs
+docker-logs:  ## View all service logs (follow)
+	$(DOCKER_COMPOSE) logs -f
+
+docker-logs-stockfish:  ## View Stockfish service logs
+	$(DOCKER_COMPOSE) logs -f stockfish
+
+docker-logs-stockfish16:  ## View Stockfish16 service logs
+	$(DOCKER_COMPOSE) logs -f stockfish16
+
+docker-logs-maia:  ## View Maia service logs
+	$(DOCKER_COMPOSE) logs -f maia
+
+# Status and health
+docker-ps:  ## Show service status
+	$(DOCKER_COMPOSE) ps
+
+docker-health:  ## Check service health status
+	@echo "=== Service Health ==="
+	@docker inspect chessbeast-stockfish --format='Stockfish: {{.State.Health.Status}}' 2>/dev/null || echo "Stockfish: not running"
+	@docker inspect chessbeast-stockfish16 --format='Stockfish16: {{.State.Health.Status}}' 2>/dev/null || echo "Stockfish16: not running"
+	@docker inspect chessbeast-maia --format='Maia: {{.State.Health.Status}}' 2>/dev/null || echo "Maia: not running"
+
+# Cleanup
+docker-clean:  ## Remove containers, images, and volumes
+	$(DOCKER_COMPOSE) down --rmi local --volumes --remove-orphans
+
+docker-prune:  ## Remove all unused Docker resources (use with caution)
+	docker system prune -af --volumes
+
+# Shell access
+docker-shell-stockfish:  ## Open shell in Stockfish container
+	docker exec -it chessbeast-stockfish /bin/bash
+
+docker-shell-stockfish16:  ## Open shell in Stockfish16 container
+	docker exec -it chessbeast-stockfish16 /bin/bash
+
+docker-shell-maia:  ## Open shell in Maia container
+	docker exec -it chessbeast-maia /bin/bash
 
 # ===========================================
 # Clean
