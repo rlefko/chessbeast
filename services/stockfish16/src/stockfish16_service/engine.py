@@ -102,7 +102,7 @@ class Stockfish16Engine:
     def __init__(self, config: Stockfish16Config | None = None) -> None:
         """Initialize the engine wrapper."""
         self._config = config or Stockfish16Config()
-        self._process: subprocess.Popen | None = None
+        self._process: subprocess.Popen[str] | None = None
         self._version: str | None = None
         self._lock = threading.Lock()
 
