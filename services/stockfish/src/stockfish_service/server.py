@@ -68,9 +68,7 @@ class StockfishServiceImpl(StockfishServiceServicer):
                 time_ms=request.time_limit_ms if request.time_limit_ms > 0 else None,
                 nodes=request.nodes if request.nodes > 0 else None,
                 multipv=request.multipv if request.multipv > 0 else 1,
-                mate_min_time_ms=request.mate_min_time_ms
-                if request.mate_min_time_ms > 0
-                else None,
+                mate_min_time_ms=request.mate_min_time_ms if request.mate_min_time_ms > 0 else None,
             )
 
             # Build response

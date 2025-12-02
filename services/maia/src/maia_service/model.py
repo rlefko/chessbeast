@@ -162,9 +162,7 @@ class Maia2Model:
 
         # Validate rating range
         if elo_self < 1100 or elo_self > 1900:
-            raise InvalidRatingError(
-                f"Rating must be between 1100 and 1900, got {elo_self}"
-            )
+            raise InvalidRatingError(f"Rating must be between 1100 and 1900, got {elo_self}")
 
         try:
             # Get predictions from Maia2
