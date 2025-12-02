@@ -7,6 +7,7 @@ members = [
     "chessbeast-maia",
     "chessbeast-services",
     "chessbeast-stockfish",
+    "chessbeast-stockfish16",
 ]
 
 [[package]]
@@ -188,6 +189,25 @@ dev = [
 name = "chessbeast-stockfish"
 version = "0.1.0"
 source = { editable = "services/stockfish" }
+dependencies = [
+    { name = "chess" },
+    { name = "chessbeast-common" },
+    { name = "grpcio" },
+    { name = "protobuf" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "chess", specifier = ">=1.10" },
+    { name = "chessbeast-common", directory = "services/common" },
+    { name = "grpcio", specifier = ">=1.60" },
+    { name = "protobuf", specifier = ">=4.25" },
+]
+
+[[package]]
+name = "chessbeast-stockfish16"
+version = "0.1.0"
+source = { editable = "services/stockfish16" }
 dependencies = [
     { name = "chess" },
     { name = "chessbeast-common" },
