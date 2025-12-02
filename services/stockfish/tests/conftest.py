@@ -20,6 +20,24 @@ COMPLEX_FEN = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4
 
 
 @pytest.fixture
+def starting_fen() -> str:
+    """Starting position FEN."""
+    return STARTING_FEN
+
+
+@pytest.fixture
+def mate_in_1_fen() -> str:
+    """Mate in 1 position FEN."""
+    return MATE_IN_1_FEN
+
+
+@pytest.fixture
+def complex_fen() -> str:
+    """Complex position FEN."""
+    return COMPLEX_FEN
+
+
+@pytest.fixture
 def stockfish_available() -> bool:
     """Check if Stockfish binary is available."""
     stockfish_path = os.environ.get("STOCKFISH_PATH", "stockfish")

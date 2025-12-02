@@ -15,8 +15,6 @@ from stockfish16_service.pool import (
     Stockfish16Manager,
 )
 
-from .conftest import STARTING_FEN
-
 
 @pytest.fixture
 def mock_engine():
@@ -115,37 +113,37 @@ class TestStockfish16ManagerShutdown:
 class TestStockfish16ManagerGetClassicalEval:
     """Tests for getting classical evaluation."""
 
-    def test_get_eval_success(self, mock_engine: MagicMock) -> None:
+    def test_get_eval_success(self, mock_engine: MagicMock, starting_fen: str) -> None:
         """Can get classical eval from manager."""
         manager = Stockfish16Manager()
         manager.start()
 
-        result = manager.get_classical_eval(STARTING_FEN)
+        result = manager.get_classical_eval(starting_fen)
 
         assert isinstance(result, ClassicalEvalResult)
         assert result.mobility.total.mg == pytest.approx(0.45)
         assert result.final_eval_cp == 48
-        mock_engine.get_classical_eval.assert_called_once_with(STARTING_FEN)
+        mock_engine.get_classical_eval.assert_called_once_with(starting_fen)
 
         manager.shutdown()
 
-    def test_get_eval_not_started(self) -> None:
+    def test_get_eval_not_started(self, starting_fen: str) -> None:
         """Cannot get eval from unstarted manager."""
         manager = Stockfish16Manager()
 
         with pytest.raises(EngineUnavailableError, match="not started"):
-            manager.get_classical_eval(STARTING_FEN)
+            manager.get_classical_eval(starting_fen)
 
-    def test_get_eval_after_shutdown(self, mock_engine: MagicMock) -> None:
+    def test_get_eval_after_shutdown(self, mock_engine: MagicMock, starting_fen: str) -> None:
         """Cannot get eval after shutdown."""
         manager = Stockfish16Manager()
         manager.start()
         manager.shutdown()
 
         with pytest.raises(EngineUnavailableError, match="shutting down"):
-            manager.get_classical_eval(STARTING_FEN)
+            manager.get_classical_eval(starting_fen)
 
-    def test_get_eval_restarts_dead_engine(self, mock_engine: MagicMock) -> None:
+    def test_get_eval_restarts_dead_engine(self, mock_engine: MagicMock, starting_fen: str) -> None:
         """Manager restarts engine if it dies."""
         manager = Stockfish16Manager()
         manager.start()
@@ -154,7 +152,7 @@ class TestStockfish16ManagerGetClassicalEval:
         mock_engine.is_alive.return_value = False
 
         # Should restart and return result
-        result = manager.get_classical_eval(STARTING_FEN)
+        result = manager.get_classical_eval(starting_fen)
 
         assert result is not None
         # Engine should have been restarted (stop + new engine start)
@@ -204,7 +202,7 @@ class TestStockfish16ManagerHealthCheck:
 class TestStockfish16ManagerConcurrency:
     """Tests for thread-safe access."""
 
-    def test_concurrent_eval_requests(self, mock_engine: MagicMock) -> None:
+    def test_concurrent_eval_requests(self, mock_engine: MagicMock, starting_fen: str) -> None:
         """Multiple threads can safely request evals."""
         manager = Stockfish16Manager()
         manager.start()
@@ -215,7 +213,7 @@ class TestStockfish16ManagerConcurrency:
         def worker(worker_id: int) -> None:
             try:
                 for _ in range(5):
-                    result = manager.get_classical_eval(STARTING_FEN)
+                    result = manager.get_classical_eval(starting_fen)
                     results.append((worker_id, result.final_eval_cp))
             except Exception as e:
                 errors.append(e)

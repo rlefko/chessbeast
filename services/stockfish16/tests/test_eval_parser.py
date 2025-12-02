@@ -8,15 +8,13 @@ import pytest
 from stockfish16_service.engine import ClassicalEvalResult, PhaseScore
 from stockfish16_service.eval_parser import format_classical_eval, parse_eval_output
 
-from conftest import SAMPLE_EVAL_OUTPUT
-
 
 class TestParseEvalOutput:
     """Tests for parse_eval_output function."""
 
-    def test_parse_complete_output(self) -> None:
+    def test_parse_complete_output(self, sample_eval_lines: list[str]) -> None:
         """Parser correctly extracts all components from sample output."""
-        result = parse_eval_output(SAMPLE_EVAL_OUTPUT)
+        result = parse_eval_output(sample_eval_lines)
 
         # Check material
         assert result.material.white.mg == pytest.approx(4.12)
@@ -26,34 +24,34 @@ class TestParseEvalOutput:
         assert result.material.total.mg == pytest.approx(0.0)
         assert result.material.total.eg == pytest.approx(0.0)
 
-    def test_parse_mobility(self) -> None:
+    def test_parse_mobility(self, sample_eval_lines: list[str]) -> None:
         """Parser correctly extracts mobility component."""
-        result = parse_eval_output(SAMPLE_EVAL_OUTPUT)
+        result = parse_eval_output(sample_eval_lines)
 
         assert result.mobility.white.mg == pytest.approx(0.45)
         assert result.mobility.white.eg == pytest.approx(0.31)
         assert result.mobility.total.mg == pytest.approx(0.45)
         assert result.mobility.total.eg == pytest.approx(0.31)
 
-    def test_parse_king_safety(self) -> None:
+    def test_parse_king_safety(self, sample_eval_lines: list[str]) -> None:
         """Parser correctly extracts king safety component."""
-        result = parse_eval_output(SAMPLE_EVAL_OUTPUT)
+        result = parse_eval_output(sample_eval_lines)
 
         assert result.king_safety.white.mg == pytest.approx(0.18)
         assert result.king_safety.white.eg == pytest.approx(-0.04)
         assert result.king_safety.total.mg == pytest.approx(0.18)
         assert result.king_safety.total.eg == pytest.approx(-0.04)
 
-    def test_parse_total(self) -> None:
+    def test_parse_total(self, sample_eval_lines: list[str]) -> None:
         """Parser correctly extracts total evaluation."""
-        result = parse_eval_output(SAMPLE_EVAL_OUTPUT)
+        result = parse_eval_output(sample_eval_lines)
 
         assert result.total.total.mg == pytest.approx(0.56)
         assert result.total.total.eg == pytest.approx(0.41)
 
-    def test_parse_final_eval_cp(self) -> None:
+    def test_parse_final_eval_cp(self, sample_eval_lines: list[str]) -> None:
         """Parser calculates final eval in centipawns."""
-        result = parse_eval_output(SAMPLE_EVAL_OUTPUT)
+        result = parse_eval_output(sample_eval_lines)
 
         # Average of 0.56 and 0.41 is 0.485, times 100 = 48.5, rounded to 48
         assert result.final_eval_cp == pytest.approx(48, abs=2)

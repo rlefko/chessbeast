@@ -67,4 +67,4 @@ known-first-party = ["stockfish_service", "maia_service", "conftest"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["services"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --import-mode=importlib"

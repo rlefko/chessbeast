@@ -15,8 +15,6 @@ from stockfish_service import (
     StockfishEngine,
 )
 
-from .conftest import COMPLEX_FEN, MATE_IN_1_FEN, STARTING_FEN
-
 
 @pytest.mark.integration
 class TestStockfishEngineIntegration:
@@ -32,9 +30,9 @@ class TestStockfishEngineIntegration:
         yield engine
         engine.stop()
 
-    def test_evaluate_starting_position(self, engine: StockfishEngine) -> None:
+    def test_evaluate_starting_position(self, engine: StockfishEngine, starting_fen: str) -> None:
         """Starting position evaluates to roughly equal."""
-        result = engine.evaluate(STARTING_FEN, depth=10)
+        result = engine.evaluate(starting_fen, depth=10)
 
         assert isinstance(result, EvaluationResult)
         assert -50 <= result.cp <= 50  # Roughly equal
@@ -42,35 +40,35 @@ class TestStockfishEngineIntegration:
         assert result.depth >= 10
         assert len(result.best_line) > 0
 
-    def test_evaluate_mate_position(self, engine: StockfishEngine) -> None:
+    def test_evaluate_mate_position(self, engine: StockfishEngine, mate_in_1_fen: str) -> None:
         """Mate position is correctly detected."""
-        result = engine.evaluate(MATE_IN_1_FEN, depth=10)
+        result = engine.evaluate(mate_in_1_fen, depth=10)
 
         assert result.mate == 1
         assert result.best_line[0] == "e1e8"  # Re1-e8#
 
-    def test_evaluate_complex_position(self, engine: StockfishEngine) -> None:
+    def test_evaluate_complex_position(self, engine: StockfishEngine, complex_fen: str) -> None:
         """Complex position returns valid evaluation."""
-        result = engine.evaluate(COMPLEX_FEN, depth=12)
+        result = engine.evaluate(complex_fen, depth=12)
 
         assert isinstance(result.cp, int)
         assert result.depth >= 12
         assert len(result.best_line) > 0
 
-    def test_evaluate_with_time_limit(self, engine: StockfishEngine) -> None:
+    def test_evaluate_with_time_limit(self, engine: StockfishEngine, starting_fen: str) -> None:
         """Time-limited search completes within timeout."""
         import time
 
         start = time.time()
-        result = engine.evaluate(STARTING_FEN, time_ms=100)
+        result = engine.evaluate(starting_fen, time_ms=100)
         elapsed = time.time() - start
 
         assert elapsed < 1.0  # Should finish well under 1 second
         assert result.depth > 0
 
-    def test_evaluate_multipv(self, engine: StockfishEngine) -> None:
+    def test_evaluate_multipv(self, engine: StockfishEngine, starting_fen: str) -> None:
         """MultiPV returns multiple variations."""
-        result = engine.evaluate(STARTING_FEN, depth=10, multipv=3)
+        result = engine.evaluate(starting_fen, depth=10, multipv=3)
 
         assert len(result.alternatives) == 2  # 3 total - 1 primary
         # All should have best lines
@@ -109,7 +107,9 @@ class TestEnginePoolIntegration:
         assert health["available"] == 2
         assert "Stockfish" in health["version"] or "stockfish" in health["version"].lower()
 
-    def test_concurrent_evaluations(self, pool: EnginePool) -> None:
+    def test_concurrent_evaluations(
+        self, pool: EnginePool, starting_fen: str, complex_fen: str
+    ) -> None:
         """Pool handles concurrent requests."""
         import concurrent.futures
 
@@ -124,7 +124,7 @@ class TestEnginePoolIntegration:
             except Exception as e:
                 errors.append(e)
 
-        positions = [STARTING_FEN, COMPLEX_FEN, STARTING_FEN, COMPLEX_FEN]
+        positions = [starting_fen, complex_fen, starting_fen, complex_fen]
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(evaluate, fen) for fen in positions]
@@ -133,11 +133,11 @@ class TestEnginePoolIntegration:
         assert len(errors) == 0, f"Errors: {errors}"
         assert len(results) == 4
 
-    def test_acquire_release_cycle(self, pool: EnginePool) -> None:
+    def test_acquire_release_cycle(self, pool: EnginePool, starting_fen: str) -> None:
         """Engines can be acquired and released multiple times."""
         for _ in range(5):
             with pool.engine() as eng:
-                result = eng.evaluate(STARTING_FEN, depth=5)
+                result = eng.evaluate(starting_fen, depth=5)
                 assert result.depth >= 5
 
         health = pool.health_check()
