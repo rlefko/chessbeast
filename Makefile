@@ -1,4 +1,5 @@
 .PHONY: all setup install build test lint clean run help setup-db download-eco download-lichess-elite build-db download-stockfish \
+	run-local-stockfish run-local-stockfish16 run-local-maia \
 	docker-build docker-build-stockfish docker-build-stockfish16 docker-build-maia \
 	docker-up docker-down docker-restart docker-rebuild-stockfish \
 	docker-logs docker-logs-stockfish docker-logs-stockfish16 docker-logs-maia \
@@ -12,10 +13,17 @@ all: help
 # Setup & Installation
 # ===========================================
 
-setup: install build-protos install-hooks setup-db download-stockfish  ## Full setup (install deps, build protos, setup DB, Stockfish)
+setup: install build-protos install-hooks setup-db docker-up  ## Full setup (install deps, build protos, setup DB, start services)
 	@echo "Setup complete!"
+	@echo ""
+	@echo "Services running:"
+	@echo "  Stockfish:   localhost:50051"
+	@echo "  Stockfish16: localhost:50053"
+	@echo "  Maia:        localhost:50052"
+	@echo ""
+	@echo "Run 'make docker-health' to check service status"
 
-download-stockfish:  ## Download Stockfish binary for current platform
+download-stockfish:  ## Download Stockfish binary for local development (optional)
 	bash scripts/download-stockfish.sh
 
 install: install-ts install-py  ## Install all dependencies (npm + uv)
@@ -146,18 +154,19 @@ typecheck-py:
 	uv run mypy services/
 
 # ===========================================
-# Services
+# Services (Docker is the standard way to run services)
 # ===========================================
 
-run: run-stockfish run-stockfish16 run-maia  ## Start all services
+run: docker-up  ## Start all services (via Docker)
 
-run-stockfish:  ## Start Stockfish service only
+# Local service commands (for development/debugging only - prefer Docker)
+run-local-stockfish:  ## [Dev] Start Stockfish service locally (requires local binary)
 	uv run python -m stockfish_service.server
 
-run-stockfish16:  ## Start Stockfish 16 service only (classical eval)
+run-local-stockfish16:  ## [Dev] Start Stockfish 16 service locally
 	uv run python -m stockfish16_service.server
 
-run-maia:  ## Start Maia service only
+run-local-maia:  ## [Dev] Start Maia service locally
 	uv run python -m maia_service.server
 
 # ===========================================
