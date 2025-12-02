@@ -37,57 +37,59 @@ def server_config():
 
 @pytest.fixture
 def mock_maia2_module(monkeypatch):
-    """Mock the maia2 module for unit testing."""
-    # Create mock modules
-    mock_model_module = MagicMock()
-    mock_inference_module = MagicMock()
+    """Mock the maia2 module for unit testing.
 
-    # Mock from_pretrained
-    mock_model = MagicMock()
-    mock_model_module.from_pretrained.return_value = mock_model
-
-    # Mock prepare
-    mock_prepared = MagicMock()
-    mock_inference_module.prepare.return_value = mock_prepared
-
-    # Mock inference_each - return realistic move probabilities
-    def mock_inference_each(model, prepared, fen, elo_self, elo_opponent):
-        # Return a dict of move -> probability
-        move_probs = {
-            "e2e4": 0.35,
-            "d2d4": 0.30,
-            "g1f3": 0.15,
-            "c2c4": 0.10,
-            "e2e3": 0.05,
-            "b1c3": 0.03,
-            "g2g3": 0.02,
-        }
-        win_prob = 0.5
-        return move_probs, win_prob
-
-    mock_inference_module.inference_each = mock_inference_each
-
-    # Create mock maia2 module
-    mock_maia2 = MagicMock()
-    mock_maia2.model = mock_model_module
-    mock_maia2.inference = mock_inference_module
-
-    # Patch sys.modules
+    Mocks the new Maia2 unified API:
+        from maia2 import Maia2
+        model = Maia2()
+        model.load()
+        result = model.predict(fen=fen, elo_self=elo)
+    """
     import sys
 
+    import chess
+
+    class MockMaia2:
+        """Mock Maia2 class matching the real API."""
+
+        def __init__(self):
+            self._loaded = False
+
+        def load(self):
+            """Mock model loading."""
+            self._loaded = True
+
+        def predict(self, fen: str, elo_self: int) -> dict[str, float]:
+            """Return realistic move probabilities.
+
+            Returns empty dict for positions with no legal moves (checkmate/stalemate).
+            """
+            board = chess.Board(fen)
+            if not list(board.legal_moves):
+                return {}
+
+            return {
+                "e2e4": 0.35,
+                "d2d4": 0.30,
+                "g1f3": 0.15,
+                "c2c4": 0.10,
+                "e2e3": 0.05,
+                "b1c3": 0.03,
+                "g2g3": 0.02,
+            }
+
+    # Create mock maia2 module with Maia2 class
+    mock_maia2 = MagicMock()
+    mock_maia2.Maia2 = MockMaia2
+
+    # Patch sys.modules
     sys.modules["maia2"] = mock_maia2
-    sys.modules["maia2.model"] = mock_model_module
-    sys.modules["maia2.inference"] = mock_inference_module
 
     yield mock_maia2
 
     # Cleanup
     if "maia2" in sys.modules:
         del sys.modules["maia2"]
-    if "maia2.model" in sys.modules:
-        del sys.modules["maia2.model"]
-    if "maia2.inference" in sys.modules:
-        del sys.modules["maia2.inference"]
 
 
 @pytest.fixture

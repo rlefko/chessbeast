@@ -95,6 +95,16 @@ class Maia2Model:
         """Check if the model is loaded."""
         return self._is_loaded
 
+    @property
+    def model_type(self) -> str:
+        """Get the model type from config."""
+        return self._config.model_type
+
+    @property
+    def device(self) -> str:
+        """Get the device from config."""
+        return self._config.device
+
     def load(self) -> None:
         """Load the Maia2 model.
 

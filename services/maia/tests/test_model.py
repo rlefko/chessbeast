@@ -70,7 +70,7 @@ class TestMaia2ModelLoad:
         with pytest.raises(ModelLoadError) as exc_info:
             model.load()
 
-        assert "maia2 package not installed" in str(exc_info.value)
+        assert "maia2" in str(exc_info.value).lower()
 
 
 class TestMaia2ModelPredict:
@@ -98,13 +98,6 @@ class TestMaia2ModelPredict:
         predictions = loaded_mock_model.predict(STARTING_FEN, 1500, top_k=3)
         assert len(predictions) <= 3
 
-    def test_predict_with_opponent_elo(self, loaded_mock_model):
-        """Test prediction with explicit opponent ELO."""
-        predictions = loaded_mock_model.predict(
-            STARTING_FEN, elo_self=1500, elo_opponent=2000, top_k=5
-        )
-        assert len(predictions) > 0
-
     def test_predict_invalid_fen(self, loaded_mock_model):
         """Test prediction with invalid FEN raises error."""
         with pytest.raises(InvalidFenError) as exc_info:
@@ -112,26 +105,19 @@ class TestMaia2ModelPredict:
 
         assert "Invalid FEN" in str(exc_info.value)
 
-    def test_predict_invalid_elo_self_negative(self, loaded_mock_model):
-        """Test prediction with negative ELO raises error."""
+    def test_predict_invalid_elo_self_too_low(self, loaded_mock_model):
+        """Test prediction with ELO below 1100 raises error."""
         with pytest.raises(InvalidRatingError) as exc_info:
-            loaded_mock_model.predict(STARTING_FEN, -100)
+            loaded_mock_model.predict(STARTING_FEN, 1000)
 
-        assert "Invalid ELO" in str(exc_info.value)
+        assert "Rating must be between 1100 and 1900" in str(exc_info.value)
 
     def test_predict_invalid_elo_self_too_high(self, loaded_mock_model):
-        """Test prediction with ELO > 4000 raises error."""
+        """Test prediction with ELO above 1900 raises error."""
         with pytest.raises(InvalidRatingError) as exc_info:
-            loaded_mock_model.predict(STARTING_FEN, 5000)
+            loaded_mock_model.predict(STARTING_FEN, 2000)
 
-        assert "Invalid ELO" in str(exc_info.value)
-
-    def test_predict_invalid_elo_opponent(self, loaded_mock_model):
-        """Test prediction with invalid opponent ELO raises error."""
-        with pytest.raises(InvalidRatingError) as exc_info:
-            loaded_mock_model.predict(STARTING_FEN, 1500, elo_opponent=5000)
-
-        assert "Invalid opponent ELO" in str(exc_info.value)
+        assert "Rating must be between 1100 and 1900" in str(exc_info.value)
 
     def test_predict_checkmate_position(self, loaded_mock_model):
         """Test prediction returns empty list for checkmate position."""
@@ -140,13 +126,13 @@ class TestMaia2ModelPredict:
         assert predictions == []
 
     def test_predict_valid_elo_boundaries(self, loaded_mock_model):
-        """Test prediction with ELO at valid boundaries."""
-        # Test ELO = 0
-        predictions = loaded_mock_model.predict(STARTING_FEN, 0)
+        """Test prediction with ELO at valid boundaries (1100-1900)."""
+        # Test ELO = 1100 (minimum)
+        predictions = loaded_mock_model.predict(STARTING_FEN, 1100)
         assert len(predictions) > 0
 
-        # Test ELO = 4000
-        predictions = loaded_mock_model.predict(STARTING_FEN, 4000)
+        # Test ELO = 1900 (maximum)
+        predictions = loaded_mock_model.predict(STARTING_FEN, 1900)
         assert len(predictions) > 0
 
 
@@ -161,12 +147,11 @@ class TestMaia2ModelEstimateRating:
             mock_model.estimate_rating(moves)
 
     def test_estimate_rating_empty_moves(self, loaded_mock_model):
-        """Test rating estimation with empty moves returns default."""
-        estimated, low, high = loaded_mock_model.estimate_rating([])
+        """Test rating estimation with empty moves raises error."""
+        with pytest.raises(ModelInferenceError) as exc_info:
+            loaded_mock_model.estimate_rating([])
 
-        assert estimated == 1500
-        assert low == 800
-        assert high == 2200
+        assert "at least one move" in str(exc_info.value).lower()
 
     def test_estimate_rating_success(self, loaded_mock_model):
         """Test successful rating estimation."""
@@ -226,19 +211,25 @@ class TestExceptionHierarchy:
     """Tests for exception hierarchy."""
 
     def test_maia_error_is_base(self):
-        """Test MaiaError is the base exception."""
+        """Test MaiaError is the base for Maia-specific exceptions."""
         assert issubclass(ModelLoadError, MaiaError)
         assert issubclass(ModelInferenceError, MaiaError)
-        assert issubclass(InvalidFenError, MaiaError)
         assert issubclass(InvalidRatingError, MaiaError)
         assert issubclass(ModelNotLoadedError, MaiaError)
 
-    def test_can_catch_with_base(self):
-        """Test all exceptions can be caught with MaiaError."""
+    def test_invalid_fen_uses_chessbeast_base(self):
+        """Test InvalidFenError uses ChessBeastError base (shared across services)."""
+        from common import ChessBeastError
+
+        assert issubclass(InvalidFenError, ChessBeastError)
+        # InvalidFenError is NOT a subclass of MaiaError (it's shared)
+        assert not issubclass(InvalidFenError, MaiaError)
+
+    def test_can_catch_maia_exceptions_with_base(self):
+        """Test Maia-specific exceptions can be caught with MaiaError."""
         for exc_class in [
             ModelLoadError,
             ModelInferenceError,
-            InvalidFenError,
             InvalidRatingError,
             ModelNotLoadedError,
         ]:
@@ -246,3 +237,12 @@ class TestExceptionHierarchy:
                 raise exc_class("test")
             except MaiaError:
                 pass  # Should be caught
+
+    def test_can_catch_invalid_fen_with_chessbeast_base(self):
+        """Test InvalidFenError can be caught with ChessBeastError."""
+        from common import ChessBeastError
+
+        try:
+            raise InvalidFenError("test")
+        except ChessBeastError:
+            pass  # Should be caught
