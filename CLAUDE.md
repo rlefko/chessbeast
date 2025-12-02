@@ -13,8 +13,32 @@ ChessBeast is an AI chess annotator that takes PGN input and produces human-frie
 **Hybrid TypeScript + Python monorepo:**
 
 - `packages/` - TypeScript packages (CLI, core logic, PGN handling, gRPC clients)
+  - `@chessbeast/types` - Shared TypeScript types (leaf package, no internal deps)
+  - `@chessbeast/utils` - Shared utilities (validation, formatting)
 - `services/` - Python gRPC services (Stockfish wrapper, Maia model serving)
+  - `services/common/` - Shared Python utilities (exceptions, gRPC helpers, server lifecycle)
 - `data/` - SQLite databases (ECO openings, Lichess Elite games)
+
+**Python Common Package (`services/common/`):**
+
+Provides shared utilities for all Python gRPC services:
+
+- `exceptions.py` - Unified exception hierarchy with `ChessBeastError` base
+- `grpc_errors.py` - `@grpc_error_handler` decorator for exception-to-gRPC-status mapping
+- `server.py` - `GracefulServer` class for proper signal handling
+
+Exception hierarchy:
+```
+ChessBeastError (base)
+├── EngineError (engine-related)
+│   ├── EngineStartupError, EngineTimeoutError
+│   ├── PoolExhaustedError, PoolShutdownError
+│   └── EvalNotAvailableError, EngineUnavailableError
+├── InvalidFenError (shared across services)
+└── MaiaError (Maia-specific)
+    ├── ModelLoadError, ModelInferenceError
+    ├── ModelNotLoadedError, InvalidRatingError
+```
 
 **Data flow:**
 
