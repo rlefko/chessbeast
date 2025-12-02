@@ -25,7 +25,7 @@ class EngineConfig:
 class PoolConfig:
     """Configuration for the engine connection pool."""
 
-    size: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH_POOL_SIZE", "2")))
+    size: int = field(default_factory=lambda: int(os.environ.get("STOCKFISH_POOL_SIZE", "1")))
     acquire_timeout: float = 30.0  # seconds to wait for an available engine
     max_retries: int = 3  # retries for failed engines before giving up
 
