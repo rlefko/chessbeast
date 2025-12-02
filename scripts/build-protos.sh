@@ -65,6 +65,7 @@ $PYTHON_CMD -m grpc_tools.protoc \
     --python_out="$PY_STOCKFISH16_OUT" \
     --pyi_out="$PY_STOCKFISH16_OUT" \
     --grpc_python_out="$PY_STOCKFISH16_OUT" \
+    "$PROTO_DIR/common.proto" \
     "$PROTO_DIR/stockfish16.proto"
 
 # Fix imports to be relative (grpc_tools generates absolute imports)
@@ -96,6 +97,7 @@ EOF
 
 cat > "$PY_STOCKFISH16_OUT/__init__.py" << 'EOF'
 """Generated gRPC stubs for Stockfish 16 service."""
+from .common_pb2 import *
 from .stockfish16_pb2 import *
 from .stockfish16_pb2_grpc import *
 EOF

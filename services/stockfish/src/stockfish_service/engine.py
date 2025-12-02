@@ -7,6 +7,7 @@ depth, time, and node-limited searches, as well as MultiPV analysis.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
@@ -143,16 +144,35 @@ class StockfishEngine:
                 self._version = None
 
     def new_game(self) -> None:
-        """Reset engine state for a new game (clears hash)."""
+        """Reset engine state for a new game (clears hash).
+
+        Raises:
+            EngineError: If the engine is not started, dead, or event loop is corrupted.
+        """
         if self._engine is None:
             raise EngineError("Engine not started")
+
+        # Check if engine is still alive before attempting reset
+        if not self.is_alive():
+            raise EngineError("Engine process is dead")
+
         try:
             # Send ucinewgame to clear hash tables
             self._engine.protocol.send_line("ucinewgame")
+
+            # Small delay to let engine process the command before ping
+            # This prevents race conditions with python-chess's async event loop
+            time.sleep(0.01)
+
             # Wait for engine to be ready
             self._engine.ping()
+        except asyncio.InvalidStateError as e:
+            # Event loop corruption - engine must be restarted
+            logger.error(f"Event loop corrupted during new_game: {e}")
+            raise EngineError("Event loop dead, engine must be restarted") from e
         except Exception as e:
             logger.warning(f"Error resetting for new game: {e}")
+            raise EngineError(f"Failed to reset engine: {e}") from e
 
     def evaluate(
         self,

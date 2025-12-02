@@ -218,13 +218,17 @@ class EnginePool:
         # Reset engine state for next use
         try:
             engine.new_game()
-        except Exception as e:
+        except EngineError as e:
             logger.warning(f"Error resetting engine: {e}")
-            # Try to restart the engine
+            # Engine state is corrupted, must restart
             try:
                 engine = self._restart_engine(engine)
-            except Exception:
-                logger.error("Failed to restart engine, dropping from pool")
+            except Exception as restart_error:
+                logger.error(f"Failed to restart engine: {restart_error}, dropping from pool")
+                # Remove the dead engine from our tracking list
+                with self._lock:
+                    if engine in self._engines:
+                        self._engines.remove(engine)
                 return
 
         self._available.put(engine)
