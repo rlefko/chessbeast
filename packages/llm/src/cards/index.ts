@@ -6,3 +6,5 @@
  */
 
 export * from './types.js';
+export * from './recommendation.js';
+export * from './builder.js';

@@ -14,6 +14,7 @@ import { classifyMoveWithStrategy, type AnnotationResult } from '@chessbeast/cor
 import { ChessPosition, renderBoard, formatBoardForPrompt } from '@chessbeast/pgn';
 import type { MoveInfo } from '@chessbeast/pgn';
 
+import { PositionCardBuilder, formatPositionCard } from '../cards/index.js';
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { ChatMessage, ToolChoice } from '../client/types.js';
 import type { LLMConfig } from '../config/llm-config.js';
@@ -216,6 +217,7 @@ export class AgenticVariationExplorer {
   private readonly stoppingConfig: StoppingConfig;
   private readonly toolExecutor: ToolExecutor;
   private readonly services: AgenticServices;
+  private readonly cardBuilder: PositionCardBuilder;
 
   // State tracking for soft move validation
   private lastCandidateMoves: Set<string> = new Set();
@@ -248,6 +250,20 @@ export class AgenticVariationExplorer {
     };
     this.services = services;
     this.toolExecutor = new ToolExecutor(services, this.config.targetRating);
+
+    // Initialize the Position Card builder
+    this.cardBuilder = new PositionCardBuilder(
+      {
+        stockfish: services.stockfish,
+        sf16: services.sf16,
+        maia: services.maia,
+        eco: services.eco,
+        lichess: services.lichess,
+      },
+      {
+        targetRating: this.config.targetRating,
+      },
+    );
   }
 
   /**
@@ -311,6 +327,29 @@ export class AgenticVariationExplorer {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: initialContext },
     ];
+
+    // Deliver initial Position Card for the starting position
+    try {
+      const initialCard = await this.cardBuilder.build(startingFen, 0);
+      const initialCardText = formatPositionCard(initialCard);
+      messages.push({
+        role: 'system',
+        content: initialCardText,
+      });
+
+      // Initialize candidate tracking for soft move validation
+      this.lastCandidatesFen = startingFen;
+      this.lastCandidateMoves = new Set(initialCard.candidates.map((c) => c.san));
+
+      // Initialize eval tracking
+      if (!initialCard.isTerminal) {
+        currentEval = initialCard.evaluation.cp;
+      }
+    } catch (cardError) {
+      this.config.warnCallback?.(
+        `Failed to build initial Position Card: ${cardError instanceof Error ? cardError.message : 'unknown error'}`,
+      );
+    }
 
     // Agentic exploration loop
     while (!finished && toolCallCount < this.config.maxToolCalls) {
@@ -397,6 +436,45 @@ export class AgenticVariationExplorer {
         });
 
         const toolName = toolCall.function.name;
+
+        // Deliver Position Card after successful navigation actions
+        const isNavigationTool = ['add_move', 'add_alternative', 'go_to', 'go_to_parent'].includes(
+          toolName,
+        );
+        const wasSuccessful =
+          typeof result === 'object' &&
+          result !== null &&
+          (result as Record<string, unknown>).success === true;
+
+        if (isNavigationTool && wasSuccessful) {
+          try {
+            const currentFen = tree.getCurrentNode().fen;
+            const treeDepth = tree.getDepthFromRoot();
+            const card = await this.cardBuilder.build(currentFen, treeDepth);
+            const cardText = formatPositionCard(card);
+
+            messages.push({
+              role: 'system',
+              content: cardText,
+            });
+
+            // Update last candidates for soft move validation
+            this.lastCandidatesFen = currentFen;
+            this.lastCandidateMoves = new Set(card.candidates.map((c) => c.san));
+
+            // Update current eval from card for swing detection
+            if (!card.isTerminal) {
+              previousEval = currentEval;
+              currentEval = card.evaluation.cp;
+            }
+          } catch (cardError) {
+            // Log but don't fail exploration if card building fails
+            this.config.warnCallback?.(
+              `Failed to build Position Card: ${cardError instanceof Error ? cardError.message : 'unknown error'}`,
+            );
+          }
+        }
+
         const phase =
           toolName === 'go_to' || toolName === 'go_to_parent'
             ? 'navigating'
