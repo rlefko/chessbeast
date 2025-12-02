@@ -2,7 +2,6 @@
 name = "chessbeast-common"
 version = "0.1.0"
 description = "Common utilities for ChessBeast Python services"
-readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "grpcio>=1.60.0",
