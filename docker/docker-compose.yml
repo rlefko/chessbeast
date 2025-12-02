@@ -66,7 +66,7 @@ services:
       - STOCKFISH_PATH=/stockfish-bin/stockfish
       - STOCKFISH_THREADS=${STOCKFISH_THREADS:-8}
       - STOCKFISH_HASH=${STOCKFISH_HASH:-2048}
-      - STOCKFISH_POOL_SIZE=${STOCKFISH_POOL_SIZE:-2}
+      - STOCKFISH_POOL_SIZE=${STOCKFISH_POOL_SIZE:-1}
       - GRPC_PORT=50051
     healthcheck:
       test: ["CMD", "python", "-c", "import grpc; ch = grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)"]

@@ -28,18 +28,26 @@ detect_arch() {
 
     case "$machine" in
         x86_64|amd64)
-            # Check for BMI2 support
-            if grep -q bmi2 /proc/cpuinfo 2>/dev/null; then
+            # Detect best available instruction set (most performant first)
+            if grep -q avx512_vnni /proc/cpuinfo 2>/dev/null; then
+                echo "x86-64-avx512"
+            elif grep -q avx512f /proc/cpuinfo 2>/dev/null; then
+                echo "x86-64-avx512"
+            elif grep -q avx2 /proc/cpuinfo 2>/dev/null; then
+                echo "x86-64-avx2"
+            elif grep -q bmi2 /proc/cpuinfo 2>/dev/null; then
                 echo "x86-64-bmi2"
             else
-                echo "x86-64-modern"
+                echo "x86-64-sse41-popcnt"
             fi
             ;;
         aarch64|arm64)
+            # armv8 for ARM64 Linux containers (including Docker on Apple Silicon)
+            # Note: apple-silicon arch is for native macOS builds only
             echo "armv8"
             ;;
         *)
-            echo "x86-64-modern"  # fallback
+            echo "x86-64-sse41-popcnt"
             ;;
     esac
 }

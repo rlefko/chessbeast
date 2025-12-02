@@ -8,6 +8,7 @@ depth, time, and node-limited searches, as well as MultiPV analysis.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from dataclasses import dataclass, field
@@ -136,6 +137,21 @@ class StockfishEngine:
         if self._engine is not None:
             try:
                 self._engine.quit()
+
+                # Wait for process to actually terminate
+                transport = self._engine.protocol.transport
+                if transport:
+                    deadline = time.time() + 2.0
+                    while time.time() < deadline:
+                        if transport.get_returncode() is not None:
+                            break
+                        time.sleep(0.05)
+                    else:
+                        # Process didn't die gracefully, force kill
+                        logger.warning("Engine did not stop gracefully, forcing termination")
+                        with contextlib.suppress(Exception):
+                            transport.kill()
+
                 logger.info("Engine stopped")
             except Exception as e:
                 logger.warning(f"Error stopping engine: {e}")
@@ -169,6 +185,14 @@ class StockfishEngine:
         except asyncio.InvalidStateError as e:
             # Event loop corruption - engine must be restarted
             logger.error(f"Event loop corrupted during new_game: {e}")
+
+            # Force cleanup of corrupted engine
+            if self._engine:
+                with contextlib.suppress(Exception):
+                    self._engine.quit()
+            self._engine = None
+            self._version = None
+
             raise EngineError("Event loop dead, engine must be restarted") from e
         except Exception as e:
             logger.warning(f"Error resetting for new game: {e}")

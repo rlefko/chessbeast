@@ -19,7 +19,7 @@ class TestEnginePoolInit:
     def test_init_with_defaults(self) -> None:
         """Pool can be created with default config."""
         pool = EnginePool()
-        assert pool.size == 2  # Default pool size
+        assert pool.size == 1  # Default pool size
         assert not pool.is_started
         assert not pool.is_shutdown
 
