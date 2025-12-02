@@ -19,8 +19,6 @@ from stockfish16_service.engine import (
     Stockfish16Engine,
 )
 
-from conftest import SAMPLE_EVAL_OUTPUT, STARTING_FEN
-
 
 def create_mock_process(responses: list[str]) -> MagicMock:
     """Create a mock subprocess with predefined responses."""
@@ -201,11 +199,11 @@ class TestStockfish16EngineIsAlive:
 class TestStockfish16EngineGetClassicalEval:
     """Tests for classical evaluation extraction."""
 
-    def test_get_eval_not_started(self) -> None:
+    def test_get_eval_not_started(self, starting_fen: str) -> None:
         """Getting eval fails if engine not started."""
         engine = Stockfish16Engine()
         with pytest.raises(EngineError, match="not started"):
-            engine.get_classical_eval(STARTING_FEN)
+            engine.get_classical_eval(starting_fen)
 
     def test_get_eval_invalid_fen(self) -> None:
         """Getting eval fails with invalid FEN."""
@@ -223,10 +221,10 @@ class TestStockfish16EngineGetClassicalEval:
 
             engine.stop()
 
-    def test_get_eval_success(self) -> None:
+    def test_get_eval_success(self, starting_fen: str, sample_eval_lines: list[str]) -> None:
         """Getting eval returns parsed result."""
         # UCI startup + eval output + empty line to terminate
-        responses = UCI_STARTUP + SAMPLE_EVAL_OUTPUT + [""]
+        responses = UCI_STARTUP + sample_eval_lines + [""]
         mock_proc = create_mock_process(responses)
 
         with (
@@ -236,7 +234,7 @@ class TestStockfish16EngineGetClassicalEval:
             engine = Stockfish16Engine()
             engine.start()
 
-            result = engine.get_classical_eval(STARTING_FEN)
+            result = engine.get_classical_eval(starting_fen)
 
             assert isinstance(result, ClassicalEvalResult)
             assert result.mobility.total.mg == pytest.approx(0.45)
@@ -244,9 +242,11 @@ class TestStockfish16EngineGetClassicalEval:
 
             engine.stop()
 
-    def test_get_eval_sends_correct_commands(self) -> None:
+    def test_get_eval_sends_correct_commands(
+        self, starting_fen: str, sample_eval_lines: list[str]
+    ) -> None:
         """Getting eval sends position and eval commands."""
-        responses = UCI_STARTUP + SAMPLE_EVAL_OUTPUT + [""]
+        responses = UCI_STARTUP + sample_eval_lines + [""]
         mock_proc = create_mock_process(responses)
 
         with (
@@ -255,10 +255,10 @@ class TestStockfish16EngineGetClassicalEval:
         ):
             engine = Stockfish16Engine()
             engine.start()
-            engine.get_classical_eval(STARTING_FEN)
+            engine.get_classical_eval(starting_fen)
 
             calls = [str(c) for c in mock_proc.stdin.write.call_args_list]
-            assert any(f"position fen {STARTING_FEN}" in c for c in calls)
+            assert any(f"position fen {starting_fen}" in c for c in calls)
             assert any("'eval" in c for c in calls)
 
             engine.stop()

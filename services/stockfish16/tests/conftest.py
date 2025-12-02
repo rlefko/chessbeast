@@ -17,6 +17,18 @@ STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 COMPLEX_FEN = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4"
 
 
+@pytest.fixture
+def starting_fen() -> str:
+    """Starting position FEN."""
+    return STARTING_FEN
+
+
+@pytest.fixture
+def complex_fen() -> str:
+    """Complex position FEN."""
+    return COMPLEX_FEN
+
+
 # Sample SF16 eval output for testing the parser
 SAMPLE_EVAL_OUTPUT = """
       Term    |    White    |    Black    |    Total
