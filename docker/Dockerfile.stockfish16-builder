@@ -1,0 +1,38 @@
+# =============================================================================
+# Stockfish 16 Builder - Builds Stockfish 16 from source (sf_16 tag)
+# =============================================================================
+# Stockfish 16 is required for classical evaluation (the 'eval' command was
+# removed in later versions). This builder compiles SF16 from the official tag.
+#
+# Unlike the latest Stockfish builder, this only builds once since SF16 is
+# a fixed version. The binary is cached by architecture only.
+#
+# The built binary is stored in a volume at /stockfish16-bin with the naming
+# convention: stockfish16-{ARCH}
+#
+# Usage:
+#   docker compose run --rm stockfish16-builder
+# =============================================================================
+
+FROM debian:bookworm-slim
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    g++ \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create volume mount point
+RUN mkdir -p /stockfish16-bin
+
+# Copy build script
+COPY docker/scripts/build-stockfish16.sh /usr/local/bin/build-stockfish16.sh
+RUN chmod +x /usr/local/bin/build-stockfish16.sh
+
+# Default environment
+ENV STOCKFISH16_VOLUME=/stockfish16-bin
+
+VOLUME /stockfish16-bin
+
+ENTRYPOINT ["/usr/local/bin/build-stockfish16.sh"]

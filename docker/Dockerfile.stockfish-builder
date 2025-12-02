@@ -1,0 +1,40 @@
+# =============================================================================
+# Stockfish Builder - Builds Stockfish from source (master branch)
+# =============================================================================
+# This builder image compiles Stockfish from the official GitHub repository.
+# It uses SHA-based caching to avoid unnecessary rebuilds.
+#
+# The built binary is stored in a volume at /stockfish-bin with the naming
+# convention: stockfish-{SHORT_SHA}-{ARCH}
+#
+# Environment Variables:
+#   FORCE_REBUILD - Set to "1" to bypass SHA cache and force rebuild
+#
+# Usage:
+#   docker compose run --rm stockfish-builder
+#   docker compose run --rm -e FORCE_REBUILD=1 stockfish-builder  # force
+# =============================================================================
+
+FROM debian:bookworm-slim
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    g++ \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create volume mount point
+RUN mkdir -p /stockfish-bin
+
+# Copy build script
+COPY docker/scripts/build-stockfish.sh /usr/local/bin/build-stockfish.sh
+RUN chmod +x /usr/local/bin/build-stockfish.sh
+
+# Default environment
+ENV STOCKFISH_VOLUME=/stockfish-bin
+ENV FORCE_REBUILD=0
+
+VOLUME /stockfish-bin
+
+ENTRYPOINT ["/usr/local/bin/build-stockfish.sh"]

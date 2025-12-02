@@ -1,4 +1,26 @@
-# Multi-stage build for Stockfish gRPC service
+# =============================================================================
+# Stockfish gRPC Service
+# =============================================================================
+# This image runs the Stockfish gRPC service. It expects the Stockfish binary
+# to be available at /stockfish-bin/stockfish via a volume mount.
+#
+# The binary is built by the stockfish-builder service and should be mounted
+# as a read-only volume.
+#
+# Ports:
+#   50051 - gRPC service
+#
+# Environment Variables:
+#   STOCKFISH_PATH      - Path to Stockfish binary (default: /stockfish-bin/stockfish)
+#   STOCKFISH_THREADS   - Number of threads per engine instance (default: 8)
+#   STOCKFISH_HASH      - Hash table size in MB (default: 2048)
+#   STOCKFISH_POOL_SIZE - Number of engine instances in pool (default: 2)
+#   GRPC_PORT           - gRPC server port (default: 50051)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build Python dependencies
+# -----------------------------------------------------------------------------
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
@@ -6,38 +28,47 @@ WORKDIR /app
 # Install uv for fast dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Copy dependency files first for caching
+# Copy dependency files first for better caching
 COPY pyproject.toml ./
+COPY services/common/pyproject.toml ./services/common/
 COPY services/stockfish/pyproject.toml ./services/stockfish/
 COPY services/protos ./services/protos
+
+# Copy source code (needed for editable installs)
+COPY services/common ./services/common
+COPY services/stockfish ./services/stockfish
 
 # Install dependencies
 RUN uv venv && uv sync --package chessbeast-stockfish --no-dev
 
-# Copy source code
-COPY services/stockfish ./services/stockfish
-
-# Final stage
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime
+# -----------------------------------------------------------------------------
 FROM python:3.12-slim
 
 WORKDIR /app
-
-# Install Stockfish from apt
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends stockfish && \
-    rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
 
 # Copy source code
+COPY --from=builder /app/services/common ./services/common
 COPY --from=builder /app/services/stockfish ./services/stockfish
 COPY --from=builder /app/services/protos ./services/protos
 
-ENV PATH="/app/.venv/bin:$PATH"
-ENV STOCKFISH_PATH="/usr/games/stockfish"
-ENV PYTHONUNBUFFERED=1
+# Environment configuration
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    STOCKFISH_PATH="/stockfish-bin/stockfish" \
+    STOCKFISH_THREADS=8 \
+    STOCKFISH_HASH=2048 \
+    STOCKFISH_POOL_SIZE=2 \
+    GRPC_PORT=50051
 
 EXPOSE 50051
+
+# Health check - verify gRPC service is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import grpc; ch = grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)"
 
 CMD ["python", "-m", "stockfish_service.server"]

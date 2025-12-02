@@ -1,0 +1,75 @@
+# =============================================================================
+# Stockfish 16 gRPC Service (Classical Evaluation)
+# =============================================================================
+# This image runs the Stockfish 16 gRPC service for classical evaluation.
+# SF16 is specifically required because the 'eval' command (classical piece
+# evaluation) was removed in later Stockfish versions.
+#
+# The binary is built by the stockfish16-builder service and should be mounted
+# as a read-only volume at /stockfish16-bin.
+#
+# Ports:
+#   50053 - gRPC service
+#
+# Environment Variables:
+#   STOCKFISH16_PATH      - Path to SF16 binary (default: /stockfish16-bin/stockfish16)
+#   STOCKFISH16_THREADS   - Number of threads (default: 1, eval doesn't need more)
+#   STOCKFISH16_HASH      - Hash table size in MB (default: 128)
+#   STOCKFISH16_POOL_SIZE - Number of engine instances (default: 1)
+#   STOCKFISH16_PORT      - gRPC server port (default: 50053)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build Python dependencies
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+# Install uv for fast dependency resolution
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy dependency files first for better caching
+COPY pyproject.toml ./
+COPY services/common/pyproject.toml ./services/common/
+COPY services/stockfish16/pyproject.toml ./services/stockfish16/
+COPY services/protos ./services/protos
+
+# Copy source code (needed for editable installs)
+COPY services/common ./services/common
+COPY services/stockfish16 ./services/stockfish16
+
+# Install dependencies
+RUN uv venv && uv sync --package chessbeast-stockfish16 --no-dev
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy source code
+COPY --from=builder /app/services/common ./services/common
+COPY --from=builder /app/services/stockfish16 ./services/stockfish16
+COPY --from=builder /app/services/protos ./services/protos
+
+# Environment configuration (lightweight defaults for eval-only service)
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    STOCKFISH16_PATH="/stockfish16-bin/stockfish16" \
+    STOCKFISH16_THREADS=1 \
+    STOCKFISH16_HASH=128 \
+    STOCKFISH16_POOL_SIZE=1 \
+    STOCKFISH16_PORT=50053
+
+EXPOSE 50053
+
+# Health check - verify gRPC service is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import grpc; ch = grpc.insecure_channel('localhost:50053'); grpc.channel_ready_future(ch).result(timeout=5)"
+
+CMD ["python", "-m", "stockfish16_service.server"]
