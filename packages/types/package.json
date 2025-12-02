@@ -1,0 +1,39 @@
+{
+  "name": "@chessbeast/types",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./services": {
+      "import": "./dist/services/index.js",
+      "types": "./dist/services/index.d.ts"
+    },
+    "./analysis": {
+      "import": "./dist/analysis/index.js",
+      "types": "./dist/analysis/index.d.ts"
+    },
+    "./annotation": {
+      "import": "./dist/annotation/index.js",
+      "types": "./dist/annotation/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix"
+  },
+  "dependencies": {
+    "@chessbeast/core": "workspace:*",
+    "@chessbeast/database": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}

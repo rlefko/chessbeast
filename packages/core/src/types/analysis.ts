@@ -1,8 +1,16 @@
 /**
  * Analysis type definitions for ChessBeast
+ *
+ * This module uses Interface Segregation Principle (ISP) - large interfaces
+ * are composed from smaller, focused interfaces. Consumers can depend on
+ * only the interfaces they need.
  */
 
 import type { MoveClassification } from '../index.js';
+
+// ============================================================================
+// Engine Evaluation Types
+// ============================================================================
 
 /**
  * Engine evaluation result
@@ -61,10 +69,14 @@ export interface MaiaPrediction {
   rating: number;
 }
 
+// ============================================================================
+// Move Analysis - Segregated Interfaces (ISP)
+// ============================================================================
+
 /**
- * Analysis result for a single move
+ * Core move identification (SRP: identity only)
  */
-export interface MoveAnalysis {
+export interface MoveIdentity {
   /** Position index in the game (0-based) */
   plyIndex: number;
   /** Move number (1-based, for display) */
@@ -77,6 +89,12 @@ export interface MoveAnalysis {
   fenBefore: string;
   /** FEN after the move */
   fenAfter: string;
+}
+
+/**
+ * Engine evaluation data for a move (SRP: evaluation only)
+ */
+export interface MoveEvaluation {
   /** Evaluation before the move (position eval) */
   evalBefore: EngineEvaluation;
   /** Evaluation after the move (resulting position) */
@@ -85,10 +103,22 @@ export interface MoveAnalysis {
   bestMove: string;
   /** Centipawn loss (0 if best move was played) */
   cpLoss: number;
+}
+
+/**
+ * Move classification data (SRP: classification only)
+ */
+export interface MoveClassificationData {
   /** Classification of the move quality */
   classification: MoveClassification;
-  /** Probability of this move being played by a human (from Maia) */
-  humanProbability?: number;
+  /** Whether this is a critical moment */
+  isCriticalMoment: boolean;
+}
+
+/**
+ * Alternative moves - optional extension for critical moments
+ */
+export interface MoveAlternatives {
   /** Alternative moves considered (for critical moments) */
   alternatives?: AlternativeMove[];
   /** Deep explored variations from VariationExplorer (for critical moments) */
@@ -99,11 +129,37 @@ export interface MoveAnalysis {
     purpose: 'best' | 'human_alternative' | 'refutation' | 'trap' | 'thematic';
     source: 'engine' | 'maia' | 'llm';
   }>;
-  /** Whether this is a critical moment */
-  isCriticalMoment: boolean;
+}
+
+/**
+ * Human prediction data - optional extension
+ */
+export interface MoveHumanPrediction {
+  /** Probability of this move being played by a human (from Maia) */
+  humanProbability?: number;
+}
+
+/**
+ * Annotation data - optional extension
+ */
+export interface MoveAnnotation {
   /** Generated annotation comment (filled in by LLM later) */
   comment?: string;
+  /** Numeric Annotation Glyphs */
+  nags?: string[];
 }
+
+/**
+ * Full MoveAnalysis - composition of all segregated interfaces
+ * Follows Interface Segregation Principle (ISP)
+ */
+export interface MoveAnalysis
+  extends MoveIdentity,
+    MoveEvaluation,
+    MoveClassificationData,
+    MoveAlternatives,
+    MoveHumanPrediction,
+    MoveAnnotation {}
 
 /**
  * Critical moment detection result
@@ -138,32 +194,71 @@ export type CriticalMomentType =
  */
 export type GamePhase = 'opening' | 'middlegame' | 'endgame';
 
+// ============================================================================
+// Game Analysis - Segregated Interfaces (ISP)
+// ============================================================================
+
 /**
- * Full game analysis result
+ * Game metadata extracted from PGN headers
  */
-export interface GameAnalysis {
-  /** Game metadata */
-  metadata: {
-    white: string;
-    black: string;
-    result: string;
-    event?: string;
-    date?: string;
-    eco?: string;
-    openingName?: string;
-    whiteElo?: number;
-    blackElo?: number;
-    estimatedWhiteElo?: number;
-    estimatedBlackElo?: number;
-  };
+export interface GameMetadata {
+  /** White player name */
+  white: string;
+  /** Black player name */
+  black: string;
+  /** Game result ("1-0", "0-1", "1/2-1/2") */
+  result: string;
+  /** Event name */
+  event?: string;
+  /** Date of the game */
+  date?: string;
+  /** ECO code */
+  eco?: string;
+  /** Opening name */
+  openingName?: string;
+  /** White player Elo (from PGN) */
+  whiteElo?: number;
+  /** Black player Elo (from PGN) */
+  blackElo?: number;
+  /** Estimated white Elo (from Maia) */
+  estimatedWhiteElo?: number;
+  /** Estimated black Elo (from Maia) */
+  estimatedBlackElo?: number;
+}
+
+/**
+ * Core game analysis results (moves + critical moments)
+ */
+export interface GameAnalysisResults {
   /** Analysis for each move */
   moves: MoveAnalysis[];
   /** Critical moments identified */
   criticalMoments: CriticalMoment[];
+}
+
+/**
+ * Game statistics
+ */
+export interface GameStatistics {
   /** Summary statistics */
   stats: GameStats;
+}
+
+/**
+ * Game summary - optional LLM-generated content
+ */
+export interface GameSummaryData {
   /** Generated game summary (filled in by LLM later) */
   summary?: string;
+}
+
+/**
+ * Full GameAnalysis - composition of all segregated interfaces
+ * Follows Interface Segregation Principle (ISP)
+ */
+export interface GameAnalysis extends GameAnalysisResults, GameStatistics, GameSummaryData {
+  /** Game metadata */
+  metadata: GameMetadata;
 }
 
 /**
