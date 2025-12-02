@@ -172,7 +172,7 @@ class Maia2Model:
             )
 
             # Convert to MovePrediction list
-            predictions = []
+            predictions: list[MovePrediction] = []
             for move, prob in result.items():
                 if len(predictions) >= top_k:
                     break
