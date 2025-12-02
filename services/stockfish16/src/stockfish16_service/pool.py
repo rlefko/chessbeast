@@ -12,8 +12,10 @@ import logging
 import threading
 from typing import TYPE_CHECKING, TypedDict
 
+from common import EngineUnavailableError
+
 from .config import Stockfish16Config
-from .engine import ClassicalEvalResult, EngineError, Stockfish16Engine
+from .engine import ClassicalEvalResult, Stockfish16Engine
 
 if TYPE_CHECKING:
     pass
@@ -28,8 +30,8 @@ class HealthStatus(TypedDict):
     version: str
 
 
-class EngineUnavailableError(EngineError):
-    """Engine is not available (not started or shutting down)."""
+# Re-export for backwards compatibility
+__all__ = ["EngineUnavailableError", "Stockfish16Manager", "HealthStatus"]
 
 
 class Stockfish16Manager:

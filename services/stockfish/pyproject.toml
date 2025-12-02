@@ -7,7 +7,11 @@ dependencies = [
     "grpcio>=1.60",
     "protobuf>=4.25",
     "chess>=1.10",
+    "chessbeast-common",
 ]
+
+[tool.uv.sources]
+chessbeast-common = { path = "../common" }
 
 [build-system]
 requires = ["hatchling"]

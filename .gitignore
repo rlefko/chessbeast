@@ -83,6 +83,7 @@ coverage/
 data/*.db
 data/eco-source/*
 data/eco.*
+maia2_models/*
 data/lichess-elite.pgn
 data/*.sqlite
 data/*.sqlite3
@@ -185,4 +186,4 @@ bin/
 
 .mcp.json
 .claude-indexer/*
-maia2_models/*
+.index_cache/*

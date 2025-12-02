@@ -95,11 +95,30 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/93/09/7d04d7581ae3bb8b598017941781bceb7959dd1b13e3ebf7b6a2cd843bc9/chess-1.11.2.tar.gz", hash = "sha256:a8b43e5678fdb3000695bdaa573117ad683761e5ca38e591c4826eba6d25bb39", size = 6131385, upload-time = "2025-02-25T19:10:27.328Z" }
 
 [[package]]
+name = "chessbeast-common"
+version = "0.1.0"
+source = { directory = "services/common" }
+dependencies = [
+    { name = "grpcio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "grpcio", specifier = ">=1.60.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "chessbeast-maia"
 version = "0.1.0"
 source = { editable = "services/maia" }
 dependencies = [
     { name = "chess" },
+    { name = "chessbeast-common" },
     { name = "einops" },
     { name = "gdown" },
     { name = "grpcio" },
@@ -117,6 +136,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "chess", specifier = ">=1.10" },
+    { name = "chessbeast-common", directory = "services/common" },
     { name = "einops", specifier = ">=0.7" },
     { name = "gdown", specifier = ">=5.0" },
     { name = "grpcio", specifier = ">=1.60" },
@@ -170,6 +190,7 @@ version = "0.1.0"
 source = { editable = "services/stockfish" }
 dependencies = [
     { name = "chess" },
+    { name = "chessbeast-common" },
     { name = "grpcio" },
     { name = "protobuf" },
 ]
@@ -177,6 +198,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "chess", specifier = ">=1.10" },
+    { name = "chessbeast-common", directory = "services/common" },
     { name = "grpcio", specifier = ">=1.60" },
     { name = "protobuf", specifier = ">=4.25" },
 ]
