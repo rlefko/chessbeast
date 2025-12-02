@@ -310,3 +310,68 @@ export function formatPositionCard(card: PositionCard): string {
 
   return lines.join('\n');
 }
+
+/**
+ * Card tier determines analysis depth and included data
+ *
+ * Tiers allow trading off analysis depth for speed:
+ * - full: Initial position, critical moments (deepest analysis)
+ * - standard: Recently explored moves (moderate analysis)
+ * - shallow: Deep variations (minimal analysis)
+ * - minimal: Very deep positions (eval only, for stopping heuristics)
+ */
+export type CardTier = 'full' | 'standard' | 'shallow' | 'minimal';
+
+/**
+ * Configuration for each card tier
+ */
+export interface CardTierConfig {
+  /** Engine analysis depth */
+  engineDepth: number;
+  /** Number of principal variations to compute */
+  multipv: number;
+  /** Include classical evaluation features (SF16) */
+  includeClassicalFeatures: boolean;
+  /** Include reference games from database */
+  includeReferenceGames: boolean;
+  /** Include Maia predictions */
+  includeMaia: boolean;
+}
+
+/**
+ * Tier configurations optimized for different exploration depths
+ *
+ * Trade-offs:
+ * - Higher tiers compute more data but take longer
+ * - Lower tiers are faster but provide less context to the LLM
+ */
+export const CARD_TIER_CONFIGS: Record<CardTier, CardTierConfig> = {
+  full: {
+    engineDepth: 18,
+    multipv: 4,
+    includeClassicalFeatures: true,
+    includeReferenceGames: true,
+    includeMaia: true,
+  },
+  standard: {
+    engineDepth: 16,
+    multipv: 3,
+    includeClassicalFeatures: true,
+    includeReferenceGames: false,
+    includeMaia: true,
+  },
+  shallow: {
+    engineDepth: 12,
+    multipv: 1,
+    includeClassicalFeatures: false,
+    includeReferenceGames: false,
+    includeMaia: true,
+  },
+  minimal: {
+    engineDepth: 10,
+    multipv: 1,
+    includeClassicalFeatures: false,
+    includeReferenceGames: false,
+    includeMaia: false,
+  },
+};

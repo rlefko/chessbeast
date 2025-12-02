@@ -18,6 +18,7 @@ import type {
 } from '@chessbeast/grpc-client';
 import { ChessPosition } from '@chessbeast/pgn';
 
+import type { EvaluationCache, CachedEvaluation } from '../cache/evaluation-cache.js';
 import {
   classifyCandidates,
   getDefaultConfig,
@@ -33,7 +34,9 @@ import type {
   Motif,
   OpeningInfo,
   ReferenceGame,
+  CardTier,
 } from './types.js';
+import { CARD_TIER_CONFIGS } from './types.js';
 
 /**
  * Services required by the builder
@@ -44,6 +47,8 @@ export interface CardBuilderServices {
   maia?: MaiaClient | undefined;
   eco?: EcoClient | undefined;
   lichess?: LichessEliteClient | undefined;
+  /** Optional shared evaluation cache for reducing Stockfish calls */
+  evaluationCache?: EvaluationCache | undefined;
 }
 
 /**
@@ -76,8 +81,15 @@ export class PositionCardBuilder {
 
   /**
    * Build a Position Card for a FEN position
+   *
+   * @param fen - Position in FEN notation
+   * @param treeDepth - Depth in the variation tree
+   * @param tier - Card tier controlling analysis depth (default: 'full')
    */
-  async build(fen: string, treeDepth: number): Promise<PositionCard> {
+  async build(fen: string, treeDepth: number, tier: CardTier = 'full'): Promise<PositionCard> {
+    // Get tier-specific configuration
+    const tierConfig = CARD_TIER_CONFIGS[tier];
+
     // Check for terminal position
     const pos = new ChessPosition(fen);
     const isCheckmate = pos.isCheckmate();
@@ -88,14 +100,16 @@ export class PositionCardBuilder {
       return this.buildTerminalCard(fen, treeDepth, isCheckmate ? 'checkmate' : 'stalemate');
     }
 
-    // Run analyses in parallel
+    // Run analyses in parallel, conditionally based on tier
     const [engineResult, sf16Result, maiaResult, openingResult, refGamesResult] = await Promise.all(
       [
-        this.getEngineAnalysis(fen),
-        this.getClassicalFeatures(fen),
-        this.getMaiaPredictions(fen),
+        this.getEngineAnalysis(fen, tierConfig.engineDepth, tierConfig.multipv),
+        tierConfig.includeClassicalFeatures
+          ? this.getClassicalFeatures(fen)
+          : Promise.resolve(undefined),
+        tierConfig.includeMaia ? this.getMaiaPredictions(fen) : Promise.resolve(undefined),
         this.getOpeningInfo(),
-        this.getReferenceGames(fen),
+        tierConfig.includeReferenceGames ? this.getReferenceGames(fen) : Promise.resolve(undefined),
       ],
     );
 
@@ -200,8 +214,16 @@ export class PositionCardBuilder {
 
   /**
    * Get engine analysis (evaluation + candidates)
+   *
+   * @param fen - Position in FEN notation
+   * @param depth - Optional depth override (for tiered cards)
+   * @param multipv - Optional multipv override (for tiered cards)
    */
-  private async getEngineAnalysis(fen: string): Promise<{
+  private async getEngineAnalysis(
+    fen: string,
+    depth?: number,
+    multipv?: number,
+  ): Promise<{
     evaluation: number;
     isMate: boolean;
     mateIn?: number;
@@ -209,11 +231,45 @@ export class PositionCardBuilder {
     bestLine: string[];
     candidates: EngineCandidate[];
   }> {
+    const effectiveDepth = depth ?? this.config.engineDepth;
+    const effectiveMultipv = multipv ?? this.config.multipv;
+    const cache = this.services.evaluationCache;
+
+    // Check cache first
+    if (cache) {
+      const cached = cache.get(fen, effectiveDepth, effectiveMultipv);
+      if (cached) {
+        return this.transformCachedEvaluation(cached);
+      }
+    }
+
     try {
       const result = await this.services.stockfish.evaluate(fen, {
-        depth: this.config.engineDepth,
-        multipv: this.config.multipv,
+        depth: effectiveDepth,
+        multipv: effectiveMultipv,
       });
+
+      // Store in cache
+      if (cache) {
+        const cacheEntry: CachedEvaluation = {
+          cp: result.cp,
+          mate: result.mate,
+          depth: result.depth,
+          bestLine: result.bestLine || [],
+          multipv: effectiveMultipv,
+          timestamp: Date.now(),
+        };
+
+        if (result.alternatives && result.alternatives.length > 0) {
+          cacheEntry.alternatives = result.alternatives.map((alt) => ({
+            cp: alt.cp,
+            mate: alt.mate,
+            bestLine: alt.bestLine || [],
+          }));
+        }
+
+        cache.set(fen, cacheEntry);
+      }
 
       const candidates: EngineCandidate[] = [];
 
@@ -279,6 +335,73 @@ export class PositionCardBuilder {
         candidates: [],
       };
     }
+  }
+
+  /**
+   * Transform cached evaluation to engine analysis result
+   */
+  private transformCachedEvaluation(cached: CachedEvaluation): {
+    evaluation: number;
+    isMate: boolean;
+    mateIn?: number;
+    depth: number;
+    bestLine: string[];
+    candidates: EngineCandidate[];
+  } {
+    const candidates: EngineCandidate[] = [];
+
+    // Process main line
+    if (cached.bestLine && cached.bestLine.length > 0) {
+      const mainCandidate: EngineCandidate = {
+        move: cached.bestLine[0]!,
+        evaluation: cached.mate !== 0 ? (cached.mate > 0 ? 10000 : -10000) : cached.cp,
+        isMate: cached.mate !== 0,
+        pv: cached.bestLine,
+      };
+      if (cached.mate !== 0) {
+        mainCandidate.mateIn = Math.abs(cached.mate);
+      }
+      candidates.push(mainCandidate);
+    }
+
+    // Process alternatives
+    if (cached.alternatives && cached.alternatives.length > 0) {
+      for (const alt of cached.alternatives) {
+        if (alt.bestLine && alt.bestLine.length > 0) {
+          const altCandidate: EngineCandidate = {
+            move: alt.bestLine[0]!,
+            evaluation: alt.mate !== 0 ? (alt.mate > 0 ? 10000 : -10000) : alt.cp,
+            isMate: alt.mate !== 0,
+            pv: alt.bestLine,
+          };
+          if (alt.mate !== 0) {
+            altCandidate.mateIn = Math.abs(alt.mate);
+          }
+          candidates.push(altCandidate);
+        }
+      }
+    }
+
+    const result: {
+      evaluation: number;
+      isMate: boolean;
+      mateIn?: number;
+      depth: number;
+      bestLine: string[];
+      candidates: EngineCandidate[];
+    } = {
+      evaluation: cached.mate !== 0 ? (cached.mate > 0 ? 10000 : -10000) : cached.cp,
+      isMate: cached.mate !== 0,
+      depth: cached.depth,
+      bestLine: cached.bestLine || [],
+      candidates,
+    };
+
+    if (cached.mate !== 0) {
+      result.mateIn = Math.abs(cached.mate);
+    }
+
+    return result;
   }
 
   /**
