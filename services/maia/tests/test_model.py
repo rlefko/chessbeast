@@ -27,7 +27,7 @@ class TestMaia2ModelInit:
         """Test initialization with default config."""
         model = Maia2Model()
         assert model.is_loaded is False
-        assert model.model_type == "rapid"
+        assert model.model_type == "blitz"
         assert model.device == "cpu"
 
     def test_init_with_custom_config(self, mock_maia2_module, model_config):

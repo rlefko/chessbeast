@@ -278,7 +278,7 @@ class TestModelConfig:
     def test_default_config(self):
         """Test default ModelConfig values."""
         config = ModelConfig()
-        assert config.model_type == "rapid"
+        assert config.model_type == "blitz"
         assert config.device == "cpu"
 
     def test_custom_config(self):
