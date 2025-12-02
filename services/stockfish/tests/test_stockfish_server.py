@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 import grpc
 import pytest
 
-from conftest import STARTING_FEN
 from stockfish_service.config import EngineConfig, PoolConfig, ServerConfig
 from stockfish_service.engine import (
     EngineError,
@@ -21,6 +20,8 @@ from stockfish_service.generated import (
 )
 from stockfish_service.pool import EnginePool, PoolExhaustedError, PoolShutdownError
 from stockfish_service.server import StockfishServiceImpl, create_server
+
+from .conftest import STARTING_FEN
 
 
 class TestStockfishServiceImpl:

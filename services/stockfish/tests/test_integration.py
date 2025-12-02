@@ -7,7 +7,6 @@ and can be run with: pytest --integration
 
 import pytest
 
-from conftest import COMPLEX_FEN, MATE_IN_1_FEN, STARTING_FEN
 from stockfish_service import (
     EngineConfig,
     EnginePool,
@@ -15,6 +14,8 @@ from stockfish_service import (
     PoolConfig,
     StockfishEngine,
 )
+
+from .conftest import COMPLEX_FEN, MATE_IN_1_FEN, STARTING_FEN
 
 
 @pytest.mark.integration

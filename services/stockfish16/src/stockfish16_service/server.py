@@ -61,7 +61,7 @@ except ImportError:
     class Stockfish16ServiceServicer:  # type: ignore[no-redef]
         pass
 
-    def add_Stockfish16ServiceServicer_to_server(servicer: object, server: object) -> None:  # type: ignore[no-redef]
+    def add_Stockfish16ServiceServicer_to_server(servicer: object, server: object) -> None:  # type: ignore[misc]
         pass
 
 
@@ -275,7 +275,7 @@ def create_server(
 
     # Add service
     servicer = Stockfish16ServiceImpl(manager)
-    add_Stockfish16ServiceServicer_to_server(servicer, server)
+    add_Stockfish16ServiceServicer_to_server(servicer, server)  # type: ignore[no-untyped-call]
 
     server.add_insecure_port(f"[::]:{config.grpc_port}")
 
