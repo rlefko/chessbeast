@@ -132,8 +132,7 @@ export class EvaluationCache {
       // Keep existing if it's deeper or has more lines
       if (
         existing.value.depth > evaluation.depth ||
-        (existing.value.depth === evaluation.depth &&
-          existing.value.multipv >= evaluation.multipv)
+        (existing.value.depth === evaluation.depth && existing.value.multipv >= evaluation.multipv)
       ) {
         return;
       }

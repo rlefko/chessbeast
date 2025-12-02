@@ -18,13 +18,13 @@ import type {
 } from '@chessbeast/grpc-client';
 import { ChessPosition } from '@chessbeast/pgn';
 
+import type { EvaluationCache, CachedEvaluation } from '../cache/evaluation-cache.js';
 import {
   classifyCandidates,
   getDefaultConfig,
   type EngineCandidate,
   type MaiaPrediction,
 } from '../explorer/candidate-classifier.js';
-import type { EvaluationCache, CachedEvaluation } from '../cache/evaluation-cache.js';
 
 import { calculateRecommendation } from './recommendation.js';
 import type {
@@ -104,7 +104,9 @@ export class PositionCardBuilder {
     const [engineResult, sf16Result, maiaResult, openingResult, refGamesResult] = await Promise.all(
       [
         this.getEngineAnalysis(fen, tierConfig.engineDepth, tierConfig.multipv),
-        tierConfig.includeClassicalFeatures ? this.getClassicalFeatures(fen) : Promise.resolve(undefined),
+        tierConfig.includeClassicalFeatures
+          ? this.getClassicalFeatures(fen)
+          : Promise.resolve(undefined),
         tierConfig.includeMaia ? this.getMaiaPredictions(fen) : Promise.resolve(undefined),
         this.getOpeningInfo(),
         tierConfig.includeReferenceGames ? this.getReferenceGames(fen) : Promise.resolve(undefined),

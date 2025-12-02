@@ -260,11 +260,7 @@ export class AgenticVariationExplorer {
     });
 
     // Pass shared cache to both ToolExecutor and PositionCardBuilder
-    this.toolExecutor = new ToolExecutor(
-      services,
-      this.config.targetRating,
-      this.evaluationCache,
-    );
+    this.toolExecutor = new ToolExecutor(services, this.config.targetRating, this.evaluationCache);
 
     // Initialize the Position Card builder with shared cache
     this.cardBuilder = new PositionCardBuilder(

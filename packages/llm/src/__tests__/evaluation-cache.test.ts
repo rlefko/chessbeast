@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+
 import { EvaluationCache, type CachedEvaluation } from '../cache/evaluation-cache.js';
 
 describe('EvaluationCache', () => {

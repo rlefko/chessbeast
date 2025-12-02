@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+
 import { selectCardTier } from '../cards/recommendation.js';
 import { CARD_TIER_CONFIGS, type CardTier } from '../cards/types.js';
 

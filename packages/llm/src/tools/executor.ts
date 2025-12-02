@@ -6,6 +6,7 @@ import type { ReferenceGame } from '@chessbeast/database';
 import { ChessPosition } from '@chessbeast/pgn';
 
 import type { EvaluationCache, CachedEvaluation } from '../cache/evaluation-cache.js';
+
 import { TOOL_NAMES } from './definitions.js';
 import type {
   AgenticServices,
@@ -225,15 +226,10 @@ export class ToolExecutor {
    * Transform cached evaluation to tool result format
    * Converts UCI moves to SAN notation
    */
-  private transformCachedToResult(
-    cached: CachedEvaluation,
-    fen: string,
-  ): EvaluatePositionResult {
+  private transformCachedToResult(cached: CachedEvaluation, fen: string): EvaluatePositionResult {
     // Convert UCI PV to SAN notation
     const pvSan =
-      cached.bestLine.length > 0
-        ? ChessPosition.convertPvToSan(cached.bestLine, fen)
-        : [];
+      cached.bestLine.length > 0 ? ChessPosition.convertPvToSan(cached.bestLine, fen) : [];
 
     const result: EvaluatePositionResult = {
       evaluation: cached.cp,
