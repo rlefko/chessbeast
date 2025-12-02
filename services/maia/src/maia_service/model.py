@@ -117,11 +117,18 @@ class Maia2Model:
 
         try:
             # Import maia2 here to avoid loading torch on import
-            from maia2 import Maia2
+            from maia2.inference import prepare
+            from maia2.model import from_pretrained
 
-            logger.info("Loading Maia2 model...")
-            self._model = Maia2()
-            self._model.load()
+            logger.info(
+                f"Loading Maia2 model (type={self._config.model_type}, device={self._config.device})..."
+            )
+            self._model = from_pretrained(
+                type=self._config.model_type,
+                device=self._config.device,
+                save_root=self._config.model_dir,
+            )
+            self._prepared = prepare()
             self._is_loaded = True
             logger.info("Maia2 model loaded successfully")
 
@@ -175,21 +182,25 @@ class Maia2Model:
             raise InvalidRatingError(f"Rating must be between 1100 and 1900, got {elo_self}")
 
         try:
+            # Import inference function here
+            from maia2.inference import inference_each
+
             # Get predictions from Maia2
-            result = self._model.predict(
-                fen=fen,
-                elo_self=elo_self,
+            # Note: maia2 requires elo_oppo, we use same rating as elo_self
+            move_probs, _win_prob = inference_each(
+                self._model,
+                self._prepared,
+                fen,
+                elo_self,
+                elo_self,  # Use same rating for opponent
             )
 
-            # Convert to MovePrediction list
+            # Convert to MovePrediction list (already sorted by probability)
             predictions: list[MovePrediction] = []
-            for move, prob in result.items():
+            for move, prob in move_probs.items():
                 if len(predictions) >= top_k:
                     break
                 predictions.append(MovePrediction(move=move, probability=float(prob)))
-
-            # Sort by probability (should already be sorted, but ensure)
-            predictions.sort(key=lambda x: x.probability, reverse=True)
 
             return predictions[:top_k]
 
@@ -223,6 +234,8 @@ class Maia2Model:
             raise ModelInferenceError("At least one move is required")
 
         try:
+            from maia2.inference import inference_each
+
             # Use Maia2's log-likelihood based estimation
             # For each rating band, compute log-likelihood of moves
             rating_bands = list(range(1100, 2000, 100))
@@ -238,8 +251,14 @@ class Maia2Model:
                 # Get predictions for each rating
                 for rating in rating_bands:
                     try:
-                        result = self._model.predict(fen=fen, elo_self=rating)
-                        prob = result.get(played_move, 0.001)  # Small epsilon
+                        move_probs, _ = inference_each(
+                            self._model,
+                            self._prepared,
+                            fen,
+                            rating,
+                            rating,
+                        )
+                        prob = move_probs.get(played_move, 0.001)  # Small epsilon
                         log_likelihoods[rating] += math.log(max(prob, 0.001))
                     except Exception:
                         # If prediction fails, skip this rating for this move

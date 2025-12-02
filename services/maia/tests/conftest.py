@@ -39,57 +39,81 @@ def server_config():
 def mock_maia2_module(monkeypatch):
     """Mock the maia2 module for unit testing.
 
-    Mocks the new Maia2 unified API:
-        from maia2 import Maia2
-        model = Maia2()
-        model.load()
-        result = model.predict(fen=fen, elo_self=elo)
+    Mocks the new maia2 API:
+        from maia2.model import from_pretrained
+        from maia2.inference import prepare, inference_each
+        model = from_pretrained(type="blitz", device="cpu", save_root="./models")
+        prepared = prepare()
+        move_probs, win_prob = inference_each(model, prepared, fen, elo_self, elo_oppo)
     """
     import sys
+    from types import ModuleType
 
     import chess
 
-    class MockMaia2:
-        """Mock Maia2 class matching the real API."""
+    class MockModel:
+        """Mock model returned by from_pretrained."""
 
-        def __init__(self):
-            self._loaded = False
+        def parameters(self):
+            """Mock parameters() for device detection."""
+            import torch
 
-        def load(self):
-            """Mock model loading."""
-            self._loaded = True
+            return iter([torch.tensor([1.0])])
 
-        def predict(self, fen: str, elo_self: int) -> dict[str, float]:
-            """Return realistic move probabilities.
+        def eval(self):
+            """Mock eval mode."""
+            pass
 
-            Returns empty dict for positions with no legal moves (checkmate/stalemate).
-            """
-            board = chess.Board(fen)
-            if not list(board.legal_moves):
-                return {}
+    def mock_from_pretrained(type: str, device: str, save_root: str = "./maia2_models"):
+        """Mock from_pretrained function."""
+        return MockModel()
 
-            return {
-                "e2e4": 0.35,
-                "d2d4": 0.30,
-                "g1f3": 0.15,
-                "c2c4": 0.10,
-                "e2e3": 0.05,
-                "b1c3": 0.03,
-                "g2g3": 0.02,
-            }
+    def mock_prepare():
+        """Mock prepare function - returns utilities tuple."""
+        return ({}, {}, {})  # all_moves_dict, elo_dict, all_moves_dict_reversed
 
-    # Create mock maia2 module with Maia2 class
-    mock_maia2 = MagicMock()
-    mock_maia2.Maia2 = MockMaia2
+    def mock_inference_each(
+        model, prepared, fen: str, elo_self: int, elo_oppo: int
+    ) -> tuple[dict[str, float], float]:
+        """Mock inference_each - returns move probabilities and win probability."""
+        board = chess.Board(fen)
+        if not list(board.legal_moves):
+            return {}, 0.5
+
+        move_probs = {
+            "e2e4": 0.35,
+            "d2d4": 0.30,
+            "g1f3": 0.15,
+            "c2c4": 0.10,
+            "e2e3": 0.05,
+            "b1c3": 0.03,
+            "g2g3": 0.02,
+        }
+        return move_probs, 0.5
+
+    # Create mock maia2 package structure
+    mock_maia2 = ModuleType("maia2")
+    mock_maia2_model = ModuleType("maia2.model")
+    mock_maia2_inference = ModuleType("maia2.inference")
+
+    # Set up model module
+    mock_maia2_model.from_pretrained = mock_from_pretrained
+
+    # Set up inference module
+    mock_maia2_inference.prepare = mock_prepare
+    mock_maia2_inference.inference_each = mock_inference_each
 
     # Patch sys.modules
     sys.modules["maia2"] = mock_maia2
+    sys.modules["maia2.model"] = mock_maia2_model
+    sys.modules["maia2.inference"] = mock_maia2_inference
 
     yield mock_maia2
 
     # Cleanup
-    if "maia2" in sys.modules:
-        del sys.modules["maia2"]
+    for mod in ["maia2", "maia2.model", "maia2.inference"]:
+        if mod in sys.modules:
+            del sys.modules[mod]
 
 
 @pytest.fixture
