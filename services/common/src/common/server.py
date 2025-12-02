@@ -1,5 +1,4 @@
-"""
-Server lifecycle utilities for gRPC services.
+"""Server lifecycle utilities for gRPC services.
 
 Provides GracefulServer class with proper signal handling to fix the critical
 bug where shutdown_event was never initialized to threading.Event().
@@ -22,7 +21,8 @@ from __future__ import annotations
 import logging
 import signal
 import threading
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import grpc
@@ -62,6 +62,7 @@ class GracefulServer:
             server: The gRPC server instance.
             grace_period: Seconds to wait for in-flight RPCs during shutdown.
             on_shutdown: Optional callback to run during shutdown (before server.stop).
+
         """
         self._server = server
         self._grace_period = grace_period

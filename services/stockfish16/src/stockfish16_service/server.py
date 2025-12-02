@@ -13,9 +13,11 @@ from concurrent import futures
 from typing import TYPE_CHECKING
 
 import grpc
+
 from common import GracefulServer, grpc_error_handler
 
 from .config import Stockfish16Config
+from .engine import ClassicalEvalResult
 from .pool import Stockfish16Manager
 
 if TYPE_CHECKING:
@@ -85,10 +87,9 @@ def _to_proto_side_breakdown(
     )
 
 
-def _build_classical_eval_response(result: "ClassicalEvalResult") -> ClassicalEvalResponse:
+def _build_classical_eval_response(result: ClassicalEvalResult) -> ClassicalEvalResponse:
     """Build proto response from ClassicalEvalResult."""
-    from .engine import ClassicalEvalResult  # noqa: F811
-    
+
     return ClassicalEvalResponse(
         material=_to_proto_side_breakdown(
             result.material.white.mg, result.material.white.eg,

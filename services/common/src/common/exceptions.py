@@ -1,5 +1,4 @@
-"""
-Unified exception hierarchy for ChessBeast services.
+"""Unified exception hierarchy for ChessBeast services.
 
 Consolidates exceptions from stockfish, maia, and stockfish16 services
 to eliminate duplication and ensure consistent error handling.

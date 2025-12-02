@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING
 import chess
 import chess.engine
 
+from common import EngineError, EngineStartupError, EngineTimeoutError, InvalidFenError
+
 from .config import EngineConfig
 
 if TYPE_CHECKING:
@@ -24,9 +26,6 @@ logger = logging.getLogger(__name__)
 
 # Threshold for "winning" position (10 pawns = 1000 centipawns)
 WINNING_THRESHOLD_CP = 1000
-
-# Import exceptions from common package
-from common import EngineError, EngineStartupError, EngineTimeoutError, InvalidFenError
 
 # Re-export for backwards compatibility
 __all__ = ["EngineError", "EngineStartupError", "EngineTimeoutError", "InvalidFenError"]

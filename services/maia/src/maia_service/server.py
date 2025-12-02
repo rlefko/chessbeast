@@ -12,6 +12,7 @@ from concurrent import futures
 from typing import TYPE_CHECKING
 
 import grpc
+
 from common import GracefulServer, grpc_error_handler
 
 from .config import ModelConfig, ServerConfig

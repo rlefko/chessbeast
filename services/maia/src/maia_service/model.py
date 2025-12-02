@@ -156,7 +156,7 @@ class Maia2Model:
 
         # Validate FEN
         try:
-            board = chess.Board(fen)
+            chess.Board(fen)
         except ValueError as e:
             raise InvalidFenError(f"Invalid FEN: {fen}") from e
 
@@ -218,7 +218,7 @@ class Maia2Model:
             # Use Maia2's log-likelihood based estimation
             # For each rating band, compute log-likelihood of moves
             rating_bands = list(range(1100, 2000, 100))
-            log_likelihoods = {r: 0.0 for r in rating_bands}
+            log_likelihoods = dict.fromkeys(rating_bands, 0.0)
 
             for fen, played_move in moves:
                 # Validate FEN

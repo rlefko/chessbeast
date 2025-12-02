@@ -1,5 +1,4 @@
-"""
-gRPC error handling utilities.
+"""gRPC error handling utilities.
 
 Provides a decorator and mapping functions to convert Python exceptions
 to appropriate gRPC status codes, eliminating duplicated try/except blocks.
@@ -9,7 +8,8 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import grpc
 
@@ -69,6 +69,7 @@ def map_exception_to_grpc_status(
 
     Returns:
         Tuple of (status_code, log_prefix).
+
     """
     for exc_type, status, prefix in EXCEPTION_STATUS_MAP:
         if isinstance(exc, exc_type):
@@ -79,7 +80,7 @@ def map_exception_to_grpc_status(
 def grpc_error_handler(
     default_response: Callable[[], Any] | None = None,
 ) -> Callable[[F], F]:
-    """Decorator to handle exceptions in gRPC service methods.
+    """Handle exceptions in gRPC service methods.
 
     Catches ChessBeast exceptions and maps them to appropriate gRPC status codes,
     logging the error and aborting the context.
@@ -96,6 +97,7 @@ def grpc_error_handler(
         def Evaluate(self, request, context):
             # ... implementation that may raise exceptions ...
             return response
+
     """
 
     def decorator(func: F) -> F:
