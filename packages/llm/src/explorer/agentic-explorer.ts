@@ -14,16 +14,14 @@ import { classifyMoveWithStrategy, type AnnotationResult } from '@chessbeast/cor
 import { ChessPosition, renderBoard, formatBoardForPrompt } from '@chessbeast/pgn';
 import type { MoveInfo } from '@chessbeast/pgn';
 
-import { ResponseCache } from '../cache/response-cache.js';
+import { PositionCardBuilder, formatPositionCard } from '../cards/index.js';
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { ChatMessage, ToolChoice } from '../client/types.js';
 import type { LLMConfig } from '../config/llm-config.js';
 import { ToolExecutor } from '../tools/executor.js';
-import type { AgenticServices, ToolCall, EvaluatePositionResult } from '../tools/types.js';
+import type { AgenticServices, ToolCall } from '../tools/types.js';
 
 import {
-  classifyCandidates,
-  getDefaultConfig,
   detectAlternativeCandidates,
   getAlternativeCandidateConfig,
   type EngineCandidate,
@@ -191,12 +189,6 @@ export interface AgenticExplorerResult {
   summary?: string;
   /** Positions marked for sub-exploration */
   markedSubPositions?: MarkedSubPosition[];
-  /** Cache statistics */
-  cacheStats?: {
-    hits: number;
-    misses: number;
-    hitRate: number;
-  };
 }
 
 /**
@@ -215,16 +207,7 @@ const DEFAULT_CONFIG: Required<AgenticExplorerConfig> = {
   warnCallback: () => {},
 };
 
-/**
- * Cache key for engine evaluations
- */
-function getEvalCacheKey(fen: string, depth: number): string {
-  const fenParts = fen.split(' ');
-  const normalizedFen = fenParts.slice(0, 4).join(' ');
-  return `eval:${normalizedFen}:d${depth}`;
-}
-
-const MIN_CACHE_DEPTH = 14;
+// Note: Engine eval caching has been removed. Position Cards handle caching.
 
 /**
  * Agentic Variation Explorer (Tree-Based)
@@ -234,9 +217,7 @@ export class AgenticVariationExplorer {
   private readonly stoppingConfig: StoppingConfig;
   private readonly toolExecutor: ToolExecutor;
   private readonly services: AgenticServices;
-  private readonly evalCache: ResponseCache<EvaluatePositionResult>;
-  private cacheHits = 0;
-  private cacheMisses = 0;
+  private readonly cardBuilder: PositionCardBuilder;
 
   // State tracking for soft move validation
   private lastCandidateMoves: Set<string> = new Set();
@@ -269,10 +250,20 @@ export class AgenticVariationExplorer {
     };
     this.services = services;
     this.toolExecutor = new ToolExecutor(services, this.config.targetRating);
-    this.evalCache = new ResponseCache({
-      maxSize: 500,
-      ttlMs: 60 * 60 * 1000,
-    });
+
+    // Initialize the Position Card builder
+    this.cardBuilder = new PositionCardBuilder(
+      {
+        stockfish: services.stockfish,
+        sf16: services.sf16,
+        maia: services.maia,
+        eco: services.eco,
+        lichess: services.lichess,
+      },
+      {
+        targetRating: this.config.targetRating,
+      },
+    );
   }
 
   /**
@@ -336,6 +327,29 @@ export class AgenticVariationExplorer {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: initialContext },
     ];
+
+    // Deliver initial Position Card for the starting position
+    try {
+      const initialCard = await this.cardBuilder.build(startingFen, 0);
+      const initialCardText = formatPositionCard(initialCard);
+      messages.push({
+        role: 'system',
+        content: initialCardText,
+      });
+
+      // Initialize candidate tracking for soft move validation
+      this.lastCandidatesFen = startingFen;
+      this.lastCandidateMoves = new Set(initialCard.candidates.map((c) => c.san));
+
+      // Initialize eval tracking
+      if (!initialCard.isTerminal) {
+        currentEval = initialCard.evaluation.cp;
+      }
+    } catch (cardError) {
+      this.config.warnCallback?.(
+        `Failed to build initial Position Card: ${cardError instanceof Error ? cardError.message : 'unknown error'}`,
+      );
+    }
 
     // Agentic exploration loop
     while (!finished && toolCallCount < this.config.maxToolCalls) {
@@ -422,6 +436,45 @@ export class AgenticVariationExplorer {
         });
 
         const toolName = toolCall.function.name;
+
+        // Deliver Position Card after successful navigation actions
+        const isNavigationTool = ['add_move', 'add_alternative', 'go_to', 'go_to_parent'].includes(
+          toolName,
+        );
+        const wasSuccessful =
+          typeof result === 'object' &&
+          result !== null &&
+          (result as Record<string, unknown>).success === true;
+
+        if (isNavigationTool && wasSuccessful) {
+          try {
+            const currentFen = tree.getCurrentNode().fen;
+            const treeDepth = tree.getDepthFromRoot();
+            const card = await this.cardBuilder.build(currentFen, treeDepth);
+            const cardText = formatPositionCard(card);
+
+            messages.push({
+              role: 'system',
+              content: cardText,
+            });
+
+            // Update last candidates for soft move validation
+            this.lastCandidatesFen = currentFen;
+            this.lastCandidateMoves = new Set(card.candidates.map((c) => c.san));
+
+            // Update current eval from card for swing detection
+            if (!card.isTerminal) {
+              previousEval = currentEval;
+              currentEval = card.evaluation.cp;
+            }
+          } catch (cardError) {
+            // Log but don't fail exploration if card building fails
+            this.config.warnCallback?.(
+              `Failed to build Position Card: ${cardError instanceof Error ? cardError.message : 'unknown error'}`,
+            );
+          }
+        }
+
         const phase =
           toolName === 'go_to' || toolName === 'go_to_parent'
             ? 'navigating'
@@ -483,15 +536,6 @@ export class AgenticVariationExplorer {
 
     if (this.markedSubPositions.length > 0) {
       result.markedSubPositions = this.markedSubPositions;
-    }
-
-    if (this.cacheHits > 0 || this.cacheMisses > 0) {
-      const total = this.cacheHits + this.cacheMisses;
-      result.cacheStats = {
-        hits: this.cacheHits,
-        misses: this.cacheMisses,
-        hitRate: total > 0 ? this.cacheHits / total : 0,
-      };
     }
 
     return result;
@@ -974,224 +1018,17 @@ export class AgenticVariationExplorer {
         };
       }
 
-      // === Analysis ===
-      case 'get_candidate_moves': {
-        const currentFen = tree.getCurrentNode().fen;
-        const count = Math.min(Math.max((args.count as number) ?? 3, 1), 5);
-
-        // Get the side to move from FEN
-        const fenParts = currentFen.split(' ');
-        const sideToMove = fenParts[1] === 'w' ? 'White' : 'Black';
-
-        // Get engine candidates and Maia predictions in parallel
-        const evalArgs = { fen: currentFen, depth: 18, multipv: count };
-        const [engineResult, maiaResult] = await Promise.all([
-          this.toolExecutor.execute({
-            ...toolCall,
-            function: {
-              name: 'evaluate_position',
-              arguments: JSON.stringify(evalArgs),
-            },
-          }),
-          // Maia predictions (optional service)
-          this.services.maia
-            ? this.toolExecutor.execute({
-                ...toolCall,
-                function: {
-                  name: 'predict_human_moves',
-                  arguments: JSON.stringify({
-                    fen: currentFen,
-                    rating: this.config.targetRating,
-                  }),
-                },
-              })
-            : Promise.resolve({ result: null, toolCallId: toolCall.id }),
-        ]);
-
-        if (engineResult.error) {
-          return { success: false, error: engineResult.error };
-        }
-
-        const evalResult = engineResult.result as Record<string, unknown>;
-
-        // Extract Maia predictions
-        let maiaPredictions: MaiaPrediction[] | undefined;
-        if (maiaResult.result) {
-          const maiaData = maiaResult.result as {
-            predictions?: Array<{ move: string; probability: number }>;
-          };
-          if (maiaData.predictions && maiaData.predictions.length > 0) {
-            maiaPredictions = maiaData.predictions.map((p) => ({
-              san: p.move,
-              probability: p.probability,
-            }));
-          }
-        }
-
-        // Build engine candidates for classification
-        const engineCandidates: EngineCandidate[] = [];
-
-        if (evalResult.lines && Array.isArray(evalResult.lines)) {
-          for (const line of evalResult.lines as Array<Record<string, unknown>>) {
-            const pv = line.principalVariation as string[] | undefined;
-            const move = pv?.[0];
-            if (move) {
-              const candidate: EngineCandidate = {
-                move,
-                evaluation: (line.evaluation as number) ?? 0,
-                isMate: (line.isMate as boolean) ?? false,
-                pv: pv ?? [],
-              };
-              if (typeof line.mateIn === 'number') {
-                candidate.mateIn = line.mateIn;
-              }
-              engineCandidates.push(candidate);
-            }
-          }
-        } else {
-          // Single line result (fallback)
-          const pv = evalResult.principalVariation as string[] | undefined;
-          const move = pv?.[0];
-          if (move) {
-            const candidate: EngineCandidate = {
-              move,
-              evaluation: (evalResult.evaluation as number) ?? 0,
-              isMate: (evalResult.isMate as boolean) ?? false,
-              pv: pv ?? [],
-            };
-            if (typeof evalResult.mateIn === 'number') {
-              candidate.mateIn = evalResult.mateIn;
-            }
-            engineCandidates.push(candidate);
-          }
-        }
-
-        if (engineCandidates.length === 0) {
-          return {
-            success: false,
-            error: 'No engine candidates found',
-          };
-        }
-
-        // Classify candidates with source information
-        const classificationConfig = getDefaultConfig(this.config.targetRating);
-        const classifiedCandidates = classifyCandidates(
-          engineCandidates,
-          maiaPredictions,
-          classificationConfig,
-        );
-
-        // Track candidates for soft validation
-        this.lastCandidatesFen = currentFen;
-        this.lastCandidateMoves = new Set(classifiedCandidates.map((c) => c.move));
-
-        // Check for attractive-but-bad moves
-        const hasAttractiveBad = classifiedCandidates.some(
-          (c) => c.primarySource === 'attractive_but_bad',
-        );
-
-        let note = `These are ${sideToMove}'s candidate moves with source classification.`;
-        if (hasAttractiveBad) {
-          note +=
-            ' **Note: Some moves are "attractive_but_bad" - consider exploring to show refutation!**';
-        }
-
-        return {
-          success: true,
-          sideToMove,
-          candidates: classifiedCandidates,
-          note,
-        };
-      }
-
-      case 'evaluate_position': {
-        const currentFen = tree.getCurrentNode().fen;
-        const depth = (args.depth as number) ?? 20;
-        const numLines = args.numLines as number | undefined;
-
-        // Check cache
-        if (depth >= MIN_CACHE_DEPTH) {
-          const cacheKey = getEvalCacheKey(currentFen, depth);
-          const cached = this.evalCache.get(cacheKey);
-          if (cached) {
-            this.cacheHits++;
-            // Also cache on tree node
-            tree.setEngineEval({
-              score: cached.evaluation ?? 0,
-              depth,
-              bestLine: cached.principalVariation ?? [],
-              timestamp: Date.now(),
-            });
-            return { result: cached, cached: true };
-          }
-          this.cacheMisses++;
-        }
-
-        const evalArgs = { fen: currentFen, depth, multipv: numLines };
-        const result = await this.toolExecutor.execute({
-          ...toolCall,
-          function: {
-            ...toolCall.function,
-            arguments: JSON.stringify(evalArgs),
-          },
-        });
-
-        // Cache result
-        if (depth >= MIN_CACHE_DEPTH && result.result && !result.error) {
-          const cacheKey = getEvalCacheKey(currentFen, depth);
-          this.evalCache.set(cacheKey, result.result as EvaluatePositionResult);
-
-          // Cache on tree node
-          const evalResult = result.result as Record<string, unknown>;
-          tree.setEngineEval({
-            score: (evalResult.evaluation as number) ?? 0,
-            depth,
-            bestLine: (evalResult.principalVariation as string[]) ?? [],
-            timestamp: Date.now(),
-          });
-        }
-
-        return result;
-      }
-
-      case 'predict_human_moves': {
-        const predictArgs = {
-          fen: tree.getCurrentNode().fen,
-          rating: args.rating ?? this.config.targetRating,
-        };
-        return this.toolExecutor.execute({
-          ...toolCall,
-          function: {
-            ...toolCall.function,
-            arguments: JSON.stringify(predictArgs),
-          },
-        });
-      }
-
-      case 'lookup_opening': {
-        const lookupArgs = { fen: tree.getCurrentNode().fen };
-        return this.toolExecutor.execute({
-          ...toolCall,
-          function: {
-            ...toolCall.function,
-            arguments: JSON.stringify(lookupArgs),
-          },
-        });
-      }
-
-      case 'find_reference_games': {
-        const gamesArgs = {
-          fen: tree.getCurrentNode().fen,
-          limit: args.limit,
-        };
-        return this.toolExecutor.execute({
-          ...toolCall,
-          function: {
-            ...toolCall.function,
-            arguments: JSON.stringify(gamesArgs),
-          },
-        });
-      }
+      // === Analysis Tools (REMOVED) ===
+      // Analysis tools have been removed in favor of Position Cards.
+      // The following tools are no longer available:
+      // - get_candidate_moves: Candidates provided in Position Card
+      // - evaluate_position: Evaluation provided in Position Card
+      // - predict_human_moves: Maia predictions provided in Position Card
+      // - lookup_opening: Opening info provided in Position Card
+      // - find_reference_games: Reference games provided in Position Card
+      //
+      // Position Cards are delivered via system message after navigation actions.
+      // If any of these tools are called, they fall through to the default case.
 
       // === Stopping ===
       case 'assess_continuation': {
@@ -1283,7 +1120,7 @@ export class AgenticVariationExplorer {
   }
 
   /**
-   * Build the system prompt for tree-based exploration
+   * Build the system prompt for tree-based exploration (Position Card version)
    */
   private buildSystemPrompt(targetRating: number, evalCp?: number): string {
     let prompt = `You are a chess coach showing a student what they did wrong and what they should have done.
@@ -1297,13 +1134,35 @@ The board shows the position where the player had to choose what to do.
 
 Use **add_move** to add better alternatives. Do NOT use add_alternative at the starting position.
 
+## POSITION CARDS (Automatic)
+
+After every navigation action (add_move, add_alternative, go_to, go_to_parent), you receive a **Position Card** in a system message.
+
+**Card Contents:**
+- **Recommendation**: EXPLORE / BRIEF / SKIP with reason
+- **Candidates**: Top engine moves with sources (engine_best, near_best, human_popular, attractive_but_bad, sacrifice, etc.)
+- **Evaluation**: Engine eval (centipawns) and win probability
+- **Maia Prediction**: What a ${targetRating} player would play (probability %)
+- **Motifs**: Detected patterns (pin, fork, back_rank_weakness, etc.)
+- **Classical Features**: SF16 breakdown (mobility, king_safety, space, threats)
+- **Opening**: ECO code and name (if in book)
+
+**You DON'T need to call tools to get analysis - it's delivered automatically in cards.**
+
+**Reading Cards:**
+1. Check the recommendation first (EXPLORE means dig deep, BRIEF means show key point, SKIP means move on)
+2. Look at candidates - especially attractive_but_bad moves worth refuting
+3. Use motifs to inform your commentary (mention pins, forks, etc.)
+4. Classical features help explain WHY (e.g., "White has space advantage")
+
 ## NAVIGATION TOOLS
 
-- **get_candidate_moves** - Get engine's best moves for the side to move. USE THIS FIRST!
-- **add_move(san)** - Add a move as a child and navigate to it. Use this for ALL new moves!
+- **add_move(san)** - Add a move as a child and navigate to it. Use this for ALL new moves! A Position Card arrives after.
 - **add_alternative(san)** - Add a sibling move (same parent). Only works AFTER you've navigated away from root.
-- **go_to(fen)** - Navigate to any position in the tree by FEN.
-- **go_to_parent** - Navigate back to the parent position.
+- **go_to(fen)** - Navigate to any position in the tree by FEN. Position Card arrives after.
+- **go_to_parent** - Navigate back to the parent position. Position Card arrives after.
+- **get_position** - Get info about current node (FEN, children, parent, etc.)
+- **get_tree** - Get ASCII visualization of the entire tree
 
 ## ANNOTATION TOOLS
 
@@ -1337,14 +1196,9 @@ Your primary job is to SHOW through variations, not TELL through long explanatio
 - {This move is inaccurate because it allows White to play Ne5...}
 - {The problem with this queen move is that it fails to address...}
 
-## ANALYSIS TOOLS
+## CANDIDATE MOVE SOURCES (from Position Cards)
 
-- **evaluate_position** - Get engine evaluation (use every 3-4 moves)
-- **predict_human_moves** - What would a ${targetRating} player do?
-
-## CANDIDATE MOVE SOURCES
-
-get_candidate_moves now returns classified candidates with sources like:
+Position Cards include classified candidates with sources like:
 - **engine_best** - Engine's top choice
 - **near_best** - Strong alternative (within 50cp of best)
 - **human_popular** - High probability move for ${targetRating} players
@@ -1354,7 +1208,7 @@ get_candidate_moves now returns classified candidates with sources like:
 
 ## EXPLORING ATTRACTIVE-BUT-BAD MOVES
 
-When get_candidate_moves returns moves with source "attractive_but_bad":
+When a Position Card shows moves with source "attractive_but_bad":
 
 1. These are TRAPS - moves that look good but fail to a specific refutation
 2. Consider exploring these moves to show WHY they fail (highly encouraged!)
@@ -1362,11 +1216,11 @@ When get_candidate_moves returns moves with source "attractive_but_bad":
 4. Comment style: "{tempting but...}" at start, "{the point}" at refutation
 
 **Example workflow:**
-1. get_candidate_moves returns Nxe4 as attractive_but_bad (35% would play, loses to Bxf7+)
-2. add_move("Nxe4")
+1. Position Card shows Nxe4 as attractive_but_bad (35% would play, loses to Bxf7+)
+2. add_move("Nxe4") → Card arrives showing refutation in candidates
 3. add_move_nag("$6")  // dubious
 4. set_comment("tempting but loses material")
-5. add_move("Bxf7+")   // the refutation
+5. add_move("Bxf7+")   // the refutation (from card)
 6. set_comment("the point")
 7. Continue until punishment is clear
 8. set_position_nag at end showing decisive advantage
@@ -1401,7 +1255,7 @@ Do NOT mark when:
 
 ## EXPLORING SIDELINES (BOTH SIDES)
 
-After add_move, you may receive **alternativeCandidates** - human-likely moves worth exploring.
+After add_move, the Position Card may highlight alternatives worth exploring.
 Use your discretion to explore sidelines that demonstrate NEW IDEAS.
 
 **When to explore a sideline:**
@@ -1418,7 +1272,7 @@ Use your discretion to explore sidelines that demonstrate NEW IDEAS.
 4. **Too deep** - Already 12+ moves into a variation
 
 **How to explore sidelines:**
-1. After add_move, check if alternativeCandidates are returned
+1. After add_move, read the Position Card for interesting alternatives
 2. Look for moves with different CHARACTER, not just different eval
 3. Use add_alternative to create the sideline
 4. Navigate to it and show the key idea (usually 3-8 moves)
@@ -1428,17 +1282,6 @@ Use your discretion to explore sidelines that demonstrate NEW IDEAS.
 - Main line: Full exploration until resolved (10-20+ moves)
 - Key alternative: Medium depth (5-10 moves) - show the idea clearly
 - Secondary alternative: Brief (3-5 moves) - just the point
-
-**Example: Exploring opponent alternatives**
-After 12...a5, alternativeCandidates returns:
-- Bf4 (25% human, +0.8) - aggressive approach
-- a4 (20% human, +0.7) - trying to punish
-
-If Bf4 creates sharp tactics while Re1 is quiet:
-1. Explore Re1 as main line first
-2. Use add_alternative("Bf4") to show the sharp try
-3. Navigate to Bf4 and show how Black handles it
-4. This shows the reader BOTH types of positions
 
 ## DISCRETION GUIDELINES
 
@@ -1463,31 +1306,30 @@ You have judgment about what's instructive. Ask yourself:
 
 Trust your judgment. The goal is INSTRUCTIVE annotation, not exhaustive analysis.
 
-## MOVE VALIDATION (IMPORTANT)
+## MOVE SELECTION (from Position Cards)
 
-Before playing ANY move with add_move or add_alternative:
-1. Call get_candidate_moves to see the best options
-2. Choose from the candidate list when possible
-3. If you play a move not in candidates, you'll see a warning
+Pick moves from the Position Card's candidate list:
+- **engine_best, near_best**: Strong moves
+- **human_popular, maia_preferred**: What players actually consider
+- **attractive_but_bad**: Worth exploring to show refutation
 
-This ensures you don't unknowingly play mistakes during analysis.
+If you play a move not in candidates, you'll see a warning.
 Exception: Obvious opponent responses (recaptures, only legal moves) don't need validation.
 
 ## WORKFLOW
 
-1. **get_candidate_moves** - See best moves for the side to move
-2. **add_move(betterMove)** - Add the better alternative (navigates to it)
-3. **set_comment** - Brief annotation (2-8 words)
-4. Check **alternativeCandidates** in response - note any interesting alternatives for later
-5. **Continue the main line** - add_move for responses
-6. At each position, ask: "Is there a sideline with a NEW IDEA here?"
-   - Different tactical motif? Different strategic approach? Human-likely move needing refutation?
-7. **evaluate_position** periodically to confirm direction
-8. When main line is resolved, go back and add noted alternatives with **add_alternative**
-9. Briefly explore each alternative (5-10 moves) to show the key idea
-10. **set_position_nag** - ONLY at variation endpoints
-11. **go_to_parent** to explore other branches
-12. **finish_exploration** when all instructive ideas are shown
+1. **Read the Position Card** - Check recommendation, candidates, motifs
+2. **add_move(san)** - Add a move from candidates → Position Card arrives
+3. **set_comment** - Brief pointer using card insights (motifs, features)
+4. **Repeat** - Read new card, continue line
+5. At each position: Check card's recommendation (EXPLORE/BRIEF/SKIP)
+   - EXPLORE: Dig deep, show multiple ideas
+   - BRIEF: Show key point, then move on
+   - SKIP: Position is resolved, backtrack or finish
+6. Use **add_alternative** for sidelines with NEW ideas
+7. **set_position_nag** - ONLY at variation endpoints
+8. **go_to_parent** to explore branches
+9. **finish_exploration** when all instructive ideas shown
 
 ## DEPTH GUIDANCE
 
@@ -1503,39 +1345,49 @@ Don't stop early just because you've shown a few moves. Show WHY the line is goo
 
 Position BEFORE 12. Qe2 (White's inaccuracy). Context says: "The player chose: Qe2"
 
-1. get_candidate_moves        → "White's best: Re1 (+1.2), Nc3 (+0.9), Bf4 (+0.8 aggressive)"
-2. add_move("Re1")            → Main suggestion, navigates to it
-3. set_comment("activates rook, prepares central play")
-4. add_move_nag("$1")         → Mark Re1 as good move (!)
-5. // Response includes alternativeCandidates: [{san: "c5", humanProb: 20%, source: "human_popular"}]
-6. add_move("Nd7")            → Main opponent response (40% human)
-7. // Note: c5 is sharp alternative - might show later
-8. add_move("Ne5")            → White: 13. Ne5
-9. evaluate_position          → Confirm +1.2
-10. set_comment("strong outpost")
-11. add_move("Nf6")           → Black: 13...Nf6
-12. add_move("Bf4")           → White: 14. Bf4
-13. ... continue until position is clarified ...
-14. set_position_nag("$14")   → White slightly better
-15. go_to_parent              → Back to after Re1
-16. // c5 was sharp alternative - show it creates different game
-17. add_alternative("c5")     → Add the aggressive opponent try
-18. go_to(fen after c5)       → Navigate to explore it
-19. add_move("dxc5")          → White captures
-20. set_comment("sharp play, but White keeps edge")
-21. evaluate_position         → +0.9
-22. set_position_nag("$14")   → Still White's favor
-23. go_to(root)               → Back to decision point
-24. add_alternative("Bf4")    → Second suggestion for White (aggressive)
-25. ... briefly explore Bf4 ideas (5-8 moves) ...
-26. finish_exploration
+[POSITION CARD - WHITE to move]
+Recommendation: EXPLORE - multiple good alternatives, played move was inaccurate
+Candidates:
+  Re1: +1.2 [engine_best] → Nd7 Ne5 Nf6 Bf4
+  Nc3: +0.9 [near_best]
+  Bf4: +0.8 [near_best, aggressive]
+Motifs: central_control, rook_activity
+
+1. add_move("Re1")            → Position Card arrives for new position
+2. set_comment("activates rook")
+3. add_move_nag("$1")         → Mark Re1 as good move (!)
+
+[POSITION CARD - BLACK to move]
+Recommendation: EXPLORE
+Candidates:
+  Nd7: +1.1 (40% human) [engine_best, human_popular]
+  c5: +0.9 (20% human) [near_best] → sharp play
+
+4. add_move("Nd7")            → Card arrives
+5. add_move("Ne5")            → Card arrives
+6. set_comment("strong outpost")
+7. ... continue until position is clarified ...
+8. set_position_nag("$14")    → White slightly better
+
+[Back to explore c5 alternative]
+9. go_to_parent               → Back after Re1, Card arrives
+10. add_alternative("c5")     → Create sideline
+11. go_to(fen after c5)       → Navigate to explore it, Card arrives
+12. add_move("dxc5")          → Card arrives
+13. set_comment("sharp play, but White keeps edge")
+14. set_position_nag("$14")   → Still White's favor
+
+15. go_to(root)               → Back to decision point, Card arrives
+16. add_alternative("Bf4")    → Second suggestion for White
+17. ... briefly explore Bf4 ideas (5-8 moves) ...
+18. finish_exploration
 
 Result: 12. Re1 $1 {activates rook} Nd7 (12...c5 13. dxc5 {sharp but White keeps edge} $14) 13. Ne5 Nf6 14. Bf4 $14 (12. Bf4 ...)
 
 ## CRITICAL RULES
 
-1. **get_candidate_moves FIRST** - Know what moves are legal and good!
-2. **Validate moves** - Check candidates before playing, heed warnings
+1. **Read Position Cards carefully** - They contain all analysis info you need
+2. **Use candidate moves from cards** - Pick from engine_best, near_best, human_popular
 3. **Use add_move at root** - Alternatives are children of the decision point
 4. **add_move continues line** - Alternates colors after each move
 5. **add_alternative only after navigating** - Creates siblings deep in a line
@@ -1547,11 +1399,11 @@ Result: 12. Re1 $1 {activates rook} Nd7 (12...c5 13. dxc5 {sharp but White keeps
 11. **NEVER say "from our perspective" or "this move is"**
 12. **Explore DEEP** - Don't stop at 3-5 moves, show full variations
 13. **Explore attractive-but-bad moves** - Show WHY tempting moves fail
-14. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives
-15. **Explore sidelines with discretion** - Add sidelines that show NEW IDEAS (different strategy, refutation, human-likely trap)
-16. **Both sides matter** - Explore interesting alternatives for player AND opponent
-17. **Avoid redundancy** - Don't repeat ideas already demonstrated elsewhere
-18. **Character over eval** - Sidelines with different character are more instructive than similar evals`;
+14. **Follow card recommendations** - EXPLORE/BRIEF/SKIP guide your depth
+15. **Mark branch points** - Use mark_for_sub_exploration for interesting alternatives
+16. **Explore sidelines with discretion** - Add sidelines that show NEW IDEAS
+17. **Both sides matter** - Explore interesting alternatives for player AND opponent
+18. **Avoid redundancy** - Don't repeat ideas already demonstrated elsewhere`;
 
     // Add winning position focus when position is already decided
     if (evalCp !== undefined && Math.abs(evalCp) >= 500) {
@@ -1614,16 +1466,15 @@ FINISH quickly once the winning idea is clear.`;
 
       if (moveClassification === 'blunder' || moveClassification === 'mistake') {
         parts.push('This was a significant error. Show what should have been played:');
-        parts.push(`1. get_candidate_moves - see ${sideToMove}'s best options`);
+        parts.push('1. Read the Position Card for best alternatives');
         parts.push('2. add_move(betterMove) - adds the better alternative');
-        parts.push(`3. add_move to continue (${opponentSide} responds, then ${sideToMove}, etc.)`);
-        parts.push('4. set_comment on key moments (2-8 words each)');
-        parts.push('5. evaluate_position every 3-4 moves to validate the line');
-        parts.push('6. set_position_nag ONLY at the END of the line');
-        parts.push('7. go_to_parent back to root to explore other options');
+        parts.push(`3. Continue the line (${opponentSide} responds, then ${sideToMove}, etc.)`);
+        parts.push('4. set_comment on key moments (brief pointers)');
+        parts.push('5. set_position_nag ONLY at the END of the line');
+        parts.push('6. go_to_parent back to root to explore other options');
       } else if (moveClassification === 'inaccuracy') {
         parts.push('This was slightly inaccurate. Show the stronger option:');
-        parts.push(`1. get_candidate_moves - see ${sideToMove}'s best options`);
+        parts.push('1. Read the Position Card for better moves');
         parts.push('2. add_move(betterMove)');
         parts.push('3. Continue and explore briefly');
         parts.push('4. set_comment on the key difference');
@@ -1644,7 +1495,7 @@ FINISH quickly once the winning idea is clear.`;
     }
 
     parts.push('');
-    parts.push('Start with get_candidate_moves to see the best options.');
+    parts.push('A Position Card with analysis will be provided shortly.');
 
     return parts.join('\n');
   }

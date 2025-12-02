@@ -3,7 +3,7 @@
  */
 
 import type { EcoClient, LichessEliteClient } from '@chessbeast/database';
-import type { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
+import type { StockfishClient, MaiaClient, Stockfish16Client } from '@chessbeast/grpc-client';
 
 /**
  * JSON Schema type for OpenAI function parameters
@@ -68,6 +68,7 @@ export interface ToolResult {
  */
 export interface AgenticServices {
   stockfish: StockfishClient;
+  sf16?: Stockfish16Client;
   maia?: MaiaClient;
   eco: EcoClient;
   lichess: LichessEliteClient;
