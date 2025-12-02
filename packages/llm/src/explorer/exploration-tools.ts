@@ -346,115 +346,20 @@ export const CLEAR_INTERESTING_TOOL: OpenAITool = {
 };
 
 // =============================================================================
-// ANALYSIS TOOLS
+// ANALYSIS TOOLS (REMOVED - Now provided via Position Cards)
 // =============================================================================
-
-/**
- * Tool: Get candidate moves from engine with source classification
- * Returns top N moves with evaluations and source classifications to help LLM choose alternatives
- */
-export const GET_CANDIDATE_MOVES_TOOL: OpenAITool = {
-  type: 'function',
-  function: {
-    name: 'get_candidate_moves',
-    description:
-      'Get candidate moves with source classification. Returns moves classified as: engine_best, near_best, human_popular, maia_preferred, attractive_but_bad, scary_check, scary_capture, sacrifice, quiet_improvement, blunder. PAY ATTENTION to "attractive_but_bad" moves - these are tempting but lose, perfect for showing refutations!',
-    parameters: {
-      type: 'object',
-      properties: {
-        count: {
-          type: 'number',
-          description: 'Number of moves to return (default: 3, max: 5)',
-        },
-      },
-      required: [],
-    },
-  },
-};
-
-/**
- * Tool: Evaluate position with engine
- */
-export const EVALUATE_POSITION_TOOL: OpenAITool = {
-  type: 'function',
-  function: {
-    name: 'evaluate_position',
-    description:
-      'Get engine evaluation of current position including best line (PV). Result is cached on the node.',
-    parameters: {
-      type: 'object',
-      properties: {
-        depth: {
-          type: 'number',
-          description: 'Analysis depth (default: 20, max: 24)',
-        },
-        numLines: {
-          type: 'number',
-          description: 'Number of lines to return (default: 1, max: 3)',
-        },
-      },
-      required: [],
-    },
-  },
-};
-
-/**
- * Tool: Predict human moves with Maia
- */
-export const PREDICT_HUMAN_MOVES_TOOL: OpenAITool = {
-  type: 'function',
-  function: {
-    name: 'predict_human_moves',
-    description: 'Predict what moves a human would play based on rating level.',
-    parameters: {
-      type: 'object',
-      properties: {
-        rating: {
-          type: 'number',
-          description: 'Target rating (1100-1900 in 100 increments)',
-        },
-      },
-      required: [],
-    },
-  },
-};
-
-/**
- * Tool: Look up opening information
- */
-export const LOOKUP_OPENING_TOOL: OpenAITool = {
-  type: 'function',
-  function: {
-    name: 'lookup_opening',
-    description: 'Look up opening name, ECO code, and typical plans from the database.',
-    parameters: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-  },
-};
-
-/**
- * Tool: Find reference games
- */
-export const FIND_REFERENCE_GAMES_TOOL: OpenAITool = {
-  type: 'function',
-  function: {
-    name: 'find_reference_games',
-    description: 'Find master games that reached this position.',
-    parameters: {
-      type: 'object',
-      properties: {
-        limit: {
-          type: 'number',
-          description: 'Maximum games to return (default: 3)',
-        },
-      },
-      required: [],
-    },
-  },
-};
+//
+// The following tools have been removed in favor of automatic Position Card delivery:
+// - get_candidate_moves: Candidates now in Position Card
+// - evaluate_position: Evaluation now in Position Card
+// - predict_human_moves: Maia predictions now in Position Card
+// - lookup_opening: Opening info now in Position Card
+// - find_reference_games: Reference games now in Position Card
+//
+// Position Cards are delivered via system message after every navigation action
+// (add_move, add_alternative, go_to, go_to_parent). The LLM reads the card
+// passively instead of calling analysis tools explicitly.
+//
 
 // =============================================================================
 // STOPPING TOOLS
@@ -544,6 +449,10 @@ export const MARK_FOR_SUB_EXPLORATION_TOOL: OpenAITool = {
 
 /**
  * Complete exploration tool set for tree-based navigation
+ *
+ * NOTE: Analysis tools have been removed. Analysis data is now delivered
+ * via Position Cards after every navigation action. The LLM reads the card
+ * passively instead of calling analysis tools.
  */
 export const EXPLORATION_TOOLS: OpenAITool[] = [
   // Navigation
@@ -567,13 +476,6 @@ export const EXPLORATION_TOOLS: OpenAITool[] = [
   MARK_INTERESTING_TOOL,
   GET_INTERESTING_TOOL,
   CLEAR_INTERESTING_TOOL,
-
-  // Analysis
-  GET_CANDIDATE_MOVES_TOOL,
-  EVALUATE_POSITION_TOOL,
-  PREDICT_HUMAN_MOVES_TOOL,
-  LOOKUP_OPENING_TOOL,
-  FIND_REFERENCE_GAMES_TOOL,
 
   // Stopping
   ASSESS_CONTINUATION_TOOL,
