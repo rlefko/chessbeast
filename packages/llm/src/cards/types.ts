@@ -349,7 +349,9 @@ export function formatPositionCardConcise(card: PositionCard): string {
   const side = card.sideToMove === 'white' ? 'W' : 'B';
 
   if (card.isTerminal) {
-    lines.push(`[CARD] ${side} d=${card.treeDepth} ${card.terminalReason?.toUpperCase() ?? 'TERMINAL'}`);
+    lines.push(
+      `[CARD] ${side} d=${card.treeDepth} ${card.terminalReason?.toUpperCase() ?? 'TERMINAL'}`,
+    );
     return lines.join('\n');
   }
 
