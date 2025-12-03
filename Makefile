@@ -159,6 +159,11 @@ run: stop  ## Start all services (native Stockfish + Docker Maia)
 		echo "Stockfish binaries not found. Run 'make setup' first."; \
 		exit 1; \
 	fi
+	@# Check for gRPC stubs
+	@if [ ! -f "services/stockfish16/src/stockfish16_service/generated/stockfish16_pb2.py" ]; then \
+		echo "gRPC stubs not found. Building..."; \
+		$(MAKE) build-protos; \
+	fi
 	@# Start Maia via Docker
 	$(DOCKER_COMPOSE) up -d maia
 	@# Start native Stockfish services in background
@@ -166,7 +171,7 @@ run: stop  ## Start all services (native Stockfish + Docker Maia)
 		uv run python -m stockfish_service.server &
 	@STOCKFISH16_PATH=$(PWD)/bin/stockfish/stockfish16 STOCKFISH16_POOL_SIZE=1 \
 		uv run python -m stockfish16_service.server &
-	@sleep 1
+	@sleep 2
 	@echo ""
 	@echo "Services started:"
 	@echo "  Stockfish:   localhost:50051"
@@ -175,8 +180,10 @@ run: stop  ## Start all services (native Stockfish + Docker Maia)
 
 stop:  ## Stop all services
 	@echo "Stopping services..."
-	@pkill -f "stockfish_service.server" 2>/dev/null || true
-	@pkill -f "stockfish16_service.server" 2>/dev/null || true
+	@pkill -9 -f "stockfish_service.server" 2>/dev/null || true
+	@pkill -9 -f "stockfish16_service.server" 2>/dev/null || true
+	@lsof -ti:50051 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:50053 | xargs kill -9 2>/dev/null || true
 	@$(DOCKER_COMPOSE) stop maia 2>/dev/null || true
 	@echo "Services stopped"
 
