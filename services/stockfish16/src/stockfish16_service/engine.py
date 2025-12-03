@@ -231,13 +231,10 @@ class Stockfish16Engine:
     def _read_until(self, terminator: str, timeout: float = 5.0) -> list[str]:
         """Read lines until we see the terminator."""
         import threading
-        import time
 
         if self._process is None or self._process.stdout is None:
             raise EngineError("Engine not started")
 
-        lines: list[str] = []
-        deadline = time.time() + timeout
         result: list[str] = []
         error: list[Exception] = []
 
