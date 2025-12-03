@@ -230,65 +230,98 @@ class Stockfish16Engine:
 
     def _read_until(self, terminator: str, timeout: float = 5.0) -> list[str]:
         """Read lines until we see the terminator."""
-        import select
+        import threading
+        import time
 
         if self._process is None or self._process.stdout is None:
             raise EngineError("Engine not started")
 
-        lines = []
-        while True:
-            # Check if data is available
-            ready, _, _ = select.select([self._process.stdout], [], [], timeout)
-            if not ready:
-                raise EngineError(f"Timeout waiting for {terminator}")
+        lines: list[str] = []
+        deadline = time.time() + timeout
+        result: list[str] = []
+        error: list[Exception] = []
 
-            line = self._process.stdout.readline().strip()
-            logger.debug(f"Recv: {line}")
-            lines.append(line)
+        def read_output() -> None:
+            try:
+                while True:
+                    line = self._process.stdout.readline()  # type: ignore
+                    if not line:
+                        break
+                    line = line.strip()
+                    logger.debug(f"Recv: {line}")
+                    result.append(line)
+                    if line == terminator:
+                        break
+            except Exception as e:
+                error.append(e)
 
-            if line == terminator:
-                break
+        thread = threading.Thread(target=read_output, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout)
 
-        return lines
+        if thread.is_alive():
+            raise EngineError(f"Timeout waiting for {terminator}")
+        if error:
+            raise error[0]
+
+        return result
 
     def _read_eval_output(self, timeout: float = 10.0) -> list[str]:
         """Read the complete eval command output."""
-        import select
+        import threading
 
         if self._process is None or self._process.stdout is None:
             raise EngineError("Engine not started")
 
-        lines = []
-        in_eval_section = False
-        total_seen = False
+        result: list[str] = []
+        error: list[Exception] = []
+        done = threading.Event()
 
-        while True:
-            ready, _, _ = select.select([self._process.stdout], [], [], timeout)
-            if not ready:
-                raise EngineError("Timeout waiting for eval output")
+        def read_output() -> None:
+            try:
+                in_eval_section = False
+                total_seen = False
 
-            line = self._process.stdout.readline().strip()
-            logger.debug(f"Recv: {line}")
+                while True:
+                    line = self._process.stdout.readline()  # type: ignore
+                    if not line:
+                        break
+                    line = line.strip()
+                    logger.debug(f"Recv: {line}")
 
-            # Look for the eval table
-            if "Term" in line and "White" in line and "Black" in line:
-                in_eval_section = True
+                    # Look for the eval table
+                    if "Term" in line and "White" in line and "Black" in line:
+                        in_eval_section = True
 
-            if in_eval_section:
-                lines.append(line)
+                    if in_eval_section:
+                        result.append(line)
 
-                # Look for Total line to know we're done
-                if line.strip().startswith("Total"):
-                    total_seen = True
+                        # Look for Total line to know we're done
+                        if line.startswith("Total"):
+                            total_seen = True
 
-                # After Total, look for the final eval line or empty line
-                if total_seen and (line == "" or "Final evaluation" in line):
-                    break
+                        # After Total, look for the final eval line or empty line
+                        if total_seen and (line == "" or "Final evaluation" in line):
+                            done.set()
+                            break
+            except Exception as e:
+                error.append(e)
+                done.set()
 
-        if not lines:
+        thread = threading.Thread(target=read_output, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout)
+
+        if error:
+            raise error[0]
+
+        if not done.is_set():
+            raise EngineError("Timeout waiting for eval output")
+
+        if not result:
             raise EvalNotAvailableError(
                 "No eval output received. Is this SF16 or earlier? "
                 "SF17+ uses pure NNUE and doesn't support the eval command."
             )
 
-        return lines
+        return result
