@@ -74,7 +74,9 @@ for dir in "$PY_STOCKFISH_OUT" "$PY_STOCKFISH16_OUT" "$PY_MAIA_OUT"; do
     for file in "$dir"/*_pb2*.py; do
         if [[ -f "$file" ]]; then
             # Replace 'import xxx_pb2' with 'from . import xxx_pb2'
-            sed -i.bak 's/^import \([a-z_]*_pb2\)/from . import \1/' "$file"
+            # Handle both simple imports and 'as' clauses, including names with numbers
+            sed -i.bak 's/^import \([a-z0-9_]*_pb2\) as \(.*\)/from . import \1 as \2/' "$file"
+            sed -i.bak 's/^import \([a-z0-9_]*_pb2\)$/from . import \1/' "$file"
             rm -f "${file}.bak"
         fi
     done
