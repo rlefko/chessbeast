@@ -1,5 +1,5 @@
-.PHONY: all setup setup-native install build test lint clean run help setup-db download-eco download-lichess-elite build-db download-stockfish \
-	run-native stop-native run-local-stockfish run-local-stockfish16 run-local-maia \
+.PHONY: all setup install build test lint clean run stop help setup-db download-eco download-lichess-elite build-db \
+	build-stockfish-native run-docker \
 	docker-build docker-build-stockfish docker-build-stockfish16 docker-build-maia \
 	docker-up docker-down docker-restart docker-rebuild-stockfish \
 	docker-logs docker-logs-stockfish docker-logs-stockfish16 docker-logs-maia \
@@ -13,25 +13,13 @@ all: help
 # Setup & Installation
 # ===========================================
 
-setup: install build-protos install-hooks setup-db docker-up  ## Full setup (install deps, build protos, setup DB, start services via Docker)
-	@echo "Setup complete!"
+setup: install build-protos install-hooks setup-db build-stockfish-native  ## Full setup (build Stockfish from source, install deps, setup DB)
 	@echo ""
-	@echo "Services running:"
-	@echo "  Stockfish:   localhost:50051"
-	@echo "  Stockfish16: localhost:50053"
-	@echo "  Maia:        localhost:50052"
-	@echo ""
-	@echo "Run 'make docker-health' to check service status"
-	@echo ""
-	@echo "TIP: On Apple Silicon, use 'make setup-native' for better Stockfish performance"
+	@echo "=== Setup Complete ==="
+	@echo "Run 'make run' to start services"
 
-setup-native: install build-protos install-hooks setup-db download-stockfish  ## Setup for Apple Silicon (native Stockfish + Docker Maia)
-	@echo "Setup complete! Use 'make run-native' to start services."
-	@echo ""
-	@echo "This mode runs native Stockfish for optimal Apple Silicon performance."
-
-download-stockfish:  ## Download Stockfish binary for local development (optional)
-	bash scripts/download-stockfish.sh
+build-stockfish-native:  ## Build Stockfish from source (latest master + SF16)
+	bash scripts/build-stockfish-native.sh
 
 install: install-ts install-py  ## Install all dependencies (npm + uv)
 	@echo "All dependencies installed"
@@ -161,54 +149,38 @@ typecheck-py:
 	uv run mypy services/
 
 # ===========================================
-# Services (Docker is the standard way to run services)
+# Services (native Stockfish + Docker Maia)
 # ===========================================
 
-run: docker-up  ## Start all services (via Docker)
-
-# Native service commands (recommended for Apple Silicon)
-run-native:  ## Start services optimally (native Stockfish + Docker Maia) - best for Apple Silicon
-	@echo "Starting services in hybrid mode (native Stockfish, Docker Maia)..."
-	@# Check for native Stockfish binary
-	@if [ ! -f "bin/stockfish/stockfish" ]; then \
-		echo "Native Stockfish binary not found. Downloading..."; \
-		$(MAKE) download-stockfish; \
+run: stop  ## Start all services (native Stockfish + Docker Maia)
+	@echo "Starting services..."
+	@# Check for native Stockfish binaries
+	@if [ ! -f "bin/stockfish/stockfish" ] || [ ! -f "bin/stockfish/stockfish16" ]; then \
+		echo "Stockfish binaries not found. Run 'make setup' first."; \
+		exit 1; \
 	fi
 	@# Start Maia via Docker
-	@echo "Starting Maia service via Docker..."
 	$(DOCKER_COMPOSE) up -d maia
 	@# Start native Stockfish services in background
-	@echo "Starting native Stockfish services..."
 	@STOCKFISH_PATH=$(PWD)/bin/stockfish/stockfish STOCKFISH_POOL_SIZE=1 \
 		uv run python -m stockfish_service.server &
-	@STOCKFISH16_PATH=$(PWD)/bin/stockfish/stockfish STOCKFISH16_POOL_SIZE=1 \
+	@STOCKFISH16_PATH=$(PWD)/bin/stockfish/stockfish16 STOCKFISH16_POOL_SIZE=1 \
 		uv run python -m stockfish16_service.server &
+	@sleep 1
 	@echo ""
 	@echo "Services started:"
-	@echo "  Stockfish (native): localhost:50051"
-	@echo "  Stockfish16 (native): localhost:50053"
-	@echo "  Maia (Docker): localhost:50052"
-	@echo ""
-	@echo "Run 'make stop-native' to stop all services"
+	@echo "  Stockfish:   localhost:50051"
+	@echo "  Stockfish16: localhost:50053"
+	@echo "  Maia:        localhost:50052"
 
-stop-native:  ## Stop native services and Docker Maia
+stop:  ## Stop all services
 	@echo "Stopping services..."
 	@pkill -f "stockfish_service.server" 2>/dev/null || true
 	@pkill -f "stockfish16_service.server" 2>/dev/null || true
-	$(DOCKER_COMPOSE) stop maia
-	@echo "All services stopped"
+	@$(DOCKER_COMPOSE) stop maia 2>/dev/null || true
+	@echo "Services stopped"
 
-# Local service commands (for development/debugging)
-run-local-stockfish:  ## [Dev] Start Stockfish service locally (requires local binary)
-	STOCKFISH_PATH=$(PWD)/bin/stockfish/stockfish STOCKFISH_POOL_SIZE=1 \
-		uv run python -m stockfish_service.server
-
-run-local-stockfish16:  ## [Dev] Start Stockfish 16 service locally
-	STOCKFISH16_PATH=$(PWD)/bin/stockfish/stockfish STOCKFISH16_POOL_SIZE=1 \
-		uv run python -m stockfish16_service.server
-
-run-local-maia:  ## [Dev] Start Maia service locally
-	uv run python -m maia_service.server
+run-docker: docker-up  ## Start all services via Docker (alternative)
 
 # ===========================================
 # Docker
