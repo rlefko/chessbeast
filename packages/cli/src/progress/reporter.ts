@@ -422,6 +422,15 @@ export class ProgressReporter {
   }
 
   /**
+   * Display a position card in concise format (debug mode only)
+   * Delegates to DebugOutput
+   */
+  displayPositionCard(cardText: string): void {
+    if (this.silent || !this.debug) return;
+    this.debugOutput.displayPositionCard(cardText);
+  }
+
+  /**
    * Complete a phase successfully
    */
   completePhase(phase: AnalysisPhase, detail?: string): void {

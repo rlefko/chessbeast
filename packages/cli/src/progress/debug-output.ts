@@ -175,4 +175,26 @@ export class DebugOutput {
       spinner.start(spinnerText);
     }
   }
+
+  /**
+   * Display a position card in concise format (debug mode only)
+   * Shows the pre-formatted card text
+   */
+  displayPositionCard(cardText: string): void {
+    const spinner = this.getSpinner();
+
+    // Stop spinner temporarily
+    const spinnerText = spinner?.text;
+    if (spinner) {
+      spinner.stop();
+    }
+
+    // Print card to stderr with cyan highlighting
+    process.stderr.write(`${this.c.cyan(cardText)}\n\n`);
+
+    // Restart spinner
+    if (spinner && spinnerText) {
+      spinner.start(spinnerText);
+    }
+  }
 }
