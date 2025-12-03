@@ -15,7 +15,12 @@ import { ChessPosition, renderBoard, formatBoardForPrompt } from '@chessbeast/pg
 import type { MoveInfo } from '@chessbeast/pgn';
 
 import { EvaluationCache } from '../cache/evaluation-cache.js';
-import { PositionCardBuilder, formatPositionCard, selectCardTier } from '../cards/index.js';
+import {
+  PositionCardBuilder,
+  formatPositionCard,
+  selectCardTier,
+  type PositionCard,
+} from '../cards/index.js';
 import type { OpenAIClient } from '../client/openai-client.js';
 import type { ChatMessage, ToolChoice } from '../client/types.js';
 import type { LLMConfig } from '../config/llm-config.js';
@@ -156,6 +161,8 @@ export interface AgenticExplorerProgress {
   toolDurationMs?: number | undefined;
   currentFen?: string | undefined;
   currentSan?: string | undefined;
+  /** Position card delivered after navigation actions (for debug logging) */
+  positionCard?: PositionCard | undefined;
 }
 
 /**
@@ -353,6 +360,9 @@ export class AgenticVariationExplorer {
       { role: 'user', content: initialContext },
     ];
 
+    // Track the most recent position card for progress reporting
+    let lastDeliveredCard: PositionCard | undefined;
+
     // Deliver initial Position Card for the starting position (always 'full' tier)
     try {
       const initialCard = await this.cardBuilder.build(startingFen, 0, 'full');
@@ -361,6 +371,9 @@ export class AgenticVariationExplorer {
         role: 'system',
         content: initialCardText,
       });
+
+      // Store for progress reporting
+      lastDeliveredCard = initialCard;
 
       // Initialize candidate tracking for soft move validation
       this.lastCandidatesFen = startingFen;
@@ -378,12 +391,19 @@ export class AgenticVariationExplorer {
 
     // Agentic exploration loop
     while (!finished && toolCallCount < this.config.maxToolCalls) {
+      // Report initial card on first iteration, then clear it
+      const cardToReport = toolCallCount === 0 ? lastDeliveredCard : undefined;
+      if (toolCallCount === 0) {
+        lastDeliveredCard = undefined;
+      }
+
       onProgress?.({
         phase: toolCallCount === 0 ? 'starting' : 'exploring',
         toolCalls: toolCallCount,
         nodeCount: tree.getAllNodes().length,
         currentFen: tree.getCurrentNode().fen,
         currentSan: tree.getCurrentNode().san,
+        positionCard: cardToReport,
       });
 
       // Add budget guidance if approaching limits
@@ -471,6 +491,9 @@ export class AgenticVariationExplorer {
           result !== null &&
           (result as Record<string, unknown>).success === true;
 
+        // Track card built during this tool call
+        let navigationCard: PositionCard | undefined;
+
         if (isNavigationTool && wasSuccessful) {
           try {
             const currentFen = tree.getCurrentNode().fen;
@@ -484,6 +507,9 @@ export class AgenticVariationExplorer {
               role: 'system',
               content: cardText,
             });
+
+            // Store for progress reporting
+            navigationCard = card;
 
             // Update last candidates for soft move validation
             this.lastCandidatesFen = currentFen;
@@ -525,6 +551,7 @@ export class AgenticVariationExplorer {
           toolDurationMs,
           currentFen: tree.getCurrentNode().fen,
           currentSan: tree.getCurrentNode().san,
+          positionCard: navigationCard,
         });
 
         if (toolName === 'finish_exploration') {
