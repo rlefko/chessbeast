@@ -11,6 +11,7 @@ import {
   AgenticVariationExplorer,
   buildRichContext,
   assessExplorationWorthiness,
+  formatPositionCardConcise,
   type AgenticProgress,
   type AgenticServices,
   type StreamChunk,
@@ -288,6 +289,11 @@ async function runVariationExploration(
         `${moveNotation} (exploring: ${progress.toolCalls} tools, ${progress.nodeCount} nodes)`,
       );
 
+      // Display position card if available (debug mode only)
+      if (reporter.isDebug() && progress.positionCard) {
+        reporter.displayPositionCard(formatPositionCardConcise(progress.positionCard));
+      }
+
       if (reporter.isDebug() && progress.lastTool && progress.toolCalls > lastToolCalls) {
         reporter.displayExplorationToolCall(
           moveNotation,
@@ -400,6 +406,11 @@ async function runSubExplorations(
           totalPositions,
           `${moveNotation} (sub ${subIdx + 1}: ${progress.toolCalls} tools)`,
         );
+
+        // Display position card if available (debug mode only)
+        if (reporter.isDebug() && progress.positionCard) {
+          reporter.displayPositionCard(formatPositionCardConcise(progress.positionCard));
+        }
 
         if (reporter.isDebug() && progress.lastTool && progress.toolCalls > 0) {
           reporter.displayExplorationToolCall(
