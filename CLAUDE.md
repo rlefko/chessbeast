@@ -97,7 +97,7 @@ python -m pytest -k "test_uci"  # Tests matching pattern
 - **All changes via Pull Requests** - no direct commits to main
 - **Commit format**: Single sentence, emoji prefix, no ending punctuation
   - Examples: `✨ Add PGN parser for multi-game files`, `🐛 Fix castling rights validation`, `♻️ Refactor engine pool for better concurrency`
-- **Author**: Ryan Lefkowitz (ryan@avoca.ai) - do not credit Claude/AI
+- **Author**: rlefko - no erroneous Claude/AI authorship whatsoever
 - Pre-commit hooks enforce commit message format
 
 Common emoji prefixes:
