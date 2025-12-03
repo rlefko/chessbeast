@@ -312,6 +312,77 @@ export function formatPositionCard(card: PositionCard): string {
 }
 
 /**
+ * Map candidate source to symbol for concise logging
+ */
+function sourceToSymbol(source: CandidateSource): string {
+  switch (source) {
+    case 'engine_best':
+      return '!';
+    case 'near_best':
+      return '~';
+    case 'attractive_but_bad':
+      return '?';
+    case 'human_popular':
+    case 'maia_preferred':
+      return '*';
+    case 'sacrifice':
+      return '^';
+    case 'blunder':
+      return '??';
+    default:
+      return '';
+  }
+}
+
+/**
+ * Format a Position Card in a concise 3-line format for debug logging
+ *
+ * Output format:
+ * [CARD] W d=3 +1.23 (72%)
+ *   Re1! Bf4~ Nxe4? | Maia: Nd7 (42%)
+ *   EXPLORE: reason | motifs: pin, outpost
+ */
+export function formatPositionCardConcise(card: PositionCard): string {
+  const lines: string[] = [];
+
+  // Line 1: Side, depth, eval, win prob
+  const side = card.sideToMove === 'white' ? 'W' : 'B';
+
+  if (card.isTerminal) {
+    lines.push(`[CARD] ${side} d=${card.treeDepth} ${card.terminalReason?.toUpperCase() ?? 'TERMINAL'}`);
+    return lines.join('\n');
+  }
+
+  const evalSign = card.evaluation.cp >= 0 ? '+' : '';
+  const evalStr = card.evaluation.isMate
+    ? `M${card.evaluation.mateIn}`
+    : `${evalSign}${(card.evaluation.cp / 100).toFixed(2)}`;
+  lines.push(`[CARD] ${side} d=${card.treeDepth} ${evalStr} (${card.evaluation.winProbability}%)`);
+
+  // Line 2: Candidates + Maia prediction
+  const candidateStrs = card.candidates.slice(0, 3).map((c) => {
+    const symbol = sourceToSymbol(c.source);
+    return `${c.san}${symbol}`;
+  });
+
+  let line2 = `  ${candidateStrs.join(' ')}`;
+  if (card.maiaPrediction) {
+    const maiaPct = Math.round(card.maiaPrediction.probability * 100);
+    line2 += ` | Maia: ${card.maiaPrediction.topMove} (${maiaPct}%)`;
+  }
+  lines.push(line2);
+
+  // Line 3: Recommendation + motifs
+  let line3 = `  ${card.recommendation.action}: ${card.recommendation.reason}`;
+  if (card.motifs.length > 0) {
+    line3 += ` | motifs: ${card.motifs.join(', ')}`;
+  }
+  lines.push(line3);
+
+  return lines.join('\n');
+}
+
+/**
  * Card tier determines analysis depth and included data
  *
  * Tiers allow trading off analysis depth for speed:
