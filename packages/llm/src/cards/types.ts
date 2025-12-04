@@ -53,6 +53,8 @@ export interface CandidateMove {
   maiaProbability?: number;
   /** Human-readable explanation of the source */
   sourceExplanation?: string;
+  /** Shallow position card with eval and classical features (optional) */
+  shallowCard?: ShallowPositionCard;
 }
 
 /**
@@ -73,6 +75,24 @@ export interface ClassicalFeatures {
   threats: { mg: number; eg: number };
   /** Passed pawn potential */
   passed: { mg: number; eg: number };
+}
+
+/**
+ * Shallow position card for candidate moves
+ * Contains evaluation and classical features for quick analysis
+ * All evaluations are from White's perspective (positive = White advantage)
+ */
+export interface ShallowPositionCard {
+  /** Evaluation in centipawns (positive = White advantage) */
+  evalCp: number;
+  /** Is this a mate score? */
+  isMate: boolean;
+  /** Mate in N (if isMate is true) */
+  mateIn?: number;
+  /** Analysis depth */
+  depth: number;
+  /** Classical eval features from SF16 */
+  classicalFeatures: ClassicalFeatures;
 }
 
 /**
@@ -448,3 +468,9 @@ export const CARD_TIER_CONFIGS: Record<CardTier, CardTierConfig> = {
     includeMaia: false,
   },
 };
+
+/**
+ * Depth offset for shallow card analysis
+ * Shallow cards use a reduced depth compared to the main card tier
+ */
+export const SHALLOW_DEPTH_OFFSET = 6;
