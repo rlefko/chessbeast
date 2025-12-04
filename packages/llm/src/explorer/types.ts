@@ -166,7 +166,7 @@ export interface CommentLimits {
  * Context-aware comment limits
  */
 export const COMMENT_LIMITS: Record<CommentType, CommentLimits> = {
-  initial: { soft: 75, hard: 150 },
+  initial: { soft: 50, hard: 100 },
   variation_start: { soft: 50, hard: 100 },
   variation_middle: { soft: 50, hard: 100 },
   variation_end: { soft: 100, hard: 150 },

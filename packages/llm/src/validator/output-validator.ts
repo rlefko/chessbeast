@@ -206,6 +206,71 @@ export function stripMetaContent(comment: string): string {
 }
 
 /**
+ * Verbose starter patterns that make initial comments too long
+ * These are soft-stripped (keep content after the verbose start)
+ *
+ * Philosophy: Explorer shows alternatives, so don't name specific moves.
+ * Strategic plans can mention moves, but specific alternatives should use concepts.
+ */
+const VERBOSE_STARTER_PATTERNS = [
+  // "We played X, but..." → strip prefix, keep the rest
+  /^we\s+(?:played|moved|chose)\s+[^,]+,?\s*(?:but\s+)?/i,
+  // "By playing X..." → strip
+  /^by\s+playing\s+[^,]+,?\s*/i,
+  // "This is an inaccuracy..." → strip classification (NAG shows it)
+  /^this\s+(?:move\s+)?(?:is|was)\s+(?:a\s+)?(?:an?\s+)?(?:inaccuracy|mistake|blunder|slightly\s+inaccurate)[^,]*,?\s*/i,
+  // "The played move..." → strip
+  /^the\s+(?:played|actual)\s+move\s+/i,
+  // "...because it doesn't/allows/prevents..." → strip because clause
+  /\s*because\s+it\s+(?:doesn't|does not|allows?|prevents?|weakens?|fails?)/i,
+  // "We should have played X..." → strip (variation shows it)
+  /\s*we\s+should\s+have\s+(?:played\s+)?[^.]+\.?\s*/i,
+];
+
+/**
+ * Strip verbose starter patterns from comments
+ *
+ * Soft cleanup: strips the verbose pattern but keeps useful content after it.
+ * This aligns with "show don't tell" - explorer shows alternatives,
+ * so comments should point to concepts, not name specific moves.
+ */
+export function stripVerbosePatterns(comment: string): string {
+  let result = comment;
+
+  for (const pattern of VERBOSE_STARTER_PATTERNS) {
+    result = result.replace(pattern, '');
+  }
+
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Apply auto-cleanup transformations for consistent comment style
+ *
+ * - Lowercase first character (pointer style)
+ * - Remove trailing punctuation (., !)
+ * - Strip leading "this " or "here "
+ */
+export function autoCleanupComment(comment: string): string {
+  if (!comment) return comment;
+
+  let result = comment;
+
+  // Strip leading "this " or "here "
+  result = result.replace(/^(?:this|here)\s+/i, '');
+
+  // Lowercase first character (pointer style)
+  if (result.length > 0) {
+    result = result.charAt(0).toLowerCase() + result.slice(1);
+  }
+
+  // Remove trailing punctuation (., !)
+  result = result.replace(/[.!]+$/, '');
+
+  return result.trim();
+}
+
+/**
  * Validate and sanitize a generated comment
  *
  * @param raw - Raw LLM response to validate
@@ -298,6 +363,32 @@ export function validateComment(
       issues.push({
         field: 'comment',
         message: 'Stripped meta-content patterns from comment',
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Strip verbose starter patterns ("We played...", "By playing...", "because it...")
+  if (comment) {
+    const beforeStrip = comment;
+    comment = stripVerbosePatterns(comment);
+    if (comment !== beforeStrip) {
+      issues.push({
+        field: 'comment',
+        message: 'Stripped verbose starter patterns from comment',
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Auto-cleanup: lowercase, remove trailing punctuation, strip "this/here"
+  if (comment) {
+    const beforeCleanup = comment;
+    comment = autoCleanupComment(comment);
+    if (comment !== beforeCleanup) {
+      issues.push({
+        field: 'comment',
+        message: 'Applied auto-cleanup (lowercase, punctuation)',
         severity: 'warning',
       });
     }

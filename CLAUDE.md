@@ -28,6 +28,7 @@ Provides shared utilities for all Python gRPC services:
 - `server.py` - `GracefulServer` class for proper signal handling
 
 Exception hierarchy:
+
 ```
 ChessBeastError (base)
 ├── EngineError (engine-related)
@@ -167,9 +168,12 @@ Common emoji prefixes:
 - Sub-exploration: `mark_for_sub_exploration` - flag interesting branch points for later analysis
 - NAG rules: Move NAGs ($1-$6) use freely, Position NAGs ($10-$19) ONLY at end of variation
 - Side-to-move context: LLM told explicitly which color's alternatives to explore
-- **"Show Don't Tell" Philosophy**: Comments are brief pointers (e.g., "allows Ne5"), variations demonstrate ideas
-- Comment types: `pointer` (default, 50-100 chars) and `summary` (for endings, 100-150 chars)
-- Comment validation: Context-aware limits, lowercase, no meta-commentary
+- **"Show Don't Tell" Philosophy**: Comments point to concepts, variations demonstrate specific moves
+  - Strategic plans: Can mention moves ("preparing ...c5", "developing toward f3")
+  - Specific alternatives: Use concepts only (explorer shows the moves)
+  - Tactical blows: Can name the killing move ("drops material after Bxf7+")
+- Comment types: `initial` (50-100 chars), `pointer` (50-100 chars), `summary` (100-150 chars)
+- Comment validation: Context-aware limits, lowercase, no meta-commentary, verbose pattern cleanup
 - **Candidate Source Classification**: `get_candidate_moves` returns sources: `engine_best`, `near_best`, `human_popular`, `maia_preferred`, `attractive_but_bad`, `sacrifice`, `scary_check`, `scary_capture`, `blunder`, `quiet_improvement`
 - **Attractive-But-Bad Detection**: Rating-dependent thresholds identify tempting moves that lose - perfect for showing refutations
 - Move validation: Soft warnings if moves not in engine candidates list
