@@ -31,12 +31,13 @@ import type {
   PositionCard,
   CandidateMove,
   ClassicalFeatures,
+  ShallowPositionCard,
   Motif,
   OpeningInfo,
   ReferenceGame,
   CardTier,
 } from './types.js';
-import { CARD_TIER_CONFIGS } from './types.js';
+import { CARD_TIER_CONFIGS, SHALLOW_DEPTH_OFFSET } from './types.js';
 
 /**
  * Normalize evaluation to White's perspective
@@ -506,6 +507,63 @@ export class PositionCardBuilder {
         san: p.move,
         probability: p.probability,
       }));
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Build a shallow position card for a candidate move
+   *
+   * @param fen - Current position FEN (before the move)
+   * @param moveSan - Move in SAN format
+   * @param tier - Card tier (determines shallow depth)
+   * @returns ShallowPositionCard with eval and classical features, or undefined on error
+   */
+  async buildShallowCard(
+    fen: string,
+    moveSan: string,
+    tier: CardTier,
+  ): Promise<ShallowPositionCard | undefined> {
+    try {
+      // Apply the move to get the resulting position
+      const pos = new ChessPosition(fen);
+      pos.pushSan(moveSan);
+      const resultingFen = pos.getFen();
+
+      // Calculate shallow depth from tier
+      const tierConfig = CARD_TIER_CONFIGS[tier];
+      const shallowDepth = Math.max(6, tierConfig.engineDepth - SHALLOW_DEPTH_OFFSET);
+
+      // Determine side to move after the candidate move
+      const sideToMove = resultingFen.includes(' w ') ? 'white' : 'black';
+
+      // Get shallow evaluation and classical features in parallel
+      const [evalResult, classicalFeatures] = await Promise.all([
+        this.getEngineAnalysis(resultingFen, shallowDepth, 1),
+        this.getClassicalFeatures(resultingFen),
+      ]);
+
+      // Classical features are required for shallow cards
+      if (!classicalFeatures) {
+        return undefined;
+      }
+
+      // Normalize evaluation to White's perspective
+      const normalizedEval = normalizeToWhitePerspective(evalResult.evaluation, sideToMove);
+
+      const shallowCard: ShallowPositionCard = {
+        evalCp: normalizedEval,
+        isMate: evalResult.isMate,
+        depth: evalResult.depth,
+        classicalFeatures,
+      };
+
+      if (evalResult.mateIn !== undefined) {
+        shallowCard.mateIn = evalResult.mateIn;
+      }
+
+      return shallowCard;
     } catch {
       return undefined;
     }
