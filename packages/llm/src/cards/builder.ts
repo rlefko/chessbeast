@@ -47,10 +47,7 @@ import { CARD_TIER_CONFIGS, SHALLOW_DEPTH_OFFSET } from './types.js';
  * @param sideToMove - Which side is to move ('white' or 'black')
  * @returns Evaluation from White's perspective (positive = White advantage)
  */
-export function normalizeToWhitePerspective(
-  evalCp: number,
-  sideToMove: 'white' | 'black',
-): number {
+export function normalizeToWhitePerspective(evalCp: number, sideToMove: 'white' | 'black'): number {
   // If it's White's turn, the eval is already from White's perspective
   // If it's Black's turn, we need to negate the eval
   return sideToMove === 'white' ? evalCp : -evalCp;
@@ -60,7 +57,7 @@ export function normalizeToWhitePerspective(
  * Maia probability thresholds for candidate selection
  */
 const MAIA_THRESHOLD_FIRST_THREE = 0.05; // 5% for first 3 moves
-const MAIA_THRESHOLD_ADDITIONAL = 0.10; // 10% for additional moves
+const MAIA_THRESHOLD_ADDITIONAL = 0.1; // 10% for additional moves
 
 /**
  * Filter Maia predictions to get candidate moves above threshold
@@ -598,8 +595,8 @@ export class PositionCardBuilder {
     try {
       // Apply the move to get the resulting position
       const pos = new ChessPosition(fen);
-      pos.pushSan(moveSan);
-      const resultingFen = pos.getFen();
+      const moveResult = pos.move(moveSan);
+      const resultingFen = moveResult.fenAfter;
 
       // Calculate shallow depth from tier
       const tierConfig = CARD_TIER_CONFIGS[tier];

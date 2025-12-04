@@ -282,7 +282,9 @@ export function formatPositionCard(card: PositionCard): string {
         shallowFeatures.push(`mob ${sc.mobility.mg > 0 ? '+' : ''}${sc.mobility.mg.toFixed(1)}`);
       }
       if (Math.abs(sc.kingSafety.mg) >= 0.15) {
-        shallowFeatures.push(`king ${sc.kingSafety.mg > 0 ? '+' : ''}${sc.kingSafety.mg.toFixed(1)}`);
+        shallowFeatures.push(
+          `king ${sc.kingSafety.mg > 0 ? '+' : ''}${sc.kingSafety.mg.toFixed(1)}`,
+        );
       }
       if (Math.abs(sc.space.mg) >= 0.15) {
         shallowFeatures.push(`space ${sc.space.mg > 0 ? '+' : ''}${sc.space.mg.toFixed(1)}`);
