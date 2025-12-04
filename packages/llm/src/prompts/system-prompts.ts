@@ -33,6 +33,9 @@ ABSOLUTE RULES:
 - Never repeat move notation already shown
 - Max ~50 characters for pointer comments
 
+EVALUATION CONVENTION:
+All evaluations are from White's perspective (positive = White advantage, negative = Black advantage).
+
 JSON output only.`;
 
 /**
