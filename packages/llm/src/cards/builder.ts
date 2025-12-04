@@ -39,6 +39,23 @@ import type {
 import { CARD_TIER_CONFIGS } from './types.js';
 
 /**
+ * Normalize evaluation to White's perspective
+ * Stockfish reports eval relative to side to move, but LLMs expect White's view
+ *
+ * @param evalCp - Evaluation in centipawns (relative to side to move)
+ * @param sideToMove - Which side is to move ('white' or 'black')
+ * @returns Evaluation from White's perspective (positive = White advantage)
+ */
+export function normalizeToWhitePerspective(
+  evalCp: number,
+  sideToMove: 'white' | 'black',
+): number {
+  // If it's White's turn, the eval is already from White's perspective
+  // If it's Black's turn, we need to negate the eval
+  return sideToMove === 'white' ? evalCp : -evalCp;
+}
+
+/**
  * Services required by the builder
  */
 export interface CardBuilderServices {
@@ -113,20 +130,23 @@ export class PositionCardBuilder {
       ],
     );
 
-    // Classify candidates
-    const candidates = this.classifyCandidates(engineResult.candidates, maiaResult);
+    // Determine side to move
+    const sideToMove = fen.includes(' w ') ? 'white' : 'black';
+
+    // Normalize evaluation to White's perspective
+    const normalizedEval = normalizeToWhitePerspective(engineResult.evaluation, sideToMove);
+
+    // Classify candidates (pass sideToMove for normalization)
+    const candidates = this.classifyCandidates(engineResult.candidates, maiaResult, sideToMove);
 
     // Detect motifs
     const motifs = this.detectMotifs(fen, engineResult.bestLine);
 
-    // Determine side to move
-    const sideToMove = fen.includes(' w ') ? 'white' : 'black';
-
-    // Calculate recommendation
+    // Calculate recommendation (uses normalized eval)
     const recommendation = calculateRecommendation({
       candidates,
       evaluation: {
-        cp: engineResult.evaluation,
+        cp: normalizedEval,
         isMate: engineResult.isMate,
       },
       treeDepth,
@@ -138,8 +158,8 @@ export class PositionCardBuilder {
       sideToMove,
       candidates,
       evaluation: {
-        cp: engineResult.evaluation,
-        winProbability: this.cpToWinProbability(engineResult.evaluation, sideToMove),
+        cp: normalizedEval,
+        winProbability: this.cpToWinProbability(normalizedEval, sideToMove),
         isMate: engineResult.isMate,
         depth: engineResult.depth,
       },
@@ -501,10 +521,12 @@ export class PositionCardBuilder {
 
   /**
    * Classify candidates with sources
+   * Normalizes evaluations to White's perspective
    */
   private classifyCandidates(
     engineCandidates: EngineCandidate[],
-    maiaPredictions?: MaiaPrediction[],
+    maiaPredictions: MaiaPrediction[] | undefined,
+    sideToMove: 'white' | 'black',
   ): CandidateMove[] {
     if (engineCandidates.length === 0) {
       return [];
@@ -514,10 +536,13 @@ export class PositionCardBuilder {
     const classified = classifyCandidates(engineCandidates, maiaPredictions, config);
 
     return classified.map((c) => {
+      // Normalize evaluation to White's perspective
+      const normalizedEval = normalizeToWhitePerspective(c.evaluation, sideToMove);
+
       const move: CandidateMove = {
         san: c.move,
         source: c.primarySource,
-        evalCp: c.evaluation,
+        evalCp: normalizedEval,
         isMate: c.isMate,
         pv: c.line.split(' '),
       };
@@ -588,16 +613,21 @@ export class PositionCardBuilder {
   }
 
   /**
-   * Convert centipawns to win probability
+   * Convert centipawns to win probability for side to move
+   *
+   * @param cp - Evaluation in centipawns (from White's perspective)
+   * @param sideToMove - Which side is to move
+   * @returns Win probability (0-100) for the side to move
    */
   private cpToWinProbability(cp: number, sideToMove: 'white' | 'black'): number {
     // Sigmoid function approximation
-    // At +100cp, roughly 60% win; at +300cp, roughly 85%
+    // At +100cp, roughly 60% win for White; at +300cp, roughly 85%
     const k = 0.004;
-    const winProb = 1 / (1 + Math.exp(-k * cp));
-    const percentage = Math.round(winProb * 100);
+    const whiteWinProb = 1 / (1 + Math.exp(-k * cp));
+    const whitePercentage = Math.round(whiteWinProb * 100);
 
     // Return probability for side to move
-    return sideToMove === 'white' ? percentage : 100 - percentage;
+    // If Black to move, invert (Black's win prob = 100 - White's win prob)
+    return sideToMove === 'white' ? whitePercentage : 100 - whitePercentage;
   }
 }
