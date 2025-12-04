@@ -274,6 +274,23 @@ export function formatPositionCard(card: PositionCard): string {
     if (candidate.pv.length > 1) {
       lines.push(`    → ${candidate.pv.slice(1, 5).join(' ')}`);
     }
+    // Show shallow card classical features if available
+    if (candidate.shallowCard) {
+      const sc = candidate.shallowCard.classicalFeatures;
+      const shallowFeatures: string[] = [];
+      if (Math.abs(sc.mobility.mg) >= 0.2) {
+        shallowFeatures.push(`mob ${sc.mobility.mg > 0 ? '+' : ''}${sc.mobility.mg.toFixed(1)}`);
+      }
+      if (Math.abs(sc.kingSafety.mg) >= 0.15) {
+        shallowFeatures.push(`king ${sc.kingSafety.mg > 0 ? '+' : ''}${sc.kingSafety.mg.toFixed(1)}`);
+      }
+      if (Math.abs(sc.space.mg) >= 0.15) {
+        shallowFeatures.push(`space ${sc.space.mg > 0 ? '+' : ''}${sc.space.mg.toFixed(1)}`);
+      }
+      if (shallowFeatures.length > 0) {
+        lines.push(`    [after: ${shallowFeatures.join(', ')}]`);
+      }
+    }
   }
 
   // Maia prediction
