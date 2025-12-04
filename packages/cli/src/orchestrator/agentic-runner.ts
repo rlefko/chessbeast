@@ -251,7 +251,7 @@ async function runVariationExploration(
 
   if (!worthiness.shouldExplore) {
     if (reporter.isDebug()) {
-      reporter.displayThinking(moveNotation, `Skipping exploration: ${worthiness.reason}`);
+      reporter.displayThinking(moveNotation, `Skipping exploration: ${worthiness.reason}\n`);
     }
     return [];
   }
@@ -263,7 +263,7 @@ async function runVariationExploration(
         : '';
     reporter.displayThinking(
       moveNotation,
-      `Starting exploration: ${worthiness.reason}${budgetInfo}`,
+      `Starting exploration: ${worthiness.reason}${budgetInfo}\n`,
     );
   }
 

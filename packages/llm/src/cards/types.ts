@@ -15,6 +15,8 @@
  * - Opening information (when applicable)
  */
 
+import { cpToWinProbability, WIN_PROB_THRESHOLDS } from '@chessbeast/core';
+
 /**
  * Source classification for candidate moves
  * Indicates WHY a move appears in the candidate list
@@ -351,34 +353,105 @@ export function formatPositionCard(card: PositionCard): string {
 }
 
 /**
- * Map candidate source to symbol for concise logging
+ * Get quality symbol based on win probability drop from best candidate
+ * Uses en-croissant style win probability thresholds
+ *
+ * @param evalCp - Evaluation for this move (from side-to-move perspective)
+ * @param bestEvalCp - Evaluation of the best move (from side-to-move perspective)
+ * @returns Quality symbol (!, ?!, ?, ??, or empty string)
  */
-function sourceToSymbol(source: CandidateSource): string {
-  switch (source) {
-    case 'engine_best':
-      return '!';
-    case 'near_best':
-      return '~';
-    case 'attractive_but_bad':
-      return '?';
-    case 'human_popular':
-    case 'maia_preferred':
-      return '*';
-    case 'sacrifice':
-      return '^';
-    case 'blunder':
-      return '??';
-    default:
-      return '';
-  }
+function evalToSymbol(evalCp: number, bestEvalCp: number): string {
+  // Convert to win probabilities
+  const winProbThis = cpToWinProbability(evalCp);
+  const winProbBest = cpToWinProbability(bestEvalCp);
+
+  // Win probability drop (positive = lost win chance)
+  const winProbDrop = winProbBest - winProbThis;
+
+  // Classify based on win probability thresholds
+  if (winProbDrop > WIN_PROB_THRESHOLDS.blunder) return '??'; // >20% lost
+  if (winProbDrop > WIN_PROB_THRESHOLDS.mistake) return '?'; // >10% lost
+  if (winProbDrop > WIN_PROB_THRESHOLDS.dubious) return '?!'; // >5% lost
+  if (winProbDrop < -WIN_PROB_THRESHOLDS.good) return '!'; // >5% gained
+  return ''; // Normal move
 }
 
 /**
- * Format a Position Card in a concise 3-line format for debug logging
+ * Filter candidates to only include human-relevant moves.
+ * Engine-only moves rated ?!, ?, or ?? (>5% win drop) are excluded
+ * unless also in Maia candidates.
+ *
+ * @param candidates - All candidate moves
+ * @param bestEval - Best evaluation (from side-to-move perspective)
+ * @returns Filtered list of human-relevant candidates
+ */
+function filterHumanRelevantCandidates(
+  candidates: CandidateMove[],
+  bestEval: number,
+): CandidateMove[] {
+  // Build set of Maia-predicted moves
+  const maiaMoves = new Set(
+    candidates
+      .filter((c) => c.maiaProbability !== undefined && c.maiaProbability > 0)
+      .map((c) => c.san),
+  );
+
+  const bestWinProb = cpToWinProbability(bestEval);
+
+  return candidates.filter((c, index) => {
+    // Always include best move (first candidate)
+    if (index === 0) return true;
+
+    // Check if this move is in Maia candidates
+    if (maiaMoves.has(c.san)) return true;
+
+    // Calculate win probability drop
+    const evalCp = c.shallowCard?.evalCp ?? c.evalCp;
+    const winProb = cpToWinProbability(evalCp);
+    const winProbDrop = bestWinProb - winProb;
+
+    // Keep moves within dubious threshold (≤5% win drop)
+    return winProbDrop <= WIN_PROB_THRESHOLDS.dubious;
+  });
+}
+
+/**
+ * Format classical features for display
+ * Shows significant features only (mobility, king safety, space)
+ */
+function formatClassicalFeaturesForDisplay(cf: ClassicalFeatures): string {
+  const features: string[] = [];
+  if (Math.abs(cf.mobility.mg) >= 0.2) {
+    features.push(`mob ${cf.mobility.mg > 0 ? '+' : ''}${cf.mobility.mg.toFixed(1)}`);
+  }
+  if (Math.abs(cf.kingSafety.mg) >= 0.15) {
+    features.push(`king ${cf.kingSafety.mg > 0 ? '+' : ''}${cf.kingSafety.mg.toFixed(1)}`);
+  }
+  if (Math.abs(cf.space.mg) >= 0.15) {
+    features.push(`space ${cf.space.mg > 0 ? '+' : ''}${cf.space.mg.toFixed(1)}`);
+  }
+  return features.join(', ');
+}
+
+/**
+ * Format a candidate's eval for display
+ */
+function formatCandidateEval(evalCp: number, isMate: boolean, mateIn?: number): string {
+  if (isMate && mateIn !== undefined) {
+    return `M${mateIn}`;
+  }
+  const sign = evalCp >= 0 ? '+' : '';
+  return `${sign}${(evalCp / 100).toFixed(2)}`;
+}
+
+/**
+ * Format a Position Card in concise format for debug logging
  *
  * Output format:
  * [CARD] W d=3 +1.23 (72%)
- *   Re1! Bf4~ Nxe4? | Maia: Nd7 (42%)
+ * FEN: rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1
+ *   e5! +0.12 [mob +0.3]
+ *   Nf6 +0.05
  *   EXPLORE: reason | motifs: pin, outpost
  */
 export function formatPositionCardConcise(card: PositionCard): string {
@@ -391,6 +464,7 @@ export function formatPositionCardConcise(card: PositionCard): string {
     lines.push(
       `[CARD] ${side} d=${card.treeDepth} ${card.terminalReason?.toUpperCase() ?? 'TERMINAL'}`,
     );
+    lines.push(`FEN: ${card.fen}`);
     return lines.join('\n');
   }
 
@@ -400,25 +474,38 @@ export function formatPositionCardConcise(card: PositionCard): string {
     : `${evalSign}${(card.evaluation.cp / 100).toFixed(2)}`;
   lines.push(`[CARD] ${side} d=${card.treeDepth} ${evalStr} (${card.evaluation.winProbability}%)`);
 
-  // Line 2: Candidates + Maia prediction
-  const candidateStrs = card.candidates.slice(0, 3).map((c) => {
-    const symbol = sourceToSymbol(c.source);
-    return `${c.san}${symbol}`;
-  });
+  // Line 2: FEN
+  lines.push(`FEN: ${card.fen}`);
 
-  let line2 = `  ${candidateStrs.join(' ')}`;
-  if (card.maiaPrediction) {
-    const maiaPct = Math.round(card.maiaPrediction.probability * 100);
-    line2 += ` | Maia: ${card.maiaPrediction.topMove} (${maiaPct}%)`;
+  // Filter to human-relevant candidates
+  const bestEval = card.candidates[0]?.shallowCard?.evalCp ?? card.candidates[0]?.evalCp ?? 0;
+  const relevantCandidates = filterHumanRelevantCandidates(card.candidates, bestEval);
+
+  // Lines 3-N: Candidates with eval and classical features
+  for (const c of relevantCandidates.slice(0, 3)) {
+    const candidateEval = c.shallowCard?.evalCp ?? c.evalCp;
+    const symbol = evalToSymbol(candidateEval, bestEval);
+    const evalDisplay = formatCandidateEval(candidateEval, c.isMate, c.mateIn);
+
+    let line = `  ${c.san}${symbol} ${evalDisplay}`;
+
+    // Add classical features if significant
+    if (c.shallowCard?.classicalFeatures) {
+      const features = formatClassicalFeaturesForDisplay(c.shallowCard.classicalFeatures);
+      if (features) {
+        line += ` [${features}]`;
+      }
+    }
+
+    lines.push(line);
   }
-  lines.push(line2);
 
-  // Line 3: Recommendation + motifs
-  let line3 = `  ${card.recommendation.action}: ${card.recommendation.reason}`;
+  // Final line: Recommendation + motifs
+  let lastLine = `  ${card.recommendation.action}: ${card.recommendation.reason}`;
   if (card.motifs.length > 0) {
-    line3 += ` | motifs: ${card.motifs.join(', ')}`;
+    lastLine += ` | motifs: ${card.motifs.join(', ')}`;
   }
-  lines.push(line3);
+  lines.push(lastLine);
 
   return lines.join('\n');
 }
