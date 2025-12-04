@@ -56,6 +56,48 @@ export function normalizeToWhitePerspective(
 }
 
 /**
+ * Maia probability thresholds for candidate selection
+ */
+const MAIA_THRESHOLD_FIRST_THREE = 0.05; // 5% for first 3 moves
+const MAIA_THRESHOLD_ADDITIONAL = 0.10; // 10% for additional moves
+
+/**
+ * Filter Maia predictions to get candidate moves above threshold
+ *
+ * Selection rules:
+ * - First 3 moves with >5% probability are always included
+ * - Additional moves require >10% probability
+ * - Sorted by probability descending
+ *
+ * @param predictions - Maia predictions sorted by probability descending
+ * @returns Filtered predictions meeting threshold criteria
+ */
+export function filterMaiaCandidates(predictions: MaiaPrediction[]): MaiaPrediction[] {
+  // Sort by probability descending (should already be sorted, but ensure)
+  const sorted = [...predictions].sort((a, b) => b.probability - a.probability);
+
+  const result: MaiaPrediction[] = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const pred = sorted[i]!;
+
+    if (i < 3) {
+      // First 3 slots: include if >5%
+      if (pred.probability > MAIA_THRESHOLD_FIRST_THREE) {
+        result.push(pred);
+      }
+    } else {
+      // Additional slots: include only if >10%
+      if (pred.probability > MAIA_THRESHOLD_ADDITIONAL) {
+        result.push(pred);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Services required by the builder
  */
 export interface CardBuilderServices {
