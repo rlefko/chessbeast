@@ -1,5 +1,5 @@
-.PHONY: all setup install build test lint clean run stop help setup-db download-eco download-lichess-elite build-db \
-	build-stockfish-native run-docker \
+.PHONY: all setup install build rebuild test lint clean run stop help setup-db download-eco download-lichess-elite build-db \
+	build-stockfish-native run-docker rebuild-ts clean-ts-cache \
 	docker-build docker-build-stockfish docker-build-stockfish16 docker-build-maia \
 	docker-up docker-down docker-restart docker-rebuild-stockfish \
 	docker-logs docker-logs-stockfish docker-logs-stockfish16 docker-logs-maia \
@@ -75,6 +75,12 @@ build-ts:
 
 build-protos:  ## Generate gRPC stubs from protos
 	bash scripts/build-protos.sh
+
+rebuild: clean build  ## Force rebuild (clean cache + build)
+	@echo "Rebuild complete"
+
+rebuild-ts: clean-ts-cache build-ts  ## Force rebuild TypeScript only
+	@echo "TypeScript rebuild complete"
 
 # ===========================================
 # Testing
@@ -274,6 +280,11 @@ clean-ts:
 	rm -rf packages/*/dist
 	rm -rf packages/*/*.tsbuildinfo
 	rm -rf node_modules
+	rm -rf .turbo
+
+clean-ts-cache:  ## Clean TypeScript build cache (keeps node_modules)
+	rm -rf packages/*/dist
+	rm -rf packages/*/*.tsbuildinfo
 	rm -rf .turbo
 
 clean-py:
