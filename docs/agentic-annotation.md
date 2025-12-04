@@ -110,15 +110,15 @@ The tree converts to PGN:
 
 ### Annotation
 
-| Tool                           | Description                                                          |
-| ------------------------------ | -------------------------------------------------------------------- |
-| `set_comment(comment, type?)`  | Set comment. Type: "pointer" (default, brief) or "summary" (endings) |
-| `get_comment`                  | Get current comment                                                  |
-| `add_move_nag(nag)`            | Add move quality NAG ($1-$6). Use freely.                            |
-| `set_position_nag(nag)`        | Set position evaluation NAG ($10-$19). **ONLY at END of variation!** |
-| `get_nags`                     | Get all NAGs on current node                                         |
-| `clear_nags`                   | Remove all NAGs                                                      |
-| `set_principal(san)`           | Mark child as main continuation                                      |
+| Tool                          | Description                                                          |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `set_comment(comment, type?)` | Set comment. Type: "pointer" (default, brief) or "summary" (endings) |
+| `get_comment`                 | Get current comment                                                  |
+| `add_move_nag(nag)`           | Add move quality NAG ($1-$6). Use freely.                            |
+| `set_position_nag(nag)`       | Set position evaluation NAG ($10-$19). **ONLY at END of variation!** |
+| `get_nags`                    | Get all NAGs on current node                                         |
+| `clear_nags`                  | Remove all NAGs                                                      |
+| `set_principal(san)`          | Mark child as main continuation                                      |
 
 ### Work Queue
 
@@ -130,30 +130,30 @@ The tree converts to PGN:
 
 ### Analysis
 
-| Tool                         | Description                                                                      |
-| ---------------------------- | -------------------------------------------------------------------------------- |
-| `get_candidate_moves(count)` | Get top N moves with source classification. **USE FIRST!** See sources below.   |
-| `evaluate_position`          | Engine evaluation (cached)                                                       |
-| `predict_human_moves`        | Maia predictions for target rating                                               |
-| `lookup_opening`             | Opening name and theory                                                          |
-| `find_reference_games`       | Master games from position                                                       |
+| Tool                         | Description                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `get_candidate_moves(count)` | Get top N moves with source classification. **USE FIRST!** See sources below. |
+| `evaluate_position`          | Engine evaluation (cached)                                                    |
+| `predict_human_moves`        | Maia predictions for target rating                                            |
+| `lookup_opening`             | Opening name and theory                                                       |
+| `find_reference_games`       | Master games from position                                                    |
 
 #### Candidate Move Sources
 
 The `get_candidate_moves` tool returns moves classified by their source/nature:
 
-| Source             | Description                                          | Exploration Priority |
-| ------------------ | ---------------------------------------------------- | -------------------- |
-| `engine_best`      | Engine's top choice                                  | Always explore       |
-| `near_best`        | Within 50cp of best (multiple good options)          | High                 |
-| `maia_preferred`   | Top human prediction at target rating                | High                 |
-| `human_popular`    | ≥15% probability at target rating                    | Medium               |
+| Source               | Description                                         | Exploration Priority |
+| -------------------- | --------------------------------------------------- | -------------------- |
+| `engine_best`        | Engine's top choice                                 | Always explore       |
+| `near_best`          | Within 50cp of best (multiple good options)         | High                 |
+| `maia_preferred`     | Top human prediction at target rating               | High                 |
+| `human_popular`      | ≥15% probability at target rating                   | Medium               |
 | `attractive_but_bad` | Tempting but loses - **perfect for showing traps!** | **Very High**        |
-| `sacrifice`        | Material sacrifice that maintains compensation       | High                 |
-| `scary_check`      | Gives check (often needs evaluation)                 | Medium               |
-| `scary_capture`    | Capture (often needs evaluation)                     | Medium               |
-| `blunder`          | Loses ≥200cp                                         | Show refutation      |
-| `quiet_improvement`| Positional improvement without tactics               | Low                  |
+| `sacrifice`          | Material sacrifice that maintains compensation      | High                 |
+| `scary_check`        | Gives check (often needs evaluation)                | Medium               |
+| `scary_capture`      | Capture (often needs evaluation)                    | Medium               |
+| `blunder`            | Loses ≥200cp                                        | Show refutation      |
+| `quiet_improvement`  | Positional improvement without tactics              | Low                  |
 
 **⚠️ Pay special attention to `attractive_but_bad` moves!** These are moves that humans at the target rating would find tempting but actually lose material or advantage. Exploring these and showing the refutation is extremely valuable for learning.
 
@@ -213,45 +213,57 @@ Use `mark_for_sub_exploration` when:
 - **Bad**: "This move is bad because it allows a knight fork winning the queen"
 - **Good**: Brief comment "allows Ne5" → then show the variation with the fork
 
-The annotation style should be minimal prose with variations doing the heavy lifting. Comments point to the key idea; moves prove it.
+The annotation style should be minimal prose with variations doing the heavy lifting. Comments point to concepts; variations demonstrate specific moves.
 
 ### Comment Types and Limits
 
 Comment length varies by position in the tree:
 
-| Comment Type       | Position                        | Soft Limit | Hard Limit |
-| ------------------ | ------------------------------- | ---------- | ---------- |
-| `pointer` (default)| Most moves                      | 50 chars   | 100 chars  |
-| `summary`          | Variation endings               | 100 chars  | 150 chars  |
+| Comment Type        | Position                       | Soft Limit | Hard Limit |
+| ------------------- | ------------------------------ | ---------- | ---------- |
+| `initial`           | Initial comment on played move | 50 chars   | 100 chars  |
+| `pointer` (default) | Most moves in variations       | 50 chars   | 100 chars  |
+| `summary`           | Variation endings              | 100 chars  | 150 chars  |
 
 Use `set_comment(comment, type="summary")` at variation endpoints for slightly longer wrap-ups.
+
+### Move/Concept Philosophy
+
+Comments should use conceptual language when variations show the specific moves:
+
+| Context               | Approach                        | Example                                    |
+| --------------------- | ------------------------------- | ------------------------------------------ |
+| Strategic plans       | Can mention moves               | "fails to prepare the queenside expansion" |
+| Specific alternatives | Concepts only (variation shows) | "misses a more active piece deployment"    |
+| Tactical blows        | Can name the killing move       | "drops material after Bxf7+"               |
 
 ### Formatting Rules
 
 Comments must be:
 
 - **Lowercase** with no ending punctuation
-- **Descriptive**, not meta-commentary
-- **Concise** - point to the key idea only
+- **Conceptual**, not move-specific (for alternatives - variations show the moves)
+- **Concise** - point to the key idea only (max 50 chars for most comments)
 
 ### Good Examples
 
 | Context              | Comment                                    |
 | -------------------- | ------------------------------------------ |
-| Initial annotation   | "allows Ne5"                               |
+| Initial (conceptual) | "neglects development"                     |
+| Initial (tactical)   | "drops material after Bxf7+"               |
 | Variation start      | "activates rook"                           |
-| Mid-variation        | "threatens Bxh7+"                          |
+| Mid-variation        | "threatens mate"                           |
 | Variation end        | "central pressure with lasting initiative" |
 | Trap refutation      | "tempting but loses to Bxf7+"              |
 
 ### Bad Examples (Rejected)
 
-| Comment                                                    | Problem              |
-| ---------------------------------------------------------- | -------------------- |
-| "From our perspective, this move is passive..."            | Meta-commentary      |
-| "This move is better because it controls the center"       | Too verbose, tells   |
-| "Nxg7 wins material"                                       | Repeats move notation|
-| "The knight fork wins the queen."                          | Tells instead of shows |
+| Comment                                              | Problem                |
+| ---------------------------------------------------- | ---------------------- |
+| "From our perspective, this move is passive..."      | Meta-commentary        |
+| "This move is better because it controls the center" | Too verbose, tells     |
+| "Nxg7 wins material"                                 | Repeats move notation  |
+| "The knight fork wins the queen."                    | Tells instead of shows |
 
 ### Anti-Patterns to Avoid
 
@@ -357,12 +369,12 @@ Engine evaluations are cached:
 
 Common errors and solutions:
 
-| Error                            | Cause                          | Solution                        |
-| -------------------------------- | ------------------------------ | ------------------------------- |
-| "Illegal move"                   | Invalid SAN                    | LLM receives legal moves list   |
-| "Cannot add alternative to root" | No played move provided        | Ensure playedMove is passed     |
-| "Comment too long"               | Exceeds context-aware limit    | Use type="summary" or shorten   |
-| "Comment trimmed"                | Exceeded soft limit (warning)  | Consider shortening             |
+| Error                            | Cause                         | Solution                      |
+| -------------------------------- | ----------------------------- | ----------------------------- |
+| "Illegal move"                   | Invalid SAN                   | LLM receives legal moves list |
+| "Cannot add alternative to root" | No played move provided       | Ensure playedMove is passed   |
+| "Comment too long"               | Exceeds context-aware limit   | Use type="summary" or shorten |
+| "Comment trimmed"                | Exceeded soft limit (warning) | Consider shortening           |
 
 ## Debug Logging
 

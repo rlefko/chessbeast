@@ -158,28 +158,37 @@ export function buildCriticalMomentPrompt(context: CommentContext): string {
 
   parts.push('');
 
-  // Format rules - pointer style
+  // Format rules - pointer style with move/concept philosophy
   parts.push('FORMAT RULES:');
-  parts.push('- Brief pointer comment (5-12 words typical)');
+  parts.push('- Brief pointer comment (5-12 words, max 50 chars)');
   parts.push('- Lowercase start, no ending punctuation');
-  parts.push('- Max ~50 characters');
-  parts.push('- Never start with "we", "this move", "the player"');
-  parts.push('- Never say "because" or explain - let variations show why');
+  parts.push('- Never start with "we played", "by playing", "this is"');
+  parts.push('- Never say "because" - variations show why');
   parts.push('');
 
-  // When variations are present, the comment just points to the key idea
-  // The variations demonstrate WHY - comment is a brief pointer
+  // When variations are present, emphasize conceptual language
+  // The variations show the moves - comments point to concepts
   if (context.plannedVariations && context.plannedVariations.length > 0) {
-    parts.push('TASK: Write a brief POINTER comment (5-12 words).');
-    parts.push('The variations show WHY - your comment just points to the key idea.');
+    parts.push('TASK: Write a brief CONCEPTUAL pointer (5-12 words).');
+    parts.push("Variations below show alternatives - don't name specific alternative moves.");
     parts.push('');
-    parts.push('POINTER STYLE:');
-    parts.push('- "allows {threat}" or "misses {opportunity}"');
-    parts.push('- "drops material" or "loses the exchange"');
-    parts.push('- lowercase, no ending punctuation');
+    parts.push('POINTER STYLE (conceptual, not move-specific):');
+    parts.push('Strategic direction (moves OK):');
+    parts.push('  - "neglects development"');
+    parts.push('  - "fails to prepare the queenside expansion"');
+    parts.push('');
+    parts.push('Specific alternatives (concepts only - variation shows the move):');
+    parts.push('  - "misses a more active piece placement"');
+    parts.push('  - "overlooks better central control"');
+    parts.push('');
+    parts.push('Tactical blows (can name the killing move):');
+    parts.push('  - "drops material after Bxf7+"');
+    parts.push('  - "walks into a knight fork"');
   } else {
-    parts.push('TASK: Write a brief POINTER comment about this position (5-12 words).');
-    parts.push('Focus on tactical or strategic idea. If mate exists, point to key move.');
+    parts.push('TASK: Write a brief CONCEPTUAL pointer about this position (5-12 words).');
+    parts.push(
+      'Focus on the strategic or tactical concept. If mate exists, can point to key move.',
+    );
   }
 
   parts.push('');

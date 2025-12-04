@@ -155,7 +155,8 @@ describe('Output Validator', () => {
       const raw = { comment: 'Good move', nags: ['$1'] };
       const result = validateComment(raw, []);
       expect(result.valid).toBe(true);
-      expect(result.sanitized.comment).toBe('Good move');
+      // Auto-cleanup lowercases first character
+      expect(result.sanitized.comment).toBe('good move');
       expect(result.sanitized.nags).toEqual(['$1']);
     });
 
@@ -173,10 +174,11 @@ describe('Output Validator', () => {
     });
 
     it('should truncate long comments', () => {
-      const raw = { comment: 'x'.repeat(2500), nags: [] };
+      const raw = { comment: 'x'.repeat(200), nags: [] };
       const result = validateComment(raw, []);
       expect(result.sanitized.comment).toBeDefined();
-      expect(result.sanitized.comment!.length).toBeLessThanOrEqual(2003); // 2000 + '...'
+      // Hard limit is 100 chars for 'initial' type
+      expect(result.sanitized.comment!.length).toBeLessThanOrEqual(100);
     });
   });
 
