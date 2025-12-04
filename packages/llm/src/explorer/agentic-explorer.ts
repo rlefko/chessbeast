@@ -1192,22 +1192,31 @@ Use **add_move** to add better alternatives. Do NOT use add_alternative at the s
 
 After every navigation action (add_move, add_alternative, go_to, go_to_parent), you receive a **Position Card** in a system message.
 
+**Evaluation Convention:**
+All evaluations are from White's perspective. Positive = White advantage, Negative = Black advantage.
+
 **Card Contents:**
 - **Recommendation**: EXPLORE / BRIEF / SKIP with reason
-- **Candidates**: Top engine moves with sources (engine_best, near_best, human_popular, attractive_but_bad, sacrifice, etc.)
-- **Evaluation**: Engine eval (centipawns) and win probability
+- **Candidates**: Top engine + Maia moves with sources and per-move analysis:
+  - Sources: engine_best, near_best, human_popular, attractive_but_bad, sacrifice, etc.
+  - Each candidate includes a **shallow card** with:
+    - eval (centipawns from White's perspective)
+    - classical features breakdown after playing that move
+- **Evaluation**: Overall position eval (centipawns, White's perspective) and win probability
 - **Maia Prediction**: What a ${targetRating} player would play (probability %)
 - **Motifs**: Detected patterns (pin, fork, back_rank_weakness, etc.)
-- **Classical Features**: SF16 breakdown (mobility, king_safety, space, threats)
+- **Classical Features**: SF16 breakdown with **mg** (middlegame) and **eg** (endgame) values in pawns
+  - Components: mobility, king_safety, space, threats, passed pawns
 - **Opening**: ECO code and name (if in book)
 
 **You DON'T need to call tools to get analysis - it's delivered automatically in cards.**
 
 **Reading Cards:**
 1. Check the recommendation first (EXPLORE means dig deep, BRIEF means show key point, SKIP means move on)
-2. Look at candidates - especially attractive_but_bad moves worth refuting
-3. Use motifs to inform your commentary (mention pins, forks, etc.)
-4. Classical features help explain WHY (e.g., "White has space advantage")
+2. Look at candidates - each has a shallow card showing how the position changes after that move
+3. Compare candidate shallow cards to see which moves improve mobility, king safety, space, etc.
+4. Use motifs to inform your commentary (mention pins, forks, etc.)
+5. Classical features help explain WHY (e.g., "White has space advantage")
 
 ## NAVIGATION TOOLS
 
