@@ -99,6 +99,61 @@ export function filterMaiaCandidates(predictions: MaiaPrediction[]): MaiaPredict
 }
 
 /**
+ * Maximum number of candidates in a merged set
+ */
+const MAX_MERGED_CANDIDATES = 6;
+
+/**
+ * Merged candidate before classification
+ * Contains move SAN and optional data from engine/Maia
+ */
+interface MergedCandidate {
+  san: string;
+  engineCandidate?: EngineCandidate;
+  maiaProbability?: number;
+}
+
+/**
+ * Merge engine candidates with filtered Maia predictions into a unified set
+ *
+ * @param engineCandidates - Engine multipv candidates
+ * @param maiaPredictions - Filtered Maia predictions (already threshold-filtered)
+ * @returns Merged candidates (deduped by SAN)
+ */
+export function mergeCandidates(
+  engineCandidates: EngineCandidate[],
+  maiaPredictions: MaiaPrediction[],
+): MergedCandidate[] {
+  const candidateMap = new Map<string, MergedCandidate>();
+
+  // Add engine candidates first (they have evaluations)
+  for (const ec of engineCandidates) {
+    candidateMap.set(ec.move, {
+      san: ec.move,
+      engineCandidate: ec,
+    });
+  }
+
+  // Add Maia candidates (may overlap with engine candidates)
+  for (const mp of maiaPredictions) {
+    const existing = candidateMap.get(mp.san);
+    if (existing) {
+      // Update with Maia probability
+      existing.maiaProbability = mp.probability;
+    } else {
+      // New Maia-only candidate
+      candidateMap.set(mp.san, {
+        san: mp.san,
+        maiaProbability: mp.probability,
+      });
+    }
+  }
+
+  // Convert to array and limit
+  return Array.from(candidateMap.values()).slice(0, MAX_MERGED_CANDIDATES);
+}
+
+/**
  * Services required by the builder
  */
 export interface CardBuilderServices {
@@ -179,8 +234,23 @@ export class PositionCardBuilder {
     // Normalize evaluation to White's perspective
     const normalizedEval = normalizeToWhitePerspective(engineResult.evaluation, sideToMove);
 
-    // Classify candidates (pass sideToMove for normalization)
-    const candidates = this.classifyCandidates(engineResult.candidates, maiaResult, sideToMove);
+    // Filter Maia predictions by threshold for candidate selection
+    const filteredMaia = maiaResult ? filterMaiaCandidates(maiaResult) : [];
+
+    // Classify candidates using engine candidates and filtered Maia predictions
+    const candidates = this.classifyCandidates(engineResult.candidates, filteredMaia, sideToMove);
+
+    // Build shallow cards for each candidate in parallel
+    const shallowCardPromises = candidates.map((c) => this.buildShallowCard(fen, c.san, tier));
+    const shallowCards = await Promise.all(shallowCardPromises);
+
+    // Attach shallow cards to candidates (by matching index)
+    for (let i = 0; i < candidates.length; i++) {
+      const shallowCard = shallowCards[i];
+      if (shallowCard) {
+        candidates[i]!.shallowCard = shallowCard;
+      }
+    }
 
     // Detect motifs
     const motifs = this.detectMotifs(fen, engineResult.bestLine);
