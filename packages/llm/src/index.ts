@@ -501,6 +501,15 @@ export {
 export {
   formatPositionCard,
   formatPositionCardConcise,
+  normalizeToWhitePerspective,
+  filterMaiaCandidates,
+  mergeCandidates,
+  PositionCardBuilder,
   type PositionCard,
+  type ShallowPositionCard,
+  type CandidateMove,
+  type ClassicalFeatures,
   type CardTier,
+  type CardBuilderServices,
+  type CardBuilderConfig,
 } from './cards/index.js';
