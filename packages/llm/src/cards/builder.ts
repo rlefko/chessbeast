@@ -365,11 +365,14 @@ export class PositionCardBuilder {
     const effectiveMultipv = multipv ?? this.config.multipv;
     const cache = this.services.evaluationCache;
 
+    // Create position for UCI→SAN conversion
+    const pos = new ChessPosition(fen);
+
     // Check cache first
     if (cache) {
       const cached = cache.get(fen, effectiveDepth, effectiveMultipv);
       if (cached) {
-        return this.transformCachedEvaluation(cached);
+        return this.transformCachedEvaluation(cached, pos);
       }
     }
 
@@ -403,10 +406,12 @@ export class PositionCardBuilder {
 
       const candidates: EngineCandidate[] = [];
 
-      // Process main line
+      // Process main line (convert UCI to SAN)
       if (result.bestLine && result.bestLine.length > 0) {
+        const uciMove = result.bestLine[0]!;
+        const sanMove = this.uciToSanSafe(pos, uciMove);
         const mainCandidate: EngineCandidate = {
-          move: result.bestLine[0]!,
+          move: sanMove,
           evaluation: result.mate !== 0 ? (result.mate > 0 ? 10000 : -10000) : result.cp,
           isMate: result.mate !== 0,
           pv: result.bestLine,
@@ -417,12 +422,14 @@ export class PositionCardBuilder {
         candidates.push(mainCandidate);
       }
 
-      // Process alternatives (multipv)
+      // Process alternatives (multipv, convert UCI to SAN)
       if (result.alternatives && result.alternatives.length > 0) {
         for (const alt of result.alternatives) {
           if (alt.bestLine && alt.bestLine.length > 0) {
+            const uciMove = alt.bestLine[0]!;
+            const sanMove = this.uciToSanSafe(pos, uciMove);
             const altCandidate: EngineCandidate = {
-              move: alt.bestLine[0]!,
+              move: sanMove,
               evaluation: alt.mate !== 0 ? (alt.mate > 0 ? 10000 : -10000) : alt.cp,
               isMate: alt.mate !== 0,
               pv: alt.bestLine,
@@ -469,8 +476,14 @@ export class PositionCardBuilder {
 
   /**
    * Transform cached evaluation to engine analysis result
+   *
+   * @param cached - Cached evaluation data
+   * @param pos - Chess position for UCI→SAN conversion
    */
-  private transformCachedEvaluation(cached: CachedEvaluation): {
+  private transformCachedEvaluation(
+    cached: CachedEvaluation,
+    pos: ChessPosition,
+  ): {
     evaluation: number;
     isMate: boolean;
     mateIn?: number;
@@ -480,10 +493,12 @@ export class PositionCardBuilder {
   } {
     const candidates: EngineCandidate[] = [];
 
-    // Process main line
+    // Process main line (convert UCI to SAN)
     if (cached.bestLine && cached.bestLine.length > 0) {
+      const uciMove = cached.bestLine[0]!;
+      const sanMove = this.uciToSanSafe(pos, uciMove);
       const mainCandidate: EngineCandidate = {
-        move: cached.bestLine[0]!,
+        move: sanMove,
         evaluation: cached.mate !== 0 ? (cached.mate > 0 ? 10000 : -10000) : cached.cp,
         isMate: cached.mate !== 0,
         pv: cached.bestLine,
@@ -494,12 +509,14 @@ export class PositionCardBuilder {
       candidates.push(mainCandidate);
     }
 
-    // Process alternatives
+    // Process alternatives (convert UCI to SAN)
     if (cached.alternatives && cached.alternatives.length > 0) {
       for (const alt of cached.alternatives) {
         if (alt.bestLine && alt.bestLine.length > 0) {
+          const uciMove = alt.bestLine[0]!;
+          const sanMove = this.uciToSanSafe(pos, uciMove);
           const altCandidate: EngineCandidate = {
-            move: alt.bestLine[0]!,
+            move: sanMove,
             evaluation: alt.mate !== 0 ? (alt.mate > 0 ? 10000 : -10000) : alt.cp,
             isMate: alt.mate !== 0,
             pv: alt.bestLine,
@@ -796,5 +813,22 @@ export class PositionCardBuilder {
     // Return probability for side to move
     // If Black to move, invert (Black's win prob = 100 - White's win prob)
     return sideToMove === 'white' ? whitePercentage : 100 - whitePercentage;
+  }
+
+  /**
+   * Convert UCI move to SAN with error handling
+   * Falls back to UCI if conversion fails
+   *
+   * @param pos - Chess position
+   * @param uciMove - Move in UCI notation (e.g., "e2e4")
+   * @returns Move in SAN notation (e.g., "e4"), or UCI if conversion fails
+   */
+  private uciToSanSafe(pos: ChessPosition, uciMove: string): string {
+    try {
+      return pos.uciToSan(uciMove);
+    } catch {
+      // Fall back to UCI if conversion fails
+      return uciMove;
+    }
   }
 }
