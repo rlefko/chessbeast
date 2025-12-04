@@ -31,12 +31,124 @@ import type {
   PositionCard,
   CandidateMove,
   ClassicalFeatures,
+  ShallowPositionCard,
   Motif,
   OpeningInfo,
   ReferenceGame,
   CardTier,
 } from './types.js';
-import { CARD_TIER_CONFIGS } from './types.js';
+import { CARD_TIER_CONFIGS, SHALLOW_DEPTH_OFFSET } from './types.js';
+
+/**
+ * Normalize evaluation to White's perspective
+ * Stockfish reports eval relative to side to move, but LLMs expect White's view
+ *
+ * @param evalCp - Evaluation in centipawns (relative to side to move)
+ * @param sideToMove - Which side is to move ('white' or 'black')
+ * @returns Evaluation from White's perspective (positive = White advantage)
+ */
+export function normalizeToWhitePerspective(evalCp: number, sideToMove: 'white' | 'black'): number {
+  // If it's White's turn, the eval is already from White's perspective
+  // If it's Black's turn, we need to negate the eval
+  return sideToMove === 'white' ? evalCp : -evalCp;
+}
+
+/**
+ * Maia probability thresholds for candidate selection
+ */
+const MAIA_THRESHOLD_FIRST_THREE = 0.05; // 5% for first 3 moves
+const MAIA_THRESHOLD_ADDITIONAL = 0.1; // 10% for additional moves
+
+/**
+ * Filter Maia predictions to get candidate moves above threshold
+ *
+ * Selection rules:
+ * - First 3 moves with >5% probability are always included
+ * - Additional moves require >10% probability
+ * - Sorted by probability descending
+ *
+ * @param predictions - Maia predictions sorted by probability descending
+ * @returns Filtered predictions meeting threshold criteria
+ */
+export function filterMaiaCandidates(predictions: MaiaPrediction[]): MaiaPrediction[] {
+  // Sort by probability descending (should already be sorted, but ensure)
+  const sorted = [...predictions].sort((a, b) => b.probability - a.probability);
+
+  const result: MaiaPrediction[] = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const pred = sorted[i]!;
+
+    if (i < 3) {
+      // First 3 slots: include if >5%
+      if (pred.probability > MAIA_THRESHOLD_FIRST_THREE) {
+        result.push(pred);
+      }
+    } else {
+      // Additional slots: include only if >10%
+      if (pred.probability > MAIA_THRESHOLD_ADDITIONAL) {
+        result.push(pred);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Maximum number of candidates in a merged set
+ */
+const MAX_MERGED_CANDIDATES = 6;
+
+/**
+ * Merged candidate before classification
+ * Contains move SAN and optional data from engine/Maia
+ */
+interface MergedCandidate {
+  san: string;
+  engineCandidate?: EngineCandidate;
+  maiaProbability?: number;
+}
+
+/**
+ * Merge engine candidates with filtered Maia predictions into a unified set
+ *
+ * @param engineCandidates - Engine multipv candidates
+ * @param maiaPredictions - Filtered Maia predictions (already threshold-filtered)
+ * @returns Merged candidates (deduped by SAN)
+ */
+export function mergeCandidates(
+  engineCandidates: EngineCandidate[],
+  maiaPredictions: MaiaPrediction[],
+): MergedCandidate[] {
+  const candidateMap = new Map<string, MergedCandidate>();
+
+  // Add engine candidates first (they have evaluations)
+  for (const ec of engineCandidates) {
+    candidateMap.set(ec.move, {
+      san: ec.move,
+      engineCandidate: ec,
+    });
+  }
+
+  // Add Maia candidates (may overlap with engine candidates)
+  for (const mp of maiaPredictions) {
+    const existing = candidateMap.get(mp.san);
+    if (existing) {
+      // Update with Maia probability
+      existing.maiaProbability = mp.probability;
+    } else {
+      // New Maia-only candidate
+      candidateMap.set(mp.san, {
+        san: mp.san,
+        maiaProbability: mp.probability,
+      });
+    }
+  }
+
+  // Convert to array and limit
+  return Array.from(candidateMap.values()).slice(0, MAX_MERGED_CANDIDATES);
+}
 
 /**
  * Services required by the builder
@@ -113,20 +225,38 @@ export class PositionCardBuilder {
       ],
     );
 
-    // Classify candidates
-    const candidates = this.classifyCandidates(engineResult.candidates, maiaResult);
+    // Determine side to move
+    const sideToMove = fen.includes(' w ') ? 'white' : 'black';
+
+    // Normalize evaluation to White's perspective
+    const normalizedEval = normalizeToWhitePerspective(engineResult.evaluation, sideToMove);
+
+    // Filter Maia predictions by threshold for candidate selection
+    const filteredMaia = maiaResult ? filterMaiaCandidates(maiaResult) : [];
+
+    // Classify candidates using engine candidates and filtered Maia predictions
+    const candidates = this.classifyCandidates(engineResult.candidates, filteredMaia, sideToMove);
+
+    // Build shallow cards for each candidate in parallel
+    const shallowCardPromises = candidates.map((c) => this.buildShallowCard(fen, c.san, tier));
+    const shallowCards = await Promise.all(shallowCardPromises);
+
+    // Attach shallow cards to candidates (by matching index)
+    for (let i = 0; i < candidates.length; i++) {
+      const shallowCard = shallowCards[i];
+      if (shallowCard) {
+        candidates[i]!.shallowCard = shallowCard;
+      }
+    }
 
     // Detect motifs
     const motifs = this.detectMotifs(fen, engineResult.bestLine);
 
-    // Determine side to move
-    const sideToMove = fen.includes(' w ') ? 'white' : 'black';
-
-    // Calculate recommendation
+    // Calculate recommendation (uses normalized eval)
     const recommendation = calculateRecommendation({
       candidates,
       evaluation: {
-        cp: engineResult.evaluation,
+        cp: normalizedEval,
         isMate: engineResult.isMate,
       },
       treeDepth,
@@ -138,8 +268,8 @@ export class PositionCardBuilder {
       sideToMove,
       candidates,
       evaluation: {
-        cp: engineResult.evaluation,
-        winProbability: this.cpToWinProbability(engineResult.evaluation, sideToMove),
+        cp: normalizedEval,
+        winProbability: this.cpToWinProbability(normalizedEval, sideToMove),
         isMate: engineResult.isMate,
         depth: engineResult.depth,
       },
@@ -450,6 +580,63 @@ export class PositionCardBuilder {
   }
 
   /**
+   * Build a shallow position card for a candidate move
+   *
+   * @param fen - Current position FEN (before the move)
+   * @param moveSan - Move in SAN format
+   * @param tier - Card tier (determines shallow depth)
+   * @returns ShallowPositionCard with eval and classical features, or undefined on error
+   */
+  async buildShallowCard(
+    fen: string,
+    moveSan: string,
+    tier: CardTier,
+  ): Promise<ShallowPositionCard | undefined> {
+    try {
+      // Apply the move to get the resulting position
+      const pos = new ChessPosition(fen);
+      const moveResult = pos.move(moveSan);
+      const resultingFen = moveResult.fenAfter;
+
+      // Calculate shallow depth from tier
+      const tierConfig = CARD_TIER_CONFIGS[tier];
+      const shallowDepth = Math.max(6, tierConfig.engineDepth - SHALLOW_DEPTH_OFFSET);
+
+      // Determine side to move after the candidate move
+      const sideToMove = resultingFen.includes(' w ') ? 'white' : 'black';
+
+      // Get shallow evaluation and classical features in parallel
+      const [evalResult, classicalFeatures] = await Promise.all([
+        this.getEngineAnalysis(resultingFen, shallowDepth, 1),
+        this.getClassicalFeatures(resultingFen),
+      ]);
+
+      // Classical features are required for shallow cards
+      if (!classicalFeatures) {
+        return undefined;
+      }
+
+      // Normalize evaluation to White's perspective
+      const normalizedEval = normalizeToWhitePerspective(evalResult.evaluation, sideToMove);
+
+      const shallowCard: ShallowPositionCard = {
+        evalCp: normalizedEval,
+        isMate: evalResult.isMate,
+        depth: evalResult.depth,
+        classicalFeatures,
+      };
+
+      if (evalResult.mateIn !== undefined) {
+        shallowCard.mateIn = evalResult.mateIn;
+      }
+
+      return shallowCard;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * Get opening info
    * Note: EcoClient.getOpeningByMoves requires move history, not FEN.
    * Since we only have FEN here, we return undefined.
@@ -501,10 +688,12 @@ export class PositionCardBuilder {
 
   /**
    * Classify candidates with sources
+   * Normalizes evaluations to White's perspective
    */
   private classifyCandidates(
     engineCandidates: EngineCandidate[],
-    maiaPredictions?: MaiaPrediction[],
+    maiaPredictions: MaiaPrediction[] | undefined,
+    sideToMove: 'white' | 'black',
   ): CandidateMove[] {
     if (engineCandidates.length === 0) {
       return [];
@@ -514,10 +703,13 @@ export class PositionCardBuilder {
     const classified = classifyCandidates(engineCandidates, maiaPredictions, config);
 
     return classified.map((c) => {
+      // Normalize evaluation to White's perspective
+      const normalizedEval = normalizeToWhitePerspective(c.evaluation, sideToMove);
+
       const move: CandidateMove = {
         san: c.move,
         source: c.primarySource,
-        evalCp: c.evaluation,
+        evalCp: normalizedEval,
         isMate: c.isMate,
         pv: c.line.split(' '),
       };
@@ -588,16 +780,21 @@ export class PositionCardBuilder {
   }
 
   /**
-   * Convert centipawns to win probability
+   * Convert centipawns to win probability for side to move
+   *
+   * @param cp - Evaluation in centipawns (from White's perspective)
+   * @param sideToMove - Which side is to move
+   * @returns Win probability (0-100) for the side to move
    */
   private cpToWinProbability(cp: number, sideToMove: 'white' | 'black'): number {
     // Sigmoid function approximation
-    // At +100cp, roughly 60% win; at +300cp, roughly 85%
+    // At +100cp, roughly 60% win for White; at +300cp, roughly 85%
     const k = 0.004;
-    const winProb = 1 / (1 + Math.exp(-k * cp));
-    const percentage = Math.round(winProb * 100);
+    const whiteWinProb = 1 / (1 + Math.exp(-k * cp));
+    const whitePercentage = Math.round(whiteWinProb * 100);
 
     // Return probability for side to move
-    return sideToMove === 'white' ? percentage : 100 - percentage;
+    // If Black to move, invert (Black's win prob = 100 - White's win prob)
+    return sideToMove === 'white' ? whitePercentage : 100 - whitePercentage;
   }
 }
