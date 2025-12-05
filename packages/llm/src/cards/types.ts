@@ -93,8 +93,8 @@ export interface ShallowPositionCard {
   mateIn?: number;
   /** Analysis depth */
   depth: number;
-  /** Classical eval features from SF16 */
-  classicalFeatures: ClassicalFeatures;
+  /** Classical eval features from SF16 (optional - requires SF16 service) */
+  classicalFeatures?: ClassicalFeatures;
 }
 
 /**
@@ -277,7 +277,7 @@ export function formatPositionCard(card: PositionCard): string {
       lines.push(`    → ${candidate.pv.slice(1, 5).join(' ')}`);
     }
     // Show shallow card classical features if available
-    if (candidate.shallowCard) {
+    if (candidate.shallowCard?.classicalFeatures) {
       const sc = candidate.shallowCard.classicalFeatures;
       const shallowFeatures: string[] = [];
       if (Math.abs(sc.mobility.mg) >= 0.2) {
@@ -356,16 +356,23 @@ export function formatPositionCard(card: PositionCard): string {
  * Get quality symbol based on win probability drop from best candidate
  * Uses en-croissant style win probability thresholds
  *
- * @param evalCp - Evaluation for this move (from side-to-move perspective)
- * @param bestEvalCp - Evaluation of the best move (from side-to-move perspective)
+ * @param evalCp - Evaluation for this move (from White's perspective)
+ * @param bestEvalCp - Evaluation of the best move (from White's perspective)
+ * @param sideToMove - Which side is to move
  * @returns Quality symbol (!, ?!, ?, ??, or empty string)
  */
-function evalToSymbol(evalCp: number, bestEvalCp: number): string {
-  // Convert to win probabilities
-  const winProbThis = cpToWinProbability(evalCp);
-  const winProbBest = cpToWinProbability(bestEvalCp);
+function evalToSymbol(evalCp: number, bestEvalCp: number, sideToMove: 'white' | 'black'): string {
+  // Convert evals to side-to-move perspective for correct comparison
+  // (evals are stored from White's perspective, but cpToWinProbability expects
+  // positive = good for the player being evaluated)
+  const evalFromStm = sideToMove === 'white' ? evalCp : -evalCp;
+  const bestEvalFromStm = sideToMove === 'white' ? bestEvalCp : -bestEvalCp;
 
-  // Win probability drop (positive = lost win chance)
+  // Convert to win probabilities (now correctly from side-to-move perspective)
+  const winProbThis = cpToWinProbability(evalFromStm);
+  const winProbBest = cpToWinProbability(bestEvalFromStm);
+
+  // Win probability drop (positive = lost win chance for side-to-move)
   const winProbDrop = winProbBest - winProbThis;
 
   // Classify based on win probability thresholds
@@ -382,12 +389,14 @@ function evalToSymbol(evalCp: number, bestEvalCp: number): string {
  * unless also in Maia candidates.
  *
  * @param candidates - All candidate moves
- * @param bestEval - Best evaluation (from side-to-move perspective)
+ * @param bestEval - Best evaluation (from White's perspective)
+ * @param sideToMove - Which side is to move
  * @returns Filtered list of human-relevant candidates
  */
 function filterHumanRelevantCandidates(
   candidates: CandidateMove[],
   bestEval: number,
+  sideToMove: 'white' | 'black',
 ): CandidateMove[] {
   // Build set of Maia-predicted moves
   const maiaMoves = new Set(
@@ -396,7 +405,9 @@ function filterHumanRelevantCandidates(
       .map((c) => c.san),
   );
 
-  const bestWinProb = cpToWinProbability(bestEval);
+  // Convert best eval to side-to-move perspective
+  const bestEvalFromStm = sideToMove === 'white' ? bestEval : -bestEval;
+  const bestWinProb = cpToWinProbability(bestEvalFromStm);
 
   return candidates.filter((c, index) => {
     // Always include best move (first candidate)
@@ -407,7 +418,8 @@ function filterHumanRelevantCandidates(
 
     // Calculate win probability drop
     const evalCp = c.shallowCard?.evalCp ?? c.evalCp;
-    const winProb = cpToWinProbability(evalCp);
+    const evalFromStm = sideToMove === 'white' ? evalCp : -evalCp;
+    const winProb = cpToWinProbability(evalFromStm);
     const winProbDrop = bestWinProb - winProb;
 
     // Keep moves within dubious threshold (≤5% win drop)
@@ -479,12 +491,16 @@ export function formatPositionCardConcise(card: PositionCard): string {
 
   // Filter to human-relevant candidates
   const bestEval = card.candidates[0]?.shallowCard?.evalCp ?? card.candidates[0]?.evalCp ?? 0;
-  const relevantCandidates = filterHumanRelevantCandidates(card.candidates, bestEval);
+  const relevantCandidates = filterHumanRelevantCandidates(
+    card.candidates,
+    bestEval,
+    card.sideToMove,
+  );
 
   // Lines 3-N: Candidates with eval and classical features
   for (const c of relevantCandidates.slice(0, 3)) {
     const candidateEval = c.shallowCard?.evalCp ?? c.evalCp;
-    const symbol = evalToSymbol(candidateEval, bestEval);
+    const symbol = evalToSymbol(candidateEval, bestEval, card.sideToMove);
     const evalDisplay = formatCandidateEval(candidateEval, c.isMate, c.mateIn);
 
     let line = `  ${c.san}${symbol} ${evalDisplay}`;

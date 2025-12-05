@@ -628,21 +628,19 @@ export class PositionCardBuilder {
         this.getClassicalFeatures(resultingFen),
       ]);
 
-      // Classical features are required for shallow cards
-      if (!classicalFeatures) {
-        return undefined;
-      }
-
       // Normalize evaluation to White's perspective
       const normalizedEval = normalizeToWhitePerspective(evalResult.evaluation, sideToMove);
 
+      // Create shallow card - classical features are optional (requires SF16 service)
       const shallowCard: ShallowPositionCard = {
         evalCp: normalizedEval,
         isMate: evalResult.isMate,
         depth: evalResult.depth,
-        classicalFeatures,
       };
 
+      if (classicalFeatures) {
+        shallowCard.classicalFeatures = classicalFeatures;
+      }
       if (evalResult.mateIn !== undefined) {
         shallowCard.mateIn = evalResult.mateIn;
       }
