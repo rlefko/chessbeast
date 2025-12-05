@@ -158,11 +158,11 @@ typecheck-py:
 # Services (native Stockfish + Docker Maia)
 # ===========================================
 
-run: stop  ## Start all services (native Stockfish + Docker Maia)
+run: stop build-stockfish-native  ## Start all services (native Stockfish + Docker Maia)
 	@echo "Starting services..."
-	@# Check for native Stockfish binaries
-	@if [ ! -f "bin/stockfish/stockfish" ] || [ ! -f "bin/stockfish/stockfish16" ]; then \
-		echo "Stockfish binaries not found. Run 'make setup' first."; \
+	@# Verify Stockfish binaries exist after build
+	@if [ ! -L "bin/stockfish/stockfish" ] || [ ! -f "bin/stockfish/stockfish-16" ]; then \
+		echo "Error: Stockfish build failed or binaries missing."; \
 		exit 1; \
 	fi
 	@# Check for gRPC stubs
@@ -175,7 +175,7 @@ run: stop  ## Start all services (native Stockfish + Docker Maia)
 	@# Start native Stockfish services in background
 	@STOCKFISH_PATH=$(PWD)/bin/stockfish/stockfish STOCKFISH_POOL_SIZE=1 \
 		uv run python -m stockfish_service.server &
-	@STOCKFISH16_PATH=$(PWD)/bin/stockfish/stockfish16 STOCKFISH16_POOL_SIZE=1 \
+	@STOCKFISH16_PATH=$(PWD)/bin/stockfish/stockfish-16 STOCKFISH16_POOL_SIZE=1 \
 		uv run python -m stockfish16_service.server &
 	@sleep 2
 	@echo ""
