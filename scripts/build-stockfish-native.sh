@@ -59,10 +59,12 @@ echo ""
 mkdir -p "$BIN_DIR"
 
 # =============================================================================
-# Build latest Stockfish from master (with SHA caching)
+# Build latest Stockfish from master (with SHA-based naming)
 # =============================================================================
 SF_LATEST_DIR="/tmp/stockfish-latest"
-SF_SHA_FILE="$BIN_DIR/.stockfish-sha"
+
+# Clean up legacy SHA file if it exists
+rm -f "$BIN_DIR/.stockfish-sha"
 
 echo "Checking latest Stockfish from master..."
 
@@ -78,26 +80,31 @@ else
 fi
 
 CURRENT_SHA=$(git rev-parse --short HEAD)
-CACHED_SHA=""
-if [ -f "$SF_SHA_FILE" ]; then
-    CACHED_SHA=$(cat "$SF_SHA_FILE")
-fi
+BINARY_NAME="stockfish-${CURRENT_SHA}"
 
 echo "Current SHA: $CURRENT_SHA"
-echo "Cached SHA:  ${CACHED_SHA:-none}"
+echo "Binary name: $BINARY_NAME"
 
-if [ "$FORCE_REBUILD" = "1" ] || [ "$CURRENT_SHA" != "$CACHED_SHA" ] || [ ! -f "$BIN_DIR/stockfish" ]; then
+if [ "$FORCE_REBUILD" = "1" ] || [ ! -f "$BIN_DIR/$BINARY_NAME" ]; then
     echo "Building Stockfish $CURRENT_SHA..."
+
+    # Clean up old stockfish-* binaries (except stockfish-16)
+    find "$BIN_DIR" -maxdepth 1 -name "stockfish-*" ! -name "stockfish-16" -type f -delete 2>/dev/null || true
+
     cd "$SF_LATEST_DIR/src"
     make clean
     make -j"$CPU_COUNT" build ARCH="$ARCH"
-    cp stockfish "$BIN_DIR/stockfish"
-    chmod +x "$BIN_DIR/stockfish"
-    echo "$CURRENT_SHA" > "$SF_SHA_FILE"
-    echo "Built: $BIN_DIR/stockfish"
+    cp stockfish "$BIN_DIR/$BINARY_NAME"
+    chmod +x "$BIN_DIR/$BINARY_NAME"
+    echo "Built: $BIN_DIR/$BINARY_NAME"
 else
-    echo "Stockfish is up to date, skipping build"
+    echo "Stockfish $CURRENT_SHA is up to date, skipping build"
 fi
+
+# Always ensure symlink points to current version
+ln -sf "$BINARY_NAME" "$BIN_DIR/stockfish"
+echo "Symlink: stockfish -> $BINARY_NAME"
+
 "$BIN_DIR/stockfish" --version 2>/dev/null || true
 echo ""
 
@@ -106,7 +113,7 @@ echo ""
 # =============================================================================
 SF16_DIR="/tmp/stockfish-16"
 
-if [ -f "$BIN_DIR/stockfish16" ] && [ "$FORCE_REBUILD" != "1" ]; then
+if [ -f "$BIN_DIR/stockfish-16" ] && [ "$FORCE_REBUILD" != "1" ]; then
     echo "Stockfish 16 already built, skipping"
 else
     echo "Building Stockfish 16..."
@@ -117,11 +124,16 @@ else
     cd "$SF16_DIR/src"
     make clean
     make -j"$CPU_COUNT" build ARCH="$ARCH"
-    cp stockfish "$BIN_DIR/stockfish16"
-    chmod +x "$BIN_DIR/stockfish16"
-    echo "Built: $BIN_DIR/stockfish16"
+    cp stockfish "$BIN_DIR/stockfish-16"
+    chmod +x "$BIN_DIR/stockfish-16"
+    echo "Built: $BIN_DIR/stockfish-16"
 fi
-"$BIN_DIR/stockfish16" --version 2>/dev/null || true
+
+# Create backward-compat symlink
+ln -sf "stockfish-16" "$BIN_DIR/stockfish16"
+echo "Symlink: stockfish16 -> stockfish-16"
+
+"$BIN_DIR/stockfish-16" --version 2>/dev/null || true
 echo ""
 
 # =============================================================================
@@ -129,5 +141,5 @@ echo ""
 # =============================================================================
 echo "=== Build Complete ==="
 echo "Binaries:"
-echo "  $BIN_DIR/stockfish (master @ $CURRENT_SHA)"
-echo "  $BIN_DIR/stockfish16 (SF16)"
+echo "  $BIN_DIR/stockfish-$CURRENT_SHA (symlink: stockfish)"
+echo "  $BIN_DIR/stockfish-16 (symlink: stockfish16)"
