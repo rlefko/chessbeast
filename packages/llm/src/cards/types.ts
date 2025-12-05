@@ -516,6 +516,14 @@ export function formatPositionCardConcise(card: PositionCard): string {
     lines.push(line);
   }
 
+  // Position-level classical features (if available)
+  if (card.classicalFeatures) {
+    const posFeatures = formatClassicalFeaturesForDisplay(card.classicalFeatures);
+    if (posFeatures) {
+      lines.push(`  [pos: ${posFeatures}]`);
+    }
+  }
+
   // Final line: Recommendation + motifs
   let lastLine = `  ${card.recommendation.action}: ${card.recommendation.reason}`;
   if (card.motifs.length > 0) {

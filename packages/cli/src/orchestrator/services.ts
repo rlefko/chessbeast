@@ -5,7 +5,7 @@
 import * as fs from 'node:fs';
 
 import { EcoClient, LichessEliteClient } from '@chessbeast/database';
-import { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
+import { StockfishClient, MaiaClient, Stockfish16Client } from '@chessbeast/grpc-client';
 import {
   Annotator,
   type AnnotatorServices,
@@ -22,6 +22,7 @@ import type { ServiceStatus } from '../progress/reporter.js';
  */
 export interface Services {
   stockfish: StockfishClient;
+  sf16: Stockfish16Client | null;
   maia: MaiaClient | null;
   ecoClient: EcoClient | null;
   lichessClient: LichessEliteClient | null;
@@ -202,6 +203,27 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
     }
   }
 
+  // Initialize Stockfish 16 (optional - for classical eval features)
+  let sf16: Stockfish16Client | null = null;
+  const sf16Config = config.services.stockfish16;
+  if (sf16Config?.enabled !== false) {
+    try {
+      sf16 = new Stockfish16Client({
+        host: sf16Config?.host ?? 'localhost',
+        port: sf16Config?.port ?? 50053,
+        timeoutMs: sf16Config?.timeoutMs ?? 30000,
+      });
+      const health = await sf16.healthCheck();
+      if (!health.healthy) {
+        // SF16 is optional - fall back gracefully
+        sf16 = null;
+      }
+    } catch {
+      // SF16 is optional - fall back gracefully without error
+      sf16 = null;
+    }
+  }
+
   // Initialize ECO database (required)
   let ecoClient: EcoClient | null = null;
   const ecoAbsolutePath = resolveAbsolutePath(config.databases.ecoPath);
@@ -263,6 +285,7 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
 
   return {
     stockfish,
+    sf16,
     maia,
     ecoClient,
     lichessClient,
