@@ -623,15 +623,26 @@ export class PositionCardBuilder {
       const sideToMove = resultingFen.includes(' w ') ? 'white' : 'black';
 
       // Get shallow evaluation and classical features in parallel
-      const [evalResult, classicalFeatures] = await Promise.all([
+      // Use Promise.allSettled so SF16 failures don't break the entire card
+      const [evalSettled, classicalSettled] = await Promise.allSettled([
         this.getEngineAnalysis(resultingFen, shallowDepth, 1),
         this.getClassicalFeatures(resultingFen),
       ]);
 
+      // Engine eval is required - if it failed, return undefined
+      if (evalSettled.status === 'rejected') {
+        return undefined;
+      }
+      const evalResult = evalSettled.value;
+
+      // Classical features are optional (requires SF16 service)
+      const classicalFeatures =
+        classicalSettled.status === 'fulfilled' ? classicalSettled.value : undefined;
+
       // Normalize evaluation to White's perspective
       const normalizedEval = normalizeToWhitePerspective(evalResult.evaluation, sideToMove);
 
-      // Create shallow card - classical features are optional (requires SF16 service)
+      // Create shallow card
       const shallowCard: ShallowPositionCard = {
         evalCp: normalizedEval,
         isMate: evalResult.isMate,

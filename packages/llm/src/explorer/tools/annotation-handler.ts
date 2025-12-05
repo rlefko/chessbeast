@@ -14,10 +14,10 @@ import type { ToolExecutionContext, ToolHandler } from './tool-router.js';
  * Validate and clean up LLM comment with context-aware limits
  *
  * Comment types:
- * - 'initial': Comment on the played move (brief pointer, 75-150 chars)
- * - 'variation_start': First comment in a variation line (50-100 chars)
- * - 'variation_middle': Comments during variation exploration (50-100 chars)
- * - 'variation_end': Summary comment at end of variation (100-150 chars)
+ * - 'initial': Comment on the played move (brief pointer, 40-60 chars)
+ * - 'variation_start': First comment in a variation line (40-60 chars)
+ * - 'variation_middle': Comments during variation exploration (40-60 chars)
+ * - 'variation_end': Summary comment at end of variation (80-120 chars)
  */
 export function validateAndCleanComment(
   comment: string,

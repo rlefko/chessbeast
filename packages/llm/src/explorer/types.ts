@@ -164,12 +164,15 @@ export interface CommentLimits {
 
 /**
  * Context-aware comment limits
+ *
+ * Limits are tighter to enforce the "brief pointer" style (5-12 words, ~50 chars).
+ * Soft limit triggers a warning, hard limit causes rejection.
  */
 export const COMMENT_LIMITS: Record<CommentType, CommentLimits> = {
-  initial: { soft: 50, hard: 100 },
-  variation_start: { soft: 50, hard: 100 },
-  variation_middle: { soft: 50, hard: 100 },
-  variation_end: { soft: 100, hard: 150 },
+  initial: { soft: 40, hard: 60 },
+  variation_start: { soft: 40, hard: 60 },
+  variation_middle: { soft: 40, hard: 60 },
+  variation_end: { soft: 80, hard: 120 },
 };
 
 /**
