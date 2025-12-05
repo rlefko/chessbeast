@@ -108,8 +108,10 @@ function calculateInterestingness(ply: PlyEvaluation): InterestingnessResult {
   const { evalBefore, evalAfter, classification } = ply;
 
   // Convert mate scores to extreme cp values for win probability calculation
-  const cpBefore = evalBefore.mate !== undefined ? (evalBefore.mate > 0 ? 10000 : -10000) : (evalBefore.cp ?? 0);
-  const cpAfter = evalAfter.mate !== undefined ? (evalAfter.mate > 0 ? 10000 : -10000) : (evalAfter.cp ?? 0);
+  const cpBefore =
+    evalBefore.mate !== undefined ? (evalBefore.mate > 0 ? 10000 : -10000) : (evalBefore.cp ?? 0);
+  const cpAfter =
+    evalAfter.mate !== undefined ? (evalAfter.mate > 0 ? 10000 : -10000) : (evalAfter.cp ?? 0);
 
   // Calculate win probability drop from the moving player's perspective
   // evalBefore.cp is from the moving player's perspective (positive = good for mover)
@@ -125,6 +127,24 @@ function calculateInterestingness(ply: PlyEvaluation): InterestingnessResult {
       type: 'tactical_moment',
       reason: 'Brilliant move',
       nag: '!!',
+    };
+  }
+
+  // Interesting (!?) - sound sacrifice, not necessarily best
+  // Detected when: sacrifice (cpLoss >= 100) + sound position + win prob drop not catastrophic
+  // Uses same perspective handling as calculateCpLoss in move-classifier.ts:
+  // - evalAfter is from opponent's perspective, negate to get player's view
+  const isSacrifice = ply.cpLoss >= 100;
+  const playerPerspectiveAfter = -cpAfter; // Same pattern as move-classifier.ts line 128
+  const isSound = playerPerspectiveAfter >= -200; // Player not worse than -200cp
+  const isNotCatastrophic = winProbDrop <= WIN_PROB_THRESHOLDS.mistake;
+
+  if (isSacrifice && isSound && isNotCatastrophic) {
+    return {
+      score: 42,
+      type: 'tactical_moment',
+      reason: `Interesting sacrifice (${ply.cpLoss}cp loss, position sound)`,
+      nag: '!?',
     };
   }
 
