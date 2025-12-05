@@ -11,11 +11,10 @@ import type {
   CriticalMomentType,
   EngineEvaluation,
   GamePhase,
-  NormalizedEval,
 } from '../types/analysis.js';
 
-import { normalizeEval } from './move-classifier.js';
 import { CRITICAL_MOMENT_THRESHOLDS } from './thresholds.js';
+import { calculateWinProbDrop, WIN_PROB_THRESHOLDS } from './win-probability.js';
 
 /**
  * Evaluation data for a single ply
@@ -76,169 +75,102 @@ export function estimateGamePhase(plyIndex: number, totalPlies: number): GamePha
 }
 
 /**
- * Determine the expected game result based on evaluation
+ * Result of interestingness calculation
  *
- * @param eval_ - Normalized evaluation
- * @returns Expected result: 'white', 'black', or 'draw'
+ * Now aligned with NAG assignment using win probability thresholds.
+ * Critical moment = Any move with auto-assigned NAG.
  */
-function getExpectedResult(
-  eval_: NormalizedEval,
-  isWhiteToMove: boolean,
-): 'white' | 'black' | 'draw' {
-  const { cp, isMate } = eval_;
-
-  if (isMate) {
-    // Positive normalized eval = side to move mates
-    const sideMating = cp > 0;
-    if (isWhiteToMove) {
-      return sideMating ? 'white' : 'black';
-    } else {
-      return sideMating ? 'black' : 'white';
-    }
-  }
-
-  const { winningThreshold, clearlyWinning } = CRITICAL_MOMENT_THRESHOLDS;
-
-  // From white's perspective
-  const whiteEval = isWhiteToMove ? cp : -cp;
-
-  if (whiteEval >= clearlyWinning) return 'white';
-  if (whiteEval <= -clearlyWinning) return 'black';
-  if (Math.abs(whiteEval) < winningThreshold) return 'draw';
-
-  // Between winning threshold and clearly winning
-  return whiteEval > 0 ? 'white' : 'black';
+interface InterestingnessResult {
+  score: number;
+  type: CriticalMomentType;
+  reason: string;
+  /** Associated NAG symbol if auto-assigned */
+  nag?: string;
 }
 
 /**
- * Calculate interestingness score for a position
+ * Calculate interestingness score for a position using win probability
  *
- * Higher scores indicate more important positions for annotation.
+ * Uses win probability thresholds aligned with NAG assignment.
+ * A critical moment is any move that gets automatically assigned a NAG annotation.
+ *
+ * Score philosophy:
+ * - ?? (blunder): 95 - highest priority
+ * - ? (mistake): 75
+ * - ?! (dubious): 55
+ * - !! (brilliant): 45
+ * - ! (good move): 40 - lower priority (good moves less interesting for exploration)
  *
  * @param ply - Evaluation data for the ply
- * @param prevPly - Previous ply data (if any)
- * @param gamePhase - Current game phase
- * @returns Interestingness score (0-100)
+ * @returns Interestingness result with score, type, reason, and optional NAG
  */
-function calculateInterestingness(
-  ply: PlyEvaluation,
-  _prevPly?: PlyEvaluation,
-  _gamePhase?: GamePhase,
-): { score: number; type: CriticalMomentType; reason: string } {
-  const { evalBefore, evalAfter, classification, cpLoss, isWhiteMove } = ply;
-  const thresholds = CRITICAL_MOMENT_THRESHOLDS;
+function calculateInterestingness(ply: PlyEvaluation): InterestingnessResult {
+  const { evalBefore, evalAfter, classification } = ply;
 
-  // Normalize evaluations
-  const normBefore = normalizeEval(evalBefore, isWhiteMove);
-  const normAfter = normalizeEval(evalAfter, !isWhiteMove);
-  const evalSwing = Math.abs(normBefore.cp - -normAfter.cp);
+  // Convert mate scores to extreme cp values for win probability calculation
+  const cpBefore = evalBefore.mate !== undefined ? (evalBefore.mate > 0 ? 10000 : -10000) : (evalBefore.cp ?? 0);
+  const cpAfter = evalAfter.mate !== undefined ? (evalAfter.mate > 0 ? 10000 : -10000) : (evalAfter.cp ?? 0);
 
-  // Check for various critical moment types
+  // Calculate win probability drop from the moving player's perspective
+  // evalBefore.cp is from the moving player's perspective (positive = good for mover)
+  // evalAfter.cp is from the opponent's perspective (positive = good for opponent)
+  // calculateWinProbDrop handles the perspective conversion internally
+  const winProbDrop = calculateWinProbDrop(cpBefore, cpAfter);
 
-  // 1. Blunders are always interesting
-  if (classification === 'blunder') {
-    return {
-      score: 85 + Math.min(15, cpLoss / 50),
-      type: 'eval_swing',
-      reason: `Blunder losing ${cpLoss} centipawns`,
-    };
-  }
-
-  // 2. Brilliant moves are interesting
+  // Brilliant moves take precedence (from existing classification - typically sacrifices)
+  // Check this first before win probability thresholds
   if (classification === 'brilliant') {
     return {
-      score: 90,
+      score: 45,
       type: 'tactical_moment',
-      reason: 'Brilliant move - surprising and strong',
+      reason: 'Brilliant move',
+      nag: '!!',
     };
   }
 
-  // 3. Large evaluation swings (turning points)
-  if (evalSwing >= thresholds.veryLargeEvalSwing) {
-    const expectedBefore = getExpectedResult(normBefore, isWhiteMove);
-    const flippedAfter: NormalizedEval = { cp: -normAfter.cp, isMate: normAfter.isMate };
-    if (normAfter.mateIn !== undefined) {
-      flippedAfter.mateIn = normAfter.mateIn;
-    }
-    const expectedAfter = getExpectedResult(flippedAfter, isWhiteMove);
-
-    if (expectedBefore !== expectedAfter) {
-      return {
-        score: 80 + Math.min(15, evalSwing / 100),
-        type: 'result_change',
-        reason: `Game result changed from ${expectedBefore} to ${expectedAfter}`,
-      };
-    }
-
+  // Classify based on win probability thresholds (aligned with NAG assignment)
+  if (winProbDrop > WIN_PROB_THRESHOLDS.blunder) {
     return {
-      score: 70 + Math.min(20, evalSwing / 50),
-      type: 'turning_point',
-      reason: `Major evaluation swing of ${evalSwing} centipawns`,
-    };
-  }
-
-  // 4. Mistakes
-  if (classification === 'mistake') {
-    return {
-      score: 60 + Math.min(20, cpLoss / 20),
+      score: 95,
       type: 'eval_swing',
-      reason: `Mistake losing ${cpLoss} centipawns`,
+      reason: `Blunder (${winProbDrop.toFixed(1)}% win probability lost)`,
+      nag: '??',
     };
   }
 
-  // 5. Medium evaluation swings
-  if (evalSwing >= thresholds.largeEvalSwing) {
-    return {
-      score: 50 + Math.min(25, evalSwing / 20),
-      type: 'eval_swing',
-      reason: `Significant evaluation change of ${evalSwing} centipawns`,
-    };
-  }
-
-  // 6. Missed wins (evaluation went from winning to not winning)
-  if (normBefore.cp >= thresholds.clearlyWinning && -normAfter.cp < thresholds.winningThreshold) {
+  if (winProbDrop > WIN_PROB_THRESHOLDS.mistake) {
     return {
       score: 75,
-      type: 'missed_win',
-      reason: 'Winning advantage squandered',
+      type: 'eval_swing',
+      reason: `Mistake (${winProbDrop.toFixed(1)}% win probability lost)`,
+      nag: '?',
     };
   }
 
-  // 7. Tactical moments (mate threats appearing or disappearing)
-  if (
-    (evalBefore.mate !== undefined && evalAfter.mate === undefined) ||
-    (evalBefore.mate === undefined && evalAfter.mate !== undefined)
-  ) {
+  if (winProbDrop > WIN_PROB_THRESHOLDS.dubious) {
     return {
-      score: 65,
+      score: 55,
+      type: 'eval_swing',
+      reason: `Dubious move (${winProbDrop.toFixed(1)}% win probability lost)`,
+      nag: '?!',
+    };
+  }
+
+  // Check for good moves (gained win probability)
+  if (winProbDrop < -WIN_PROB_THRESHOLDS.good) {
+    return {
+      score: 40, // Lower priority - good moves less interesting for exploration
       type: 'tactical_moment',
-      reason: evalAfter.mate !== undefined ? 'Mate threat created' : 'Mate threat escaped',
+      reason: `Good move (${(-winProbDrop).toFixed(1)}% win probability gained)`,
+      nag: '!',
     };
   }
 
-  // 8. Inaccuracies (less critical but still notable)
-  if (classification === 'inaccuracy') {
-    return {
-      score: 35 + Math.min(15, cpLoss / 10),
-      type: 'eval_swing',
-      reason: `Inaccuracy losing ${cpLoss} centipawns`,
-    };
-  }
-
-  // 9. Small evaluation swings
-  if (evalSwing >= thresholds.minEvalSwing) {
-    return {
-      score: 30 + Math.min(15, evalSwing / 15),
-      type: 'eval_swing',
-      reason: `Evaluation changed by ${evalSwing} centipawns`,
-    };
-  }
-
-  // Default: not very interesting
+  // Default: not a critical moment (no NAG assigned)
   return {
-    score: Math.min(25, evalSwing / 5),
+    score: 0,
     type: 'eval_swing',
-    reason: 'Minor position change',
+    reason: 'Normal move',
   };
 }
 
@@ -269,6 +201,9 @@ export function detectPhaseTransitions(
 /**
  * Detect critical moments in a game
  *
+ * A critical moment is any move that gets automatically assigned a NAG annotation.
+ * Only negative NAGs (?!, ?, ??) warrant deep exploration.
+ *
  * @param evaluations - Evaluation data for all plies
  * @param options - Detection options
  * @returns Array of critical moments, sorted by interestingness
@@ -279,7 +214,7 @@ export function detectCriticalMoments(
 ): CriticalMoment[] {
   const {
     maxCriticalRatio = CRITICAL_MOMENT_THRESHOLDS.maxCriticalRatio,
-    minScore = CRITICAL_MOMENT_THRESHOLDS.minInterestingnessScore,
+    minScore = 1, // Any move with a NAG is critical (score > 0)
     includePhaseTransitions = false,
   } = options;
 
@@ -293,17 +228,20 @@ export function detectCriticalMoments(
   // Analyze each ply
   for (let i = 0; i < evaluations.length; i++) {
     const ply = evaluations[i]!;
-    const prevPly = i > 0 ? evaluations[i - 1] : undefined;
-    const gamePhase = estimateGamePhase(ply.plyIndex, totalPlies);
 
-    const { score, type, reason } = calculateInterestingness(ply, prevPly, gamePhase);
+    const { score, type, reason, nag } = calculateInterestingness(ply);
 
-    if (score >= minScore) {
+    // Only include moves that got a NAG (score > 0)
+    if (nag && score >= minScore) {
       moments.push({
         plyIndex: ply.plyIndex,
         type,
         score,
         reason,
+        nag,
+        // Negative NAGs need deep exploration to explain what went wrong
+        // Positive NAGs (player understood the move) just need brief explanation
+        needsExploration: ['??', '?', '?!'].includes(nag),
       });
     }
 

@@ -87,17 +87,12 @@ describe('Rating Thresholds', () => {
 });
 
 describe('Critical Moment Thresholds', () => {
-  it('should have reasonable eval swing thresholds', () => {
-    expect(CRITICAL_MOMENT_THRESHOLDS.minEvalSwing).toBeGreaterThan(0);
-    expect(CRITICAL_MOMENT_THRESHOLDS.largeEvalSwing).toBeGreaterThan(
-      CRITICAL_MOMENT_THRESHOLDS.minEvalSwing,
-    );
-    expect(CRITICAL_MOMENT_THRESHOLDS.veryLargeEvalSwing).toBeGreaterThan(
-      CRITICAL_MOMENT_THRESHOLDS.largeEvalSwing,
-    );
-  });
-
   it('should cap critical moments at 25%', () => {
     expect(CRITICAL_MOMENT_THRESHOLDS.maxCriticalRatio).toBe(0.25);
+  });
+
+  it('should have minimum interestingness score for NAG-based detection', () => {
+    // Any move with a NAG is critical (score > 0)
+    expect(CRITICAL_MOMENT_THRESHOLDS.minInterestingnessScore).toBe(1);
   });
 });

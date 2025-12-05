@@ -200,22 +200,17 @@ export const DEFAULT_RATING = 1500;
 
 /**
  * Thresholds for critical moment detection
+ *
+ * Critical moment detection now uses win probability thresholds (from win-probability.ts)
+ * aligned with NAG assignment. A critical moment is any move with an auto-assigned NAG.
+ *
+ * @see WIN_PROB_THRESHOLDS in win-probability.ts for the primary thresholds
  */
 export const CRITICAL_MOMENT_THRESHOLDS = {
-  /** Minimum evaluation swing (cp) to be considered critical */
-  minEvalSwing: 100,
-  /** Large evaluation swing (cp) */
-  largeEvalSwing: 200,
-  /** Very large evaluation swing (cp) - definitely critical */
-  veryLargeEvalSwing: 300,
-  /** Winning threshold (cp) - position is winning */
-  winningThreshold: 200,
-  /** Clearly winning threshold (cp) */
-  clearlyWinning: 500,
   /** Maximum percentage of moves to mark as critical */
   maxCriticalRatio: 0.25,
-  /** Minimum interestingness score to be included */
-  minInterestingnessScore: 30,
+  /** Minimum interestingness score to be included (0 = any NAG) */
+  minInterestingnessScore: 1,
 };
 
 /**
