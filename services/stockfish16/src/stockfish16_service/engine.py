@@ -293,7 +293,8 @@ class Stockfish16Engine:
                         result.append(line)
 
                         # SF16 eval output ends with "Total" line - no further output
-                        if line.startswith("Total"):
+                        # Note: line format is "|      Total |..." so check contains
+                        if "Total" in line and "Term" not in line:
                             done.set()
                             break
             except Exception as e:
