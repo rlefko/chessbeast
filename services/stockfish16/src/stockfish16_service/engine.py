@@ -277,7 +277,6 @@ class Stockfish16Engine:
         def read_output() -> None:
             try:
                 in_eval_section = False
-                total_seen = False
 
                 while True:
                     line = self._process.stdout.readline()  # type: ignore
@@ -293,12 +292,8 @@ class Stockfish16Engine:
                     if in_eval_section:
                         result.append(line)
 
-                        # Look for Total line to know we're done
+                        # SF16 eval output ends with "Total" line - no further output
                         if line.startswith("Total"):
-                            total_seen = True
-
-                        # After Total, look for the final eval line or empty line
-                        if total_seen and (line == "" or "Final evaluation" in line):
                             done.set()
                             break
             except Exception as e:

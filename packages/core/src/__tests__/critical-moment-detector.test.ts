@@ -115,12 +115,15 @@ describe('Critical Moment Detector', () => {
     it('should detect brilliant moves as critical moments', () => {
       const plies: PlyEvaluation[] = [
         createPlyWithEval(0, 0, 0),
-        createPlyWithEval(1, 0, -200, 'brilliant'), // Brilliant!
-        createPlyWithEval(2, 200, 200),
+        createPlyWithEval(1, 0, 0, 'brilliant'), // Brilliant! (neutral eval to avoid triggering good move)
+        createPlyWithEval(2, 0, 0),
+        createPlyWithEval(3, 0, 0),
       ];
 
-      const moments = detectCriticalMoments(plies);
+      // Use higher maxCriticalRatio to ensure brilliant moves aren't capped out
+      const moments = detectCriticalMoments(plies, { maxCriticalRatio: 0.5 });
       expect(moments.some((m) => m.plyIndex === 1)).toBe(true);
+      expect(moments.some((m) => m.nag === '!!')).toBe(true);
     });
 
     it('should detect large evaluation swings', () => {

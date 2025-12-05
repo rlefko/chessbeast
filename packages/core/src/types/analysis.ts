@@ -173,6 +173,10 @@ export interface CriticalMoment {
   score: number;
   /** Reason for flagging as critical */
   reason: string;
+  /** Associated NAG if auto-assigned (!, ?!, ?, ??, !!) */
+  nag?: string;
+  /** Whether this moment warrants deep exploration (negative NAGs only) */
+  needsExploration?: boolean;
 }
 
 /**
