@@ -86,11 +86,22 @@ export const llmConfigSchema = z.object({
 });
 
 /**
+ * Optional service endpoint schema (with enabled flag)
+ */
+export const optionalServiceEndpointSchema = z.object({
+  host: z.string().min(1).default('localhost'),
+  port: portSchema,
+  timeoutMs: z.number().int().min(1000).default(30000),
+  enabled: z.boolean().default(true),
+});
+
+/**
  * Services configuration schema
  */
 export const servicesConfigSchema = z.object({
   stockfish: serviceEndpointSchema,
   maia: serviceEndpointSchema,
+  stockfish16: optionalServiceEndpointSchema.optional(),
 });
 
 /**
@@ -134,6 +145,7 @@ export const partialConfigSchema = z.object({
     .object({
       stockfish: serviceEndpointSchema.partial().optional(),
       maia: serviceEndpointSchema.partial().optional(),
+      stockfish16: optionalServiceEndpointSchema.partial().optional(),
     })
     .optional(),
   databases: databasesConfigSchema.partial().optional(),

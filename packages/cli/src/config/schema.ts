@@ -112,6 +112,20 @@ export interface ServiceEndpoint {
 }
 
 /**
+ * Optional service endpoint configuration (with enabled flag)
+ */
+export interface OptionalServiceEndpoint {
+  /** Service host */
+  host: string;
+  /** Service port */
+  port: number;
+  /** Request timeout in milliseconds */
+  timeoutMs: number;
+  /** Whether the service is enabled */
+  enabled: boolean;
+}
+
+/**
  * Services configuration
  */
 export interface ServicesConfigSchema {
@@ -119,6 +133,8 @@ export interface ServicesConfigSchema {
   stockfish: ServiceEndpoint;
   /** Maia human-likeness service */
   maia: ServiceEndpoint;
+  /** Stockfish 16 classical eval service (optional) */
+  stockfish16?: OptionalServiceEndpoint;
 }
 
 /**

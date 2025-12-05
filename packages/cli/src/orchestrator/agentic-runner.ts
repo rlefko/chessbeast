@@ -84,6 +84,9 @@ export async function runAgenticAnnotation(
   if (services.maia) {
     agenticServices.maia = services.maia;
   }
+  if (services.sf16) {
+    agenticServices.sf16 = services.sf16;
+  }
 
   const targetRating = config.ratings.targetAudienceRating ?? config.ratings.defaultRating;
   const generator = new AgenticCommentGenerator(client, llmConfig, agenticServices, targetRating);
