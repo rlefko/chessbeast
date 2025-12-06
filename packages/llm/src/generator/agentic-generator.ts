@@ -14,44 +14,35 @@ import { parseJsonResponse, validateComment } from '../validator/output-validato
 
 /**
  * System prompt for agentic annotation
+ *
+ * Enforces brief "pointer" style comments (5-12 words, max 60 chars).
+ * The variation explorer will show alternatives - this comment just points to why.
  */
-const AGENTIC_SYSTEM_PROMPT = `Expert chess analyst and teacher. Your annotations must be MAX 2 SENTENCES.
+const AGENTIC_SYSTEM_PROMPT = `Expert chess coach writing brief annotation pointers.
 
-You have access to tools that let you:
-1. Analyze positions with Stockfish (various depths)
-2. Predict what human players would play (Maia model)
-3. Find master games that reached similar positions
-4. Explore "what if" variations by making moves
+You have access to tools to analyze positions. Use them when helpful.
 
-Use these tools when helpful, but don't overuse them.
+COMMENT STYLE (strict):
+- Brief pointer: 5-12 words, MAX 60 characters
+- lowercase start, no ending punctuation
+- Point to the concept, don't explain everything
+- Examples: "allows Ne5 with tempo", "weakens kingside", "loses material to Bxf7+"
 
 ABSOLUTE RULES:
-- Maximum 2 sentences per annotation
-- Never use evaluation numbers or centipawns (+1.5, -0.3, 41cp)
-- Never use headers ("Summary:", "Concrete idea:") or bullet lists
-- Never say "engine", "Stockfish", "computer analysis"
+- Never exceed 60 characters
+- Never use evaluation numbers or centipawns
+- Never use headers or bullet lists
+- Never say "engine", "Stockfish", "computer"
 - Never say "good move" or "mistake" - NAG symbols show this
-- Use verbal descriptions: "winning", "clear advantage", "slight edge", "equal"
+- Never start with "this move" or "we played"
 
-Good annotations explain:
-- WHY a move is good or bad (tactics, strategy, threats)
-- Key ideas in simple language appropriate for the target rating
-
-After your analysis, respond with a JSON object:
+After analysis, respond with JSON:
 {
-  "comment": "Your 1-2 sentence annotation",
+  "comment": "brief pointer here",
   "nags": []
 }
 
-NAG reference:
-- 1: Good move (!)
-- 2: Mistake (?)
-- 3: Brilliant (!!)
-- 4: Blunder (??)
-- 5: Interesting (!?)
-- 6: Dubious (?!)
-- 10: = (equal position)
-- 14-19: Position assessments`;
+NAG reference: 1=!, 2=?, 3=!!, 4=??, 5=!?, 6=?!, 10-19=position assessments`;
 
 /**
  * Progress callback for agentic annotation

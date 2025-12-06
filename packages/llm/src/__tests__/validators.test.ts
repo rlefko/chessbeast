@@ -286,23 +286,23 @@ describe('Output Validator', () => {
   });
 
   describe('validateComment character limits', () => {
-    it('should truncate comments exceeding hard limit (150 chars for initial type)', () => {
-      const longComment = 'A'.repeat(200); // 200 chars, exceeds 150 hard limit
+    it('should truncate comments exceeding hard limit (60 chars for initial type)', () => {
+      const longComment = 'A'.repeat(100); // 100 chars, exceeds 60 hard limit
       const raw = { comment: longComment, nags: [] };
       const result = validateComment(raw, []);
-      expect(result.sanitized.comment!.length).toBeLessThanOrEqual(150);
+      expect(result.sanitized.comment!.length).toBeLessThanOrEqual(60);
     });
 
     it('should warn but not truncate comments between soft and hard limits', () => {
-      const mediumComment = 'A'.repeat(100); // 100 chars, between 75 soft and 150 hard
+      const mediumComment = 'A'.repeat(50); // 50 chars, between 40 soft and 60 hard
       const raw = { comment: mediumComment, nags: [] };
       const result = validateComment(raw, []);
-      expect(result.sanitized.comment!.length).toBe(100);
+      expect(result.sanitized.comment!.length).toBe(50);
       expect(result.issues.some((i) => i.message.includes('soft limit'))).toBe(true);
     });
 
     it('should allow comments under soft limit without warnings', () => {
-      const shortComment = 'allows Nxe5'; // 11 chars, well under 75 soft limit
+      const shortComment = 'allows Nxe5'; // 11 chars, well under 40 soft limit
       const raw = { comment: shortComment, nags: [] };
       const result = validateComment(raw, []);
       expect(result.sanitized.comment).toBe('allows Nxe5');
