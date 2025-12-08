@@ -15,7 +15,7 @@
  * - Opening information (when applicable)
  */
 
-import { cpToWinProbability, WIN_PROB_THRESHOLDS } from '@chessbeast/core';
+import { cpToWinProbability, WIN_PROB_THRESHOLDS, type DetectedTheme } from '@chessbeast/core';
 
 /**
  * Source classification for candidate moves
@@ -206,8 +206,14 @@ export interface PositionCard {
   /** Classical eval features from SF16 (optional) */
   classicalFeatures?: ClassicalFeatures;
 
-  /** Detected motifs and patterns */
+  /** Detected motifs and patterns (legacy, for backward compatibility) */
   motifs: Motif[];
+
+  /** Enhanced theme detection with metadata (new) */
+  themes?: {
+    tactical: DetectedTheme[];
+    positional: DetectedTheme[];
+  };
 
   /** Exploration recommendation */
   recommendation: {
@@ -305,8 +311,26 @@ export function formatPositionCard(card: PositionCard): string {
     );
   }
 
-  // Motifs
-  if (card.motifs.length > 0) {
+  // Themes (enhanced detection)
+  if (card.themes) {
+    lines.push('');
+    lines.push('**Themes:**');
+    if (card.themes.tactical.length > 0) {
+      const tacticalStr = card.themes.tactical
+        .slice(0, 4)
+        .map((t) => `${t.id}${t.confidence === 'high' ? '!' : ''}${t.squares?.length ? ` (${t.squares[0]})` : ''}`)
+        .join(', ');
+      lines.push(`Tactical: ${tacticalStr}`);
+    }
+    if (card.themes.positional.length > 0) {
+      const positionalStr = card.themes.positional
+        .slice(0, 4)
+        .map((t) => `${t.id}${t.severity === 'critical' ? '!' : ''}`)
+        .join(', ');
+      lines.push(`Positional: ${positionalStr}`);
+    }
+  } else if (card.motifs.length > 0) {
+    // Fallback to legacy motifs
     lines.push('');
     lines.push(`Motifs: ${card.motifs.join(', ')}`);
   }
@@ -524,9 +548,16 @@ export function formatPositionCardConcise(card: PositionCard): string {
     }
   }
 
-  // Final line: Recommendation + motifs
+  // Final line: Recommendation + themes/motifs
   let lastLine = `  ${card.recommendation.action}: ${card.recommendation.reason}`;
-  if (card.motifs.length > 0) {
+  if (card.themes) {
+    const tacticalIds = card.themes.tactical.slice(0, 3).map((t) => t.id);
+    const positionalIds = card.themes.positional.slice(0, 2).map((t) => t.id);
+    const allThemes = [...tacticalIds, ...positionalIds];
+    if (allThemes.length > 0) {
+      lastLine += ` | themes: ${allThemes.join(', ')}`;
+    }
+  } else if (card.motifs.length > 0) {
     lastLine += ` | motifs: ${card.motifs.join(', ')}`;
   }
   lines.push(lastLine);

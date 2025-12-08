@@ -346,20 +346,36 @@ export const CLEAR_INTERESTING_TOOL: OpenAITool = {
 };
 
 // =============================================================================
-// ANALYSIS TOOLS (REMOVED - Now provided via Position Cards)
+// ANALYSIS TOOLS
 // =============================================================================
 //
-// The following tools have been removed in favor of automatic Position Card delivery:
-// - get_candidate_moves: Candidates now in Position Card
-// - evaluate_position: Evaluation now in Position Card
-// - predict_human_moves: Maia predictions now in Position Card
-// - lookup_opening: Opening info now in Position Card
-// - find_reference_games: Reference games now in Position Card
+// Most analysis is now provided via Position Cards after every navigation action.
+// However, the analyze_themes tool provides deeper, on-demand theme analysis.
 //
-// Position Cards are delivered via system message after every navigation action
-// (add_move, add_alternative, go_to, go_to_parent). The LLM reads the card
-// passively instead of calling analysis tools explicitly.
-//
+
+/**
+ * Tool: Analyze themes in current position
+ * Provides deeper theme analysis beyond what's in the Position Card
+ */
+export const ANALYZE_THEMES_TOOL: OpenAITool = {
+  type: 'function',
+  function: {
+    name: 'analyze_themes',
+    description:
+      'Re-analyze the current position for tactical and positional themes at full depth. Use when you need deeper insight into position characteristics beyond what the Position Card provides. Returns detailed explanations of detected themes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        focus: {
+          type: 'string',
+          enum: ['all', 'tactical', 'positional'],
+          description: 'Which themes to analyze (default: all)',
+        },
+      },
+      required: [],
+    },
+  },
+};
 
 // =============================================================================
 // STOPPING TOOLS
@@ -476,6 +492,9 @@ export const EXPLORATION_TOOLS: OpenAITool[] = [
   MARK_INTERESTING_TOOL,
   GET_INTERESTING_TOOL,
   CLEAR_INTERESTING_TOOL,
+
+  // Analysis
+  ANALYZE_THEMES_TOOL,
 
   // Stopping
   ASSESS_CONTINUATION_TOOL,

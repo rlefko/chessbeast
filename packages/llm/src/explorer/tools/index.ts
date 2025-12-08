@@ -9,6 +9,7 @@
 export { ToolRouter, type ToolHandler, type ToolExecutionContext } from './tool-router.js';
 
 // Handlers
+export { AnalysisToolHandler } from './analysis-handler.js';
 export { AnnotationToolHandler, validateAndCleanComment } from './annotation-handler.js';
 export { NavigationToolHandler } from './navigation-handler.js';
 export { WorkQueueToolHandler } from './work-queue-handler.js';

@@ -1072,17 +1072,78 @@ export class AgenticVariationExplorer {
         };
       }
 
-      // === Analysis Tools (REMOVED) ===
-      // Analysis tools have been removed in favor of Position Cards.
-      // The following tools are no longer available:
-      // - get_candidate_moves: Candidates provided in Position Card
-      // - evaluate_position: Evaluation provided in Position Card
-      // - predict_human_moves: Maia predictions provided in Position Card
-      // - lookup_opening: Opening info provided in Position Card
-      // - find_reference_games: Reference games provided in Position Card
-      //
-      // Position Cards are delivered via system message after navigation actions.
-      // If any of these tools are called, they fall through to the default case.
+      // === Analysis Tools ===
+      // Most analysis is provided via Position Cards, but analyze_themes
+      // provides on-demand deep theme analysis.
+      case 'analyze_themes': {
+        const focus = (args.focus as string) || 'all';
+        const fen = tree.getCurrentNode().fen;
+        const pos = new ChessPosition(fen);
+
+        // Import theme detectors inline to avoid circular deps
+        const { TacticalThemeDetector, PositionalThemeDetector, generateThemeSummary } =
+          await import('@chessbeast/core');
+
+        const tacticalDetector = new TacticalThemeDetector();
+        const positionalDetector = new PositionalThemeDetector();
+
+        // Detect themes at full depth
+        let tactical: Array<Record<string, unknown>> = [];
+        let positional: Array<Record<string, unknown>> = [];
+
+        if (focus === 'all' || focus === 'tactical') {
+          const themes = tacticalDetector.detect(pos, { tier: 'full' });
+          tactical = themes.map((t) => {
+            const result: Record<string, unknown> = {
+              id: t.id,
+              confidence: t.confidence,
+              severity: t.severity,
+              explanation: t.explanation,
+              beneficiary: t.beneficiary === 'w' ? 'white' : 'black',
+            };
+            if (t.squares) result.squares = t.squares;
+            if (t.pieces) result.pieces = t.pieces;
+            if (t.materialAtStake !== undefined) result.materialAtStake = t.materialAtStake;
+            return result;
+          });
+        }
+
+        if (focus === 'all' || focus === 'positional') {
+          const themes = positionalDetector.detect(pos, { tier: 'full' });
+          positional = themes.map((t) => {
+            const result: Record<string, unknown> = {
+              id: t.id,
+              confidence: t.confidence,
+              severity: t.severity,
+              explanation: t.explanation,
+              beneficiary: t.beneficiary === 'w' ? 'white' : 'black',
+            };
+            if (t.squares) result.squares = t.squares;
+            return result;
+          });
+        }
+
+        // Generate summary (need to re-get themes for the function)
+        const allTactical = focus === 'all' || focus === 'tactical'
+          ? tacticalDetector.detect(pos, { tier: 'full' })
+          : [];
+        const allPositional = focus === 'all' || focus === 'positional'
+          ? positionalDetector.detect(pos, { tier: 'full' })
+          : [];
+        const summary = generateThemeSummary(allTactical, allPositional);
+
+        return {
+          success: true,
+          fen,
+          tactical,
+          positional,
+          summary,
+          counts: {
+            tactical: tactical.length,
+            positional: positional.length,
+          },
+        };
+      }
 
       // === Stopping ===
       case 'assess_continuation': {
@@ -1240,6 +1301,13 @@ Move Quality NAGs (use freely on any move):
 Position Evaluation NAGs (ONLY at END of variation!):
 - **set_position_nag(nag)** - $10=equal, $14/15=slight edge, $16/17=clear advantage, $18/19=winning
 - ⚠️ NEVER use position NAGs mid-variation. ONLY at the final position!
+
+## ANALYSIS TOOLS
+
+- **analyze_themes(focus?)** - Re-analyze current position for tactical and positional themes at full depth.
+  - focus: 'all' (default), 'tactical', or 'positional'
+  - Returns detailed theme explanations beyond Position Card motifs
+  - Use when you need deeper insight into position characteristics
 
 ## SHOW DON'T TELL PHILOSOPHY
 

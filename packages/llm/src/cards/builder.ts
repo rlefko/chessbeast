@@ -17,6 +17,12 @@ import type {
   ClassicalEvalResponse,
 } from '@chessbeast/grpc-client';
 import { ChessPosition } from '@chessbeast/pgn';
+import {
+  TacticalThemeDetector,
+  PositionalThemeDetector,
+  themesToMotifs,
+  type DetectedTheme,
+} from '@chessbeast/core';
 
 import type { EvaluationCache, CachedEvaluation } from '../cache/evaluation-cache.js';
 import {
@@ -183,6 +189,8 @@ const DEFAULT_CONFIG: CardBuilderConfig = {
  */
 export class PositionCardBuilder {
   private readonly config: CardBuilderConfig;
+  private readonly tacticalDetector = new TacticalThemeDetector();
+  private readonly positionalDetector = new PositionalThemeDetector();
 
   constructor(
     private readonly services: CardBuilderServices,
@@ -249,8 +257,8 @@ export class PositionCardBuilder {
       }
     }
 
-    // Detect motifs
-    const motifs = this.detectMotifs(fen, engineResult.bestLine);
+    // Detect themes (includes legacy motifs for backward compatibility)
+    const { motifs, themes } = this.detectThemes(fen, tier);
 
     // Calculate recommendation (uses normalized eval)
     const recommendation = calculateRecommendation({
@@ -296,6 +304,9 @@ export class PositionCardBuilder {
     // Add optional fields
     if (sf16Result) {
       card.classicalFeatures = sf16Result;
+    }
+    if (themes) {
+      card.themes = themes;
     }
     if (openingResult) {
       card.opening = openingResult;
@@ -756,53 +767,47 @@ export class PositionCardBuilder {
   }
 
   /**
-   * Detect tactical and strategic motifs (deterministic)
+   * Detect tactical and strategic themes (deterministic)
+   *
+   * @param fen - Position in FEN notation
+   * @param tier - Card tier controls depth of detection
+   * @returns Object with tactical themes, positional themes, and legacy motifs
    */
-  private detectMotifs(fen: string, bestLine: string[]): Motif[] {
-    const motifs: Motif[] = [];
+  private detectThemes(
+    fen: string,
+    tier: CardTier,
+  ): {
+    motifs: Motif[];
+    themes?: { tactical: DetectedTheme[]; positional: DetectedTheme[] };
+  } {
     const pos = new ChessPosition(fen);
 
-    // Check for checks
-    if (pos.isCheck()) {
-      motifs.push('discovered_attack');
+    // Map tier to detection tier
+    const detectionTier =
+      tier === 'minimal' || tier === 'shallow' ? 'shallow' : tier === 'standard' ? 'standard' : 'full';
+
+    // Detect tactical themes
+    const tacticalThemes = this.tacticalDetector.detect(pos, { tier: detectionTier });
+
+    // Detect positional themes (skip for minimal/shallow)
+    const positionalThemes =
+      tier !== 'minimal' && tier !== 'shallow'
+        ? this.positionalDetector.detect(pos, { tier: detectionTier })
+        : [];
+
+    // Convert to legacy motifs for backward compatibility
+    // Cast is safe because themesToMotifs only returns valid Motif values
+    const motifs = themesToMotifs([...tacticalThemes, ...positionalThemes]) as Motif[];
+
+    // Only include full themes for standard and full tiers
+    if (tier === 'full' || tier === 'standard') {
+      return {
+        motifs,
+        themes: { tactical: tacticalThemes, positional: positionalThemes },
+      };
     }
 
-    // Detect back rank weakness (simplified)
-    // In real implementation, this would analyze king safety squares
-    const fenParts = fen.split(' ');
-    const board = fenParts[0]!;
-
-    // White back rank weakness (king on 1st rank with pawns blocking)
-    if (board.endsWith('K') || board.includes('K1/')) {
-      const rank1 = board.split('/').pop()!;
-      if (rank1.includes('PP') || rank1.includes('PPP')) {
-        motifs.push('back_rank_weakness');
-      }
-    }
-
-    // Black back rank weakness
-    if (board.startsWith('k') || board.includes('/k')) {
-      const rank8 = board.split('/')[0]!;
-      if (rank8.includes('pp') || rank8.includes('ppp')) {
-        motifs.push('back_rank_weakness');
-      }
-    }
-
-    // Detect passed pawns (simplified)
-    // This is a placeholder - real implementation would check pawn structure
-    if (board.match(/P[1-7]\/[1-8]\/[1-8]\/[1-8]\/[1-8]\/[1-8]/)) {
-      motifs.push('passed_pawn');
-    }
-
-    // If best line has captures on consecutive moves, likely a tactical sequence
-    if (bestLine.length >= 2) {
-      const captureCount = bestLine.slice(0, 4).filter((m) => m.includes('x')).length;
-      if (captureCount >= 2) {
-        motifs.push('double_attack');
-      }
-    }
-
-    return motifs;
+    return { motifs };
   }
 
   /**
