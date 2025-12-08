@@ -11,3 +11,7 @@ export * from './material.js';
 export * from './win-probability.js';
 export * from './annotation-strategy.js';
 export * from './win-prob-strategy.js';
+
+// Criticality scoring and adaptive analysis
+export * from './criticality-scorer.js';
+export * from './adaptive-multipv.js';
