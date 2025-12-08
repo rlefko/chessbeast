@@ -784,7 +784,11 @@ export class PositionCardBuilder {
 
     // Map tier to detection tier
     const detectionTier =
-      tier === 'minimal' || tier === 'shallow' ? 'shallow' : tier === 'standard' ? 'standard' : 'full';
+      tier === 'minimal' || tier === 'shallow'
+        ? 'shallow'
+        : tier === 'standard'
+          ? 'standard'
+          : 'full';
 
     // Detect tactical themes
     const tacticalThemes = this.tacticalDetector.detect(pos, { tier: detectionTier });

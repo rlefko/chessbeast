@@ -318,7 +318,10 @@ export function formatPositionCard(card: PositionCard): string {
     if (card.themes.tactical.length > 0) {
       const tacticalStr = card.themes.tactical
         .slice(0, 4)
-        .map((t) => `${t.id}${t.confidence === 'high' ? '!' : ''}${t.squares?.length ? ` (${t.squares[0]})` : ''}`)
+        .map(
+          (t) =>
+            `${t.id}${t.confidence === 'high' ? '!' : ''}${t.squares?.length ? ` (${t.squares[0]})` : ''}`,
+        )
         .join(', ');
       lines.push(`Tactical: ${tacticalStr}`);
     }

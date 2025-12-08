@@ -1124,12 +1124,14 @@ export class AgenticVariationExplorer {
         }
 
         // Generate summary (need to re-get themes for the function)
-        const allTactical = focus === 'all' || focus === 'tactical'
-          ? tacticalDetector.detect(pos, { tier: 'full' })
-          : [];
-        const allPositional = focus === 'all' || focus === 'positional'
-          ? positionalDetector.detect(pos, { tier: 'full' })
-          : [];
+        const allTactical =
+          focus === 'all' || focus === 'tactical'
+            ? tacticalDetector.detect(pos, { tier: 'full' })
+            : [];
+        const allPositional =
+          focus === 'all' || focus === 'positional'
+            ? positionalDetector.detect(pos, { tier: 'full' })
+            : [];
         const summary = generateThemeSummary(allTactical, allPositional);
 
         return {
