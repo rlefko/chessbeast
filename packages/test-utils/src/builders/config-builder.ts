@@ -109,6 +109,42 @@ export interface OutputConfigSchema {
 }
 
 /**
+ * Analysis speed / tier configuration
+ */
+export type AnalysisSpeed = 'fast' | 'normal' | 'deep';
+
+/**
+ * Theme output verbosity
+ */
+export type ThemeVerbosity = 'none' | 'important' | 'all';
+
+/**
+ * Variation exploration depth
+ */
+export type VariationDepth = 'low' | 'medium' | 'high';
+
+/**
+ * Comment density control
+ */
+export type CommentDensity = 'sparse' | 'normal' | 'verbose';
+
+/**
+ * Target audience level for annotations
+ */
+export type AudienceLevel = 'beginner' | 'club' | 'expert';
+
+/**
+ * Ultra-Fast Coach configuration
+ */
+export interface UltraFastCoachConfigSchema {
+  speed: AnalysisSpeed;
+  themes: ThemeVerbosity;
+  variations: VariationDepth;
+  commentDensity: CommentDensity;
+  audience: AudienceLevel;
+}
+
+/**
  * Complete ChessBeast configuration
  */
 export interface ChessBeastConfig {
@@ -119,6 +155,7 @@ export interface ChessBeastConfig {
   services: ServicesConfigSchema;
   databases: DatabasesConfigSchema;
   output: OutputConfigSchema;
+  ultraFastCoach: UltraFastCoachConfigSchema;
 }
 
 /**
@@ -207,6 +244,13 @@ const DEFAULT_CONFIG: ChessBeastConfig = {
     includeNags: true,
     includeSummary: true,
     perspective: 'neutral',
+  },
+  ultraFastCoach: {
+    speed: 'normal',
+    themes: 'important',
+    variations: 'medium',
+    commentDensity: 'normal',
+    audience: 'club',
   },
 };
 
@@ -443,6 +487,34 @@ export class ConfigBuilder {
    */
   withAnalysis(analysis: Partial<AnalysisConfigSchema>): this {
     this.config.analysis = { ...this.config.analysis, ...analysis };
+    return this;
+  }
+
+  /**
+   * Configure Ultra-Fast Coach options
+   */
+  withUltraFastCoach(options: {
+    speed?: AnalysisSpeed;
+    themes?: ThemeVerbosity;
+    variations?: VariationDepth;
+    commentDensity?: CommentDensity;
+    audience?: AudienceLevel;
+  }): this {
+    if (options.speed !== undefined) {
+      this.config.ultraFastCoach.speed = options.speed;
+    }
+    if (options.themes !== undefined) {
+      this.config.ultraFastCoach.themes = options.themes;
+    }
+    if (options.variations !== undefined) {
+      this.config.ultraFastCoach.variations = options.variations;
+    }
+    if (options.commentDensity !== undefined) {
+      this.config.ultraFastCoach.commentDensity = options.commentDensity;
+    }
+    if (options.audience !== undefined) {
+      this.config.ultraFastCoach.audience = options.audience;
+    }
     return this;
   }
 
