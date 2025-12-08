@@ -24,6 +24,31 @@ export type AnnotationPerspective = 'white' | 'black' | 'neutral';
 export type ReasoningEffort = 'low' | 'medium' | 'high' | 'none';
 
 /**
+ * Analysis speed / tier configuration
+ */
+export type AnalysisSpeed = 'fast' | 'normal' | 'deep';
+
+/**
+ * Theme output verbosity
+ */
+export type ThemeVerbosity = 'none' | 'important' | 'all';
+
+/**
+ * Variation exploration depth
+ */
+export type VariationDepth = 'low' | 'medium' | 'high';
+
+/**
+ * Comment density control
+ */
+export type CommentDensity = 'sparse' | 'normal' | 'verbose';
+
+/**
+ * Target audience level for annotations
+ */
+export type AudienceLevel = 'beginner' | 'club' | 'expert';
+
+/**
  * Analysis configuration
  */
 export interface AnalysisConfigSchema {
@@ -164,6 +189,25 @@ export interface OutputConfigSchema {
 }
 
 /**
+ * Ultra-Fast Coach configuration
+ *
+ * Settings for the new architecture with staged analysis,
+ * theme detection, and post-write comment synthesis.
+ */
+export interface UltraFastCoachConfigSchema {
+  /** Analysis speed tier */
+  speed: AnalysisSpeed;
+  /** Theme output verbosity */
+  themes: ThemeVerbosity;
+  /** Variation exploration depth */
+  variations: VariationDepth;
+  /** Comment density control */
+  commentDensity: CommentDensity;
+  /** Target audience level */
+  audience: AudienceLevel;
+}
+
+/**
  * Complete ChessBeast configuration
  */
 export interface ChessBeastConfig {
@@ -181,6 +225,8 @@ export interface ChessBeastConfig {
   databases: DatabasesConfigSchema;
   /** Output settings */
   output: OutputConfigSchema;
+  /** Ultra-Fast Coach settings */
+  ultraFastCoach: UltraFastCoachConfigSchema;
 }
 
 /**
@@ -235,4 +281,14 @@ export interface CliOptions {
   explorationMaxToolCalls?: number;
   /** Maximum depth for agentic exploration */
   explorationMaxDepth?: number;
+  /** Analysis speed tier (fast/normal/deep) */
+  speed?: AnalysisSpeed;
+  /** Theme output verbosity (none/important/all) */
+  themes?: ThemeVerbosity;
+  /** Variation exploration depth (low/medium/high) */
+  variations?: VariationDepth;
+  /** Comment density control (sparse/normal/verbose) */
+  commentDensity?: CommentDensity;
+  /** Target audience level (beginner/club/expert) */
+  audience?: AudienceLevel;
 }

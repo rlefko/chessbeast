@@ -123,6 +123,17 @@ export const DEFAULT_OUTPUT_CONFIG = {
 };
 
 /**
+ * Default Ultra-Fast Coach configuration
+ */
+export const DEFAULT_ULTRA_FAST_COACH_CONFIG = {
+  speed: 'normal' as const,
+  themes: 'important' as const,
+  variations: 'medium' as const,
+  commentDensity: 'normal' as const,
+  audience: 'club' as const,
+};
+
+/**
  * Complete default configuration
  */
 export const DEFAULT_CONFIG: ChessBeastConfig = {
@@ -136,6 +147,7 @@ export const DEFAULT_CONFIG: ChessBeastConfig = {
   },
   databases: DEFAULT_DATABASES_CONFIG,
   output: DEFAULT_OUTPUT_CONFIG,
+  ultraFastCoach: DEFAULT_ULTRA_FAST_COACH_CONFIG,
 };
 
 /**

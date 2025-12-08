@@ -57,7 +57,18 @@ export {
   createMoveSequence,
 } from './builders/move-analysis-builder.js';
 
-export { ConfigBuilder, config, configPresets } from './builders/config-builder.js';
+export {
+  ConfigBuilder,
+  config,
+  configPresets,
+  type AnalysisSpeed,
+  type ThemeVerbosity,
+  type VariationDepth,
+  type CommentDensity,
+  type AudienceLevel,
+  type UltraFastCoachConfigSchema,
+  type ChessBeastConfig,
+} from './builders/config-builder.js';
 
 // Semantic matching
 export {
