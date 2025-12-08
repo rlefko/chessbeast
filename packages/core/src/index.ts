@@ -30,3 +30,6 @@ export * from './classifier/index.js';
 
 // Re-export pipeline
 export * from './pipeline/index.js';
+
+// Re-export exploration
+export * from './exploration/index.js';
