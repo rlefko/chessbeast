@@ -10,6 +10,11 @@ import type {
   OutputVerbosity,
   AnnotationPerspective,
   ReasoningEffort,
+  AnalysisSpeed,
+  ThemeVerbosity,
+  VariationDepth,
+  CommentDensity,
+  AudienceLevel,
 } from './config/schema.js';
 
 export const VERSION = '0.1.0';
@@ -57,6 +62,46 @@ const AGENTIC_HELP = `Enable agentic annotation mode with tool calling.
 const AGENTIC_EXPLORATION_HELP = `Enable agentic variation exploration.
     The LLM autonomously explores variations, leaving comments
     at critical points and navigating with tool calls.`;
+
+/**
+ * Analysis speed descriptions for help text
+ */
+const SPEED_HELP = `Analysis speed/tier:
+    fast   - Quick analysis (shallow depth, minimal themes)
+    normal - Balanced analysis [default]
+    deep   - Thorough analysis (deep search, full themes)`;
+
+/**
+ * Theme verbosity descriptions for help text
+ */
+const THEMES_HELP = `Theme output verbosity:
+    none      - No theme detection
+    important - Only significant themes [default]
+    all       - All detected themes`;
+
+/**
+ * Variation depth descriptions for help text
+ */
+const VARIATIONS_HELP = `Variation exploration depth:
+    low    - Minimal variations
+    medium - Standard exploration [default]
+    high   - Deep variation trees`;
+
+/**
+ * Comment density descriptions for help text
+ */
+const DENSITY_HELP = `Comment density control:
+    sparse  - Fewer comments, key moments only
+    normal  - Standard density [default]
+    verbose - More frequent comments`;
+
+/**
+ * Audience level descriptions for help text
+ */
+const AUDIENCE_HELP = `Target audience skill level:
+    beginner - Simple explanations, basic terms
+    club     - Club player level [default]
+    expert   - Advanced terminology`;
 
 /**
  * Create and configure the CLI program
@@ -112,6 +157,11 @@ export function createProgram(): Command {
     .option('--show-config', 'Print resolved configuration and exit')
     .option('--no-color', 'Disable colored output (useful for piping)')
     .option('--dry-run', 'Validate setup and configuration without running analysis')
+    .option('--speed <level>', SPEED_HELP, 'normal')
+    .option('--themes <level>', THEMES_HELP, 'important')
+    .option('--variations <level>', VARIATIONS_HELP, 'medium')
+    .option('--comment-density <level>', DENSITY_HELP, 'normal')
+    .option('--audience <level>', AUDIENCE_HELP, 'club')
     .action(async (options) => {
       // Import dynamically to avoid circular dependencies
       const { analyzeCommand } = await import('./commands/analyze.js');
@@ -159,6 +209,13 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
     result.explorationMaxToolCalls = options['explorationMaxToolCalls'] as number;
   if (options['explorationMaxDepth'] !== undefined)
     result.explorationMaxDepth = options['explorationMaxDepth'] as number;
+  if (options['speed'] !== undefined) result.speed = options['speed'] as AnalysisSpeed;
+  if (options['themes'] !== undefined) result.themes = options['themes'] as ThemeVerbosity;
+  if (options['variations'] !== undefined)
+    result.variations = options['variations'] as VariationDepth;
+  if (options['commentDensity'] !== undefined)
+    result.commentDensity = options['commentDensity'] as CommentDensity;
+  if (options['audience'] !== undefined) result.audience = options['audience'] as AudienceLevel;
 
   return result;
 }
