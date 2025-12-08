@@ -27,6 +27,7 @@ import {
 import { runAgenticAnnotation } from './agentic-runner.js';
 import { toAnalysisInput } from './converters.js';
 import type { Services } from './services.js';
+import { createUltraFastCoachConfig, getUltraFastTierConfig } from './ultra-fast-coach.js';
 
 /**
  * Analysis result for a single game
@@ -98,17 +99,22 @@ export async function orchestrateAnalysis(
     // Create progress callback
     const progressCallback = createPipelineProgressCallback(reporter);
 
-    // Create analysis pipeline
+    // Create Ultra-Fast Coach config and get tier settings
+    const coachConfig = createUltraFastCoachConfig(config.ultraFastCoach);
+    const tierConfigs = getUltraFastTierConfig(coachConfig);
+    const defaultTierConfig = tierConfigs[coachConfig.defaultTier];
+
+    // Create analysis pipeline with tier-based settings
     const pipeline = createAnalysisPipeline(
       engine,
       maia,
       openings,
       referenceGames,
       {
-        shallowDepth: config.analysis.shallowDepth,
-        deepDepth: config.analysis.deepDepth,
-        multiPvCount: config.analysis.multiPvCount,
-        maxCriticalRatio: config.analysis.maxCriticalRatio,
+        shallowDepth: tierConfigs.shallow.depth ?? config.analysis.shallowDepth,
+        deepDepth: defaultTierConfig.depth ?? config.analysis.deepDepth,
+        multiPvCount: defaultTierConfig.multipv ?? config.analysis.multiPvCount,
+        maxCriticalRatio: coachConfig.pipeline.maxCriticalRatio ?? config.analysis.maxCriticalRatio,
         whiteRating: config.ratings.targetAudienceRating ?? config.ratings.defaultRating,
         blackRating: config.ratings.targetAudienceRating ?? config.ratings.defaultRating,
         skipMaia: config.analysis.skipMaia,
