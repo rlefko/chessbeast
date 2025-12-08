@@ -12,6 +12,11 @@ import type {
   OutputVerbosity,
   AnnotationPerspective,
   ReasoningEffort,
+  AnalysisSpeed,
+  ThemeVerbosity,
+  VariationDepth,
+  CommentDensity,
+  AudienceLevel,
 } from './schema.js';
 import { validateConfig, validatePartialConfig } from './validation.js';
 
@@ -58,6 +63,13 @@ const ENV_VAR_MAP: Record<string, string> = {
   // Output
   CHESSBEAST_VERBOSITY: 'output.verbosity',
   CHESSBEAST_PERSPECTIVE: 'output.perspective',
+
+  // Ultra-Fast Coach
+  CHESSBEAST_SPEED: 'ultraFastCoach.speed',
+  CHESSBEAST_THEMES: 'ultraFastCoach.themes',
+  CHESSBEAST_VARIATIONS: 'ultraFastCoach.variations',
+  CHESSBEAST_COMMENT_DENSITY: 'ultraFastCoach.commentDensity',
+  CHESSBEAST_AUDIENCE: 'ultraFastCoach.audience',
 };
 
 /**
@@ -112,6 +124,11 @@ function deepMerge(target: ChessBeastConfig, source: Partial<ChessBeastConfig>):
   // Merge output
   if (source.output) {
     result.output = { ...result.output, ...source.output };
+  }
+
+  // Merge ultraFastCoach
+  if (source.ultraFastCoach) {
+    result.ultraFastCoach = { ...result.ultraFastCoach, ...source.ultraFastCoach };
   }
 
   return result;
@@ -359,6 +376,67 @@ function mapCliToConfig(options: CliOptions): Partial<ChessBeastConfig> {
       ...config.agentic,
       explorationMaxDepth: options.explorationMaxDepth,
     } as ChessBeastConfig['agentic'];
+  }
+
+  // Ultra-Fast Coach options
+  if (options.speed !== undefined) {
+    const speedMap: Record<AnalysisSpeed, AnalysisSpeed> = {
+      fast: 'fast',
+      normal: 'normal',
+      deep: 'deep',
+    };
+    config.ultraFastCoach = {
+      ...config.ultraFastCoach,
+      speed: speedMap[options.speed],
+    } as ChessBeastConfig['ultraFastCoach'];
+  }
+
+  if (options.themes !== undefined) {
+    const themesMap: Record<ThemeVerbosity, ThemeVerbosity> = {
+      none: 'none',
+      important: 'important',
+      all: 'all',
+    };
+    config.ultraFastCoach = {
+      ...config.ultraFastCoach,
+      themes: themesMap[options.themes],
+    } as ChessBeastConfig['ultraFastCoach'];
+  }
+
+  if (options.variations !== undefined) {
+    const variationsMap: Record<VariationDepth, VariationDepth> = {
+      low: 'low',
+      medium: 'medium',
+      high: 'high',
+    };
+    config.ultraFastCoach = {
+      ...config.ultraFastCoach,
+      variations: variationsMap[options.variations],
+    } as ChessBeastConfig['ultraFastCoach'];
+  }
+
+  if (options.commentDensity !== undefined) {
+    const densityMap: Record<CommentDensity, CommentDensity> = {
+      sparse: 'sparse',
+      normal: 'normal',
+      verbose: 'verbose',
+    };
+    config.ultraFastCoach = {
+      ...config.ultraFastCoach,
+      commentDensity: densityMap[options.commentDensity],
+    } as ChessBeastConfig['ultraFastCoach'];
+  }
+
+  if (options.audience !== undefined) {
+    const audienceMap: Record<AudienceLevel, AudienceLevel> = {
+      beginner: 'beginner',
+      club: 'club',
+      expert: 'expert',
+    };
+    config.ultraFastCoach = {
+      ...config.ultraFastCoach,
+      audience: audienceMap[options.audience],
+    } as ChessBeastConfig['ultraFastCoach'];
   }
 
   return config;
