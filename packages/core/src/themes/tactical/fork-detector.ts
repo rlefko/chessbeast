@@ -269,3 +269,76 @@ export function detectPotentialForks(pos: ChessPosition): DetectedTheme[] {
 
   return Array.from(uniqueThemes.values()).slice(0, 5); // Limit to 5 potential forks
 }
+
+/**
+ * Detect double attacks (generalized forks)
+ *
+ * A double attack is any piece attacking two or more valuable targets.
+ * This includes pieces that aren't typically associated with "forks"
+ * like queens, rooks, and bishops.
+ */
+export function detectDoubleAttacks(pos: ChessPosition): DetectedTheme[] {
+  const themes: DetectedTheme[] = [];
+
+  for (const color of ['w', 'b'] as Color[]) {
+    themes.push(...detectDoubleAttacksForColor(pos, color));
+  }
+
+  return themes;
+}
+
+/**
+ * Detect double attacks for a specific color
+ */
+function detectDoubleAttacksForColor(pos: ChessPosition, attackerColor: Color): DetectedTheme[] {
+  const themes: DetectedTheme[] = [];
+  const enemyColor = attackerColor === 'w' ? 'b' : 'w';
+  const attackerPieces = pos.getAllPieces().filter((p) => p.color === attackerColor);
+  const enemyPieces = pos.getAllPieces().filter((p) => p.color === enemyColor);
+
+  // Only consider major pieces and queens for double attacks
+  // (knights and pawns are already handled by specific fork detectors)
+  for (const attacker of attackerPieces) {
+    // Skip knights and pawns - they have specific fork detectors
+    if (attacker.type === 'n' || attacker.type === 'p' || attacker.type === 'k') continue;
+
+    const attackedPieces = getAttackedPieces(pos, attacker, enemyPieces);
+
+    // Need at least 2 attacked pieces for a double attack
+    if (attackedPieces.length < 2) continue;
+
+    // Filter to only valuable targets (at least pawns)
+    const valuableTargets = attackedPieces.filter((p) => getPieceValue(p.type) >= 100);
+    if (valuableTargets.length < 2) continue;
+
+    // Calculate value at risk
+    const values = valuableTargets.map((p) => getPieceValue(p.type));
+    const materialAtStake = Math.min(...values);
+
+    // Determine severity
+    const hasRoyalTarget = valuableTargets.some((p) => p.type === 'k' || p.type === 'q');
+    const severity = hasRoyalTarget ? 'critical' : materialAtStake >= 500 ? 'significant' : 'minor';
+
+    const targetDescriptions = valuableTargets
+      .slice(0, 3)
+      .map((p) => pieceName(p.type))
+      .join(', ');
+
+    themes.push({
+      id: 'double_attack',
+      category: 'tactical',
+      confidence: 'high',
+      severity,
+      squares: [attacker.square, ...valuableTargets.slice(0, 3).map((p) => p.square)],
+      pieces: [
+        formatPieceAtSquare(attacker as LocatedPiece),
+        ...valuableTargets.slice(0, 3).map((p) => formatPieceAtSquare(p)),
+      ],
+      beneficiary: attackerColor,
+      explanation: `${pieceName(attacker.type)} on ${attacker.square} attacks ${targetDescriptions}`,
+      materialAtStake,
+    });
+  }
+
+  return themes;
+}

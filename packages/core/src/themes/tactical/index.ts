@@ -13,10 +13,13 @@ import type { DetectedTheme, DetectionConfig, DetectionTier } from '../types.js'
 import { detectBatteries } from './battery-detector.js';
 import { detectDefenderTactics, detectDeflection } from './defender-detector.js';
 import { detectDiscoveries, detectPotentialDiscoveries } from './discovery-detector.js';
-import { detectForks, detectPotentialForks } from './fork-detector.js';
+import { detectEndgameThemes } from './endgame-detector.js';
+import { detectForcingMoves } from './forcing-detector.js';
+import { detectForks, detectPotentialForks, detectDoubleAttacks } from './fork-detector.js';
 import { detectPawnTactics, detectUnderpromotion } from './pawn-tactics-detector.js';
 import { detectPins, detectSituationalPins } from './pin-detector.js';
 import { detectSkewers } from './skewer-detector.js';
+import { detectSpecialTactics } from './special-tactics-detector.js';
 import { detectWeaknesses, detectHangingPieces } from './weakness-detector.js';
 
 /**
@@ -86,6 +89,12 @@ export class TacticalThemeDetector {
 
       // Pawn tactics (O(pawns))
       themes.push(...detectPawnTactics(pos));
+
+      // Double attacks (generalized forks)
+      themes.push(...detectDoubleAttacks(pos));
+
+      // Endgame themes (O(1) for opposition, O(moves) for zugzwang)
+      themes.push(...detectEndgameThemes(pos));
     }
 
     // === Tier 3: Deep analysis (move simulation) ===
@@ -103,6 +112,12 @@ export class TacticalThemeDetector {
 
       // Underpromotion (O(promotion moves))
       themes.push(...detectUnderpromotion(pos));
+
+      // Forcing moves (attraction, decoy, interference, clearance)
+      themes.push(...detectForcingMoves(pos));
+
+      // Special tactics (zwischenzug, windmill, greek_gift, sacrifice)
+      themes.push(...detectSpecialTactics(pos));
     }
 
     // Sort by severity and confidence
@@ -165,10 +180,13 @@ export class TacticalThemeDetector {
 
 // Export individual detectors for direct use
 export { detectPins, detectSituationalPins } from './pin-detector.js';
-export { detectForks, detectPotentialForks } from './fork-detector.js';
+export { detectForks, detectPotentialForks, detectDoubleAttacks } from './fork-detector.js';
 export { detectSkewers } from './skewer-detector.js';
 export { detectDiscoveries, detectPotentialDiscoveries } from './discovery-detector.js';
 export { detectBatteries } from './battery-detector.js';
 export { detectWeaknesses, detectHangingPieces } from './weakness-detector.js';
 export { detectDefenderTactics, detectDeflection } from './defender-detector.js';
 export { detectPawnTactics, detectUnderpromotion } from './pawn-tactics-detector.js';
+export { detectEndgameThemes } from './endgame-detector.js';
+export { detectForcingMoves } from './forcing-detector.js';
+export { detectSpecialTactics } from './special-tactics-detector.js';

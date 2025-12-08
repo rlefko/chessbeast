@@ -187,3 +187,5 @@ bin/
 .mcp.json
 .claude-indexer/*
 .index_cache/*
+.claude/
+CLAUDE.md

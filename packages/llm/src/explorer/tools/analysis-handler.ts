@@ -5,13 +5,13 @@
  * Tools: analyze_themes
  */
 
-import { ChessPosition } from '@chessbeast/pgn';
 import {
   TacticalThemeDetector,
   PositionalThemeDetector,
   generateThemeSummary,
   type DetectedTheme,
 } from '@chessbeast/core';
+import { ChessPosition } from '@chessbeast/pgn';
 
 import type { ToolCall } from '../../tools/types.js';
 

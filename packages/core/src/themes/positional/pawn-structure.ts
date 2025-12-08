@@ -25,6 +25,8 @@ export function detectPawnStructure(pos: ChessPosition): DetectedTheme[] {
     themes.push(...detectBackwardPawns(pos, color));
     themes.push(...detectPassedPawns(pos, color));
     themes.push(...detectPawnBreaks(pos, color));
+    themes.push(...detectWeakPawns(pos, color));
+    themes.push(...detectSteamrolling(pos, color));
   }
 
   themes.push(...detectPawnMajority(pos));
@@ -358,6 +360,165 @@ function detectPawnMajority(pos: ChessPosition): DetectedTheme[] {
       beneficiary: 'b',
       explanation: `Black has a kingside pawn majority (${blackKingside} vs ${whiteKingside})`,
     });
+  }
+
+  return themes;
+}
+
+/**
+ * Detect generic weak pawns
+ * A pawn is weak if it cannot be defended by other pawns
+ * This is a catch-all for pawns that aren't isolated, doubled, or backward
+ * but are still structurally weak
+ */
+function detectWeakPawns(pos: ChessPosition, color: Color): DetectedTheme[] {
+  const themes: DetectedTheme[] = [];
+  const enemyColor = color === 'w' ? 'b' : 'w';
+  const pawns = pos.getAllPieces().filter((p) => p.color === color && p.type === 'p');
+
+  // Group pawns by file
+  const pawnsByFile = new Map<number, typeof pawns>();
+  for (const pawn of pawns) {
+    const file = fileIndex(pawn.square);
+    const existing = pawnsByFile.get(file) || [];
+    existing.push(pawn);
+    pawnsByFile.set(file, existing);
+  }
+
+  for (const pawn of pawns) {
+    const file = fileIndex(pawn.square);
+    const rank = rankIndex(pawn.square);
+    const adjacentFiles = getAdjacentFiles(file);
+
+    // Check if this pawn can be defended by another pawn
+    let canBeDefended = false;
+    for (const adjFile of adjacentFiles) {
+      const adjPawns = pawnsByFile.get(adjFile) || [];
+      for (const adjPawn of adjPawns) {
+        const adjRank = rankIndex(adjPawn.square);
+        // Can defend if on adjacent file and one rank behind
+        const defendRank = color === 'w' ? rank - 1 : rank + 1;
+        if (adjRank === defendRank) {
+          canBeDefended = true;
+          break;
+        }
+      }
+      if (canBeDefended) break;
+    }
+
+    // If cannot be defended by pawns, check if attacked
+    if (!canBeDefended) {
+      const isAttacked = pos.isSquareAttacked(pawn.square, enemyColor);
+      const defenders = pos.getAttackers(pawn.square, color);
+
+      // Weak if attacked more than defended, or undefendable
+      if (isAttacked && defenders.length === 0) {
+        themes.push({
+          id: 'weak_pawn',
+          category: 'positional',
+          confidence: 'medium',
+          severity: 'minor',
+          squares: [pawn.square],
+          pieces: [`P${pawn.square}`],
+          beneficiary: enemyColor,
+          explanation: `Weak pawn on ${pawn.square} cannot be defended by other pawns`,
+          materialAtStake: 50,
+        });
+      }
+    }
+  }
+
+  return themes;
+}
+
+/**
+ * Detect steamrolling - connected passed pawns advancing together
+ * Multiple connected passed pawns that are advancing and difficult to stop
+ */
+function detectSteamrolling(pos: ChessPosition, color: Color): DetectedTheme[] {
+  const themes: DetectedTheme[] = [];
+  const enemyColor = color === 'w' ? 'b' : 'w';
+  const pawns = pos.getAllPieces().filter((p) => p.color === color && p.type === 'p');
+  const enemyPawns = pos.getAllPieces().filter((p) => p.color === enemyColor && p.type === 'p');
+
+  // Find passed pawns
+  const passedPawns: Array<{ square: string; file: number; rank: number }> = [];
+
+  for (const pawn of pawns) {
+    const file = fileIndex(pawn.square);
+    const rank = rankIndex(pawn.square);
+    const adjacentFiles = [file - 1, file, file + 1].filter((f) => f >= 0 && f < 8);
+
+    const isPassed = !enemyPawns.some((ep) => {
+      const epFile = fileIndex(ep.square);
+      const epRank = rankIndex(ep.square);
+
+      if (!adjacentFiles.includes(epFile)) return false;
+
+      return color === 'w' ? epRank > rank : epRank < rank;
+    });
+
+    if (isPassed) {
+      passedPawns.push({ square: pawn.square, file, rank });
+    }
+  }
+
+  // Check for connected passed pawns (2+ on adjacent files)
+  if (passedPawns.length >= 2) {
+    // Sort by file
+    passedPawns.sort((a, b) => a.file - b.file);
+
+    // Find groups of connected passers
+    const connectedGroups: Array<typeof passedPawns> = [];
+    let currentGroup: typeof passedPawns = [passedPawns[0]!];
+
+    for (let i = 1; i < passedPawns.length; i++) {
+      const prev = passedPawns[i - 1]!;
+      const curr = passedPawns[i]!;
+
+      if (curr.file - prev.file === 1) {
+        // Adjacent files - connected
+        currentGroup.push(curr);
+      } else {
+        // Not connected - start new group
+        if (currentGroup.length >= 2) {
+          connectedGroups.push([...currentGroup]);
+        }
+        currentGroup = [curr];
+      }
+    }
+
+    // Don't forget the last group
+    if (currentGroup.length >= 2) {
+      connectedGroups.push(currentGroup);
+    }
+
+    // Report steamrolling for each connected group
+    for (const group of connectedGroups) {
+      // Calculate how advanced they are
+      const avgRank = group.reduce((sum, p) => sum + p.rank, 0) / group.length;
+      const advancedThreshold = color === 'w' ? 4 : 3;
+
+      if (
+        (color === 'w' && avgRank >= advancedThreshold) ||
+        (color === 'b' && avgRank <= advancedThreshold)
+      ) {
+        const promotionDistances = group.map((p) => (color === 'w' ? 8 - p.rank : p.rank - 1));
+        const avgDistance = promotionDistances.reduce((a, b) => a + b, 0) / group.length;
+
+        themes.push({
+          id: 'steamrolling',
+          category: 'positional',
+          confidence: 'high',
+          severity: avgDistance <= 3 ? 'critical' : 'significant',
+          squares: group.map((p) => p.square),
+          pieces: group.map((p) => `P${p.square}`),
+          beneficiary: color,
+          explanation: `${group.length} connected passed pawns steamrolling forward`,
+          materialAtStake: group.length * 150,
+        });
+      }
+    }
   }
 
   return themes;

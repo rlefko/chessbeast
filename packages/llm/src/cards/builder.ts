@@ -9,6 +9,12 @@
  * - Reference games database
  */
 
+import {
+  TacticalThemeDetector,
+  PositionalThemeDetector,
+  themesToMotifs,
+  type DetectedTheme,
+} from '@chessbeast/core';
 import type { EcoClient, LichessEliteClient } from '@chessbeast/database';
 import type {
   StockfishClient,
@@ -17,12 +23,6 @@ import type {
   ClassicalEvalResponse,
 } from '@chessbeast/grpc-client';
 import { ChessPosition } from '@chessbeast/pgn';
-import {
-  TacticalThemeDetector,
-  PositionalThemeDetector,
-  themesToMotifs,
-  type DetectedTheme,
-} from '@chessbeast/core';
 
 import type { EvaluationCache, CachedEvaluation } from '../cache/evaluation-cache.js';
 import {
