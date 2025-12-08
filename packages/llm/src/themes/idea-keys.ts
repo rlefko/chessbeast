@@ -187,6 +187,13 @@ export class IdeaKeySet {
   }
 
   /**
+   * Remove an idea from the set
+   */
+  delete(ideaKey: IdeaKey): boolean {
+    return this.keys.delete(ideaKey.key);
+  }
+
+  /**
    * Mark multiple ideas as explained
    */
   addAll(ideaKeys: IdeaKey[]): void {
