@@ -105,6 +105,8 @@ export async function orchestrateAnalysis(
     const defaultTierConfig = tierConfigs[coachConfig.defaultTier];
 
     // Create analysis pipeline with tier-based settings
+    // Note: maxCriticalRatio comes from analysis config, not coach config,
+    // to allow explicit overrides in tests and CLI
     const pipeline = createAnalysisPipeline(
       engine,
       maia,
@@ -114,7 +116,7 @@ export async function orchestrateAnalysis(
         shallowDepth: tierConfigs.shallow.depth ?? config.analysis.shallowDepth,
         deepDepth: defaultTierConfig.depth ?? config.analysis.deepDepth,
         multiPvCount: defaultTierConfig.multipv ?? config.analysis.multiPvCount,
-        maxCriticalRatio: coachConfig.pipeline.maxCriticalRatio ?? config.analysis.maxCriticalRatio,
+        maxCriticalRatio: config.analysis.maxCriticalRatio,
         whiteRating: config.ratings.targetAudienceRating ?? config.ratings.defaultRating,
         blackRating: config.ratings.targetAudienceRating ?? config.ratings.defaultRating,
         skipMaia: config.analysis.skipMaia,
