@@ -185,5 +185,7 @@ bin/
 *.pid.lock
 
 .mcp.json
-.claude-indexer/*
-.index_cache/*
+.claude-indexer/
+.index_cache/
+.claude/
+CLAUDE.md
