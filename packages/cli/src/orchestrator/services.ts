@@ -4,6 +4,12 @@
 
 import * as fs from 'node:fs';
 
+import {
+  type ArtifactCache,
+  createArtifactCache,
+  DEFAULT_CACHE_CONFIG,
+  COMPACT_CACHE_CONFIG,
+} from '@chessbeast/core';
 import { EcoClient, LichessEliteClient } from '@chessbeast/database';
 import { StockfishClient, MaiaClient, Stockfish16Client } from '@chessbeast/grpc-client';
 import {
@@ -27,6 +33,7 @@ export interface Services {
   ecoClient: EcoClient | null;
   lichessClient: LichessEliteClient | null;
   annotator: Annotator | null;
+  cache: ArtifactCache;
 }
 
 /**
@@ -283,6 +290,11 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
     annotator = new Annotator(annotatorConfig, annotatorServices);
   }
 
+  // Initialize artifact cache based on analysis speed
+  const cacheConfig =
+    config.ultraFastCoach.speed === 'fast' ? COMPACT_CACHE_CONFIG : DEFAULT_CACHE_CONFIG;
+  const cache = createArtifactCache(cacheConfig);
+
   return {
     stockfish,
     sf16,
@@ -290,6 +302,7 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
     ecoClient,
     lichessClient,
     annotator,
+    cache,
   };
 }
 
