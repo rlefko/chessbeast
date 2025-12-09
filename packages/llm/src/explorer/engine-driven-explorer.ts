@@ -213,30 +213,34 @@ export class EngineDrivenExplorer {
     const explainedIdeaKeys = new Set<string>();
     let themesDetected = 0;
 
-    // Set up node exploration callback for theme detection
-    if (this.config.detectThemes) {
-      explorer.onNodeExplored((node: ExplorationNode) => {
-        const { themes, summary, intents } = this.processNodeThemes(node, explainedIdeaKeys);
+    // Set up node exploration callback for intent and theme detection
+    // Always register - intent generation works with or without theme detection
+    explorer.onNodeExplored((node: ExplorationNode) => {
+      // Process themes and generate intents
+      const { themes, summary, intents } = this.processNodeForIntents(
+        node,
+        explainedIdeaKeys,
+        this.config.detectThemes,
+      );
 
-        if (themes.length > 0) {
-          allThemes.set(node.positionKey, themes);
-          themeSummaries.set(node.positionKey, summary);
-          themesDetected += themes.length;
-        }
+      if (themes.length > 0) {
+        allThemes.set(node.positionKey, themes);
+        themeSummaries.set(node.positionKey, summary);
+        themesDetected += themes.length;
+      }
 
-        allIntents.push(...intents);
+      allIntents.push(...intents);
 
-        // Update progress
-        onProgress?.({
-          phase: 'exploring',
-          nodesExplored: explorer.getState().nodesExplored,
-          maxNodes: this.config.maxNodes,
-          currentDepth: node.explorationDepth,
-          themesDetected,
-          intentsGenerated: allIntents.length,
-        });
+      // Update progress
+      onProgress?.({
+        phase: 'exploring',
+        nodesExplored: explorer.getState().nodesExplored,
+        maxNodes: this.config.maxNodes,
+        currentDepth: node.explorationDepth,
+        themesDetected,
+        intentsGenerated: allIntents.length,
       });
-    }
+    });
 
     // Build initial candidates from position analysis
     const candidates = await this.buildInitialCandidates(rootFen, playedMove, classification);
@@ -373,12 +377,51 @@ export class EngineDrivenExplorer {
   }
 
   /**
-   * Process themes for an explored node
+   * Process a node for both themes and position-based intents
+   *
+   * This is the main entry point for intent generation. It:
+   * 1. Optionally detects themes (if detectThemes is true)
+   * 2. Always generates position-based intents based on criticality
+   * 3. Combines theme-based and position-based intents
    */
-  private processNodeThemes(
+  private processNodeForIntents(
     node: ExplorationNode,
     explainedIdeaKeys: Set<string>,
+    detectThemes: boolean,
   ): { themes: ThemeInstance[]; summary: ThemeSummary; intents: CommentIntent[] } {
+    let themes: ThemeInstance[] = [];
+    let deltas: ThemeDelta[] = [];
+
+    // Optionally run theme detection
+    if (detectThemes) {
+      const themeResult = this.detectThemesForNode(node);
+      themes = themeResult.themes;
+      deltas = this.filterDeltasByVerbosity(themeResult.deltas);
+    }
+
+    // Build summary (empty if no themes)
+    const summary = this.buildThemeSummary(themes, deltas);
+
+    // Generate intents - this now works with or without themes
+    const intents = this.generateIntents(node, themes, deltas, explainedIdeaKeys);
+
+    // Update explained idea keys
+    for (const intent of intents) {
+      for (const ideaKey of intent.content.ideaKeys) {
+        explainedIdeaKeys.add(ideaKey.key);
+      }
+    }
+
+    return { themes, summary, intents };
+  }
+
+  /**
+   * Detect themes for a node
+   */
+  private detectThemesForNode(node: ExplorationNode): {
+    themes: ThemeInstance[];
+    deltas: ThemeDelta[];
+  } {
     // Build detector position
     const detectorPosition = this.buildDetectorPosition(node.fen);
 
@@ -393,33 +436,64 @@ export class EngineDrivenExplorer {
     const detectionResult = this.detectorRegistry.detectAll(context);
 
     // Process through lifecycle tracker
-    const { themes, deltas } = this.lifecycleTracker.processThemes(
-      detectionResult.themes,
-      node.ply,
+    return this.lifecycleTracker.processThemes(detectionResult.themes, node.ply);
+  }
+
+  /**
+   * Generate intents from node data
+   *
+   * This method generates intents based on:
+   * 1. Position characteristics (criticality, exploration priority)
+   * 2. Theme transitions (if available)
+   * 3. Move quality indicators
+   */
+  private generateIntents(
+    node: ExplorationNode,
+    themes: ThemeInstance[],
+    deltas: ThemeDelta[],
+    explainedIdeaKeys: Set<string>,
+  ): CommentIntent[] {
+    const intents: CommentIntent[] = [];
+
+    // Calculate criticality for the node
+    // Use the node's existing criticality score and boost based on themes
+    const criticalityScore: CriticalityScore = calculateCriticality(
+      0, // We don't have eval data in exploration context
+      0,
+      {
+        newThemes: deltas.filter((d) => d.transition === 'emerged').length,
+      },
     );
 
-    // Filter to significant deltas based on verbosity
-    const significantDeltas = this.filterDeltasByVerbosity(deltas);
+    // Use the higher of calculated criticality or node's criticality score
+    criticalityScore.score = Math.max(criticalityScore.score, node.criticalityScore);
 
-    // Build summary
-    const summary = this.buildThemeSummary(themes, significantDeltas);
+    // Generate intent if we have interesting content
+    const hasThemeContent = deltas.length > 0;
+    const hasHighCriticality = node.criticalityScore >= 40 || criticalityScore.score >= 40;
+    const hasSignificantPriority = node.explorationPriority >= 60;
 
-    // Generate intents from significant themes
-    const intents = this.generateIntentsFromThemes(
-      node,
-      themes,
-      significantDeltas,
-      explainedIdeaKeys,
-    );
+    // Generate intent for positions with interesting characteristics
+    if (hasThemeContent || hasHighCriticality || hasSignificantPriority) {
+      const input: IntentInput = {
+        move: node.parentMove ?? '',
+        moveNumber: Math.floor(node.ply / 2) + 1,
+        isWhiteMove: node.ply % 2 === 1,
+        plyIndex: node.ply,
+        criticalityScore,
+        themeDeltas: deltas,
+        activeThemes: themes,
+        explainedIdeaKeys,
+      };
 
-    // Update explained idea keys
-    for (const intent of intents) {
-      for (const ideaKey of intent.content.ideaKeys) {
-        explainedIdeaKeys.add(ideaKey.key);
+      // Create intent
+      const intent = createCommentIntent(input);
+      if (intent) {
+        intents.push(intent);
       }
     }
 
-    return { themes, summary, intents };
+    return intents;
   }
 
   /**
@@ -610,51 +684,6 @@ export class EngineDrivenExplorer {
     return summary;
   }
 
-  /**
-   * Generate comment intents from themes
-   */
-  private generateIntentsFromThemes(
-    node: ExplorationNode,
-    themes: ThemeInstance[],
-    deltas: ThemeDelta[],
-    explainedIdeaKeys: Set<string>,
-  ): CommentIntent[] {
-    const intents: CommentIntent[] = [];
-
-    // Only generate intents for positions with interesting themes
-    if (deltas.length === 0) {
-      return intents;
-    }
-
-    // Calculate criticality for the node
-    const criticalityScore: CriticalityScore = calculateCriticality(
-      0, // We don't have before/after evals in node context
-      0,
-      {
-        newThemes: deltas.filter((d) => d.transition === 'emerged').length,
-      },
-    );
-
-    // Build intent input
-    const input: IntentInput = {
-      move: node.parentMove ?? '',
-      moveNumber: Math.floor(node.ply / 2) + 1,
-      isWhiteMove: node.ply % 2 === 1,
-      plyIndex: node.ply,
-      criticalityScore,
-      themeDeltas: deltas,
-      activeThemes: themes,
-      explainedIdeaKeys,
-    };
-
-    // Create intent
-    const intent = createCommentIntent(input);
-    if (intent) {
-      intents.push(intent);
-    }
-
-    return intents;
-  }
 
   /**
    * Convert exploration result to legacy ExploredLine format
