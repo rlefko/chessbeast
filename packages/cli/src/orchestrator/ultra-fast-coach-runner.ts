@@ -229,7 +229,8 @@ export async function runUltraFastCoachFull(
   reporter.completePhase('llm_annotation', `${pipelineResult.stats.commentsGenerated} comments`);
 
   // Create a simple DAG for the main line to transform
-  const startingFen = analysis.moves[0]?.fenBefore ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const startingFen =
+    analysis.moves[0]?.fenBefore ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   const dag = createVariationDAG(startingFen);
 
   // Add the main line to the DAG

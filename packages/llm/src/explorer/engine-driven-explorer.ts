@@ -26,16 +26,21 @@ import {
 } from '@chessbeast/core';
 import { ChessPosition } from '@chessbeast/pgn';
 
-import type { CommentIntent, IntentInput, DensityLevel, AudienceLevel } from '../narration/index.js';
+import type {
+  CommentIntent,
+  IntentInput,
+  DensityLevel,
+  AudienceLevel,
+} from '../narration/index.js';
 import { createCommentIntent } from '../narration/intents.js';
-import type { ThemeInstance, ThemeDelta, ThemeSummary } from '../themes/types.js';
+import type { DetectorContext, DetectorPosition } from '../themes/detector-interface.js';
+import { createFullDetectorRegistry } from '../themes/detectors/index.js';
 import {
   ThemeLifecycleTracker,
   createLifecycleTracker,
   filterSignificantDeltas,
 } from '../themes/lifecycle.js';
-import type { DetectorContext, DetectorPosition } from '../themes/detector-interface.js';
-import { createFullDetectorRegistry } from '../themes/detectors/index.js';
+import type { ThemeInstance, ThemeDelta, ThemeSummary } from '../themes/types.js';
 
 import type { EngineService, ExploredLine, LinePurpose, LineSource } from './variation-explorer.js';
 
@@ -388,7 +393,10 @@ export class EngineDrivenExplorer {
     const detectionResult = this.detectorRegistry.detectAll(context);
 
     // Process through lifecycle tracker
-    const { themes, deltas } = this.lifecycleTracker.processThemes(detectionResult.themes, node.ply);
+    const { themes, deltas } = this.lifecycleTracker.processThemes(
+      detectionResult.themes,
+      node.ply,
+    );
 
     // Filter to significant deltas based on verbosity
     const significantDeltas = this.filterDeltasByVerbosity(deltas);
@@ -397,7 +405,12 @@ export class EngineDrivenExplorer {
     const summary = this.buildThemeSummary(themes, significantDeltas);
 
     // Generate intents from significant themes
-    const intents = this.generateIntentsFromThemes(node, themes, significantDeltas, explainedIdeaKeys);
+    const intents = this.generateIntentsFromThemes(
+      node,
+      themes,
+      significantDeltas,
+      explainedIdeaKeys,
+    );
 
     // Update explained idea keys
     for (const intent of intents) {

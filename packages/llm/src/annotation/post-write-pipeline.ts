@@ -22,7 +22,13 @@ import {
   DEFAULT_LINE_MEMORY_CONFIG,
 } from '../memory/line-memory.js';
 import type { CommentIntent, DensityLevel, NarratorConfig } from '../narration/index.js';
-import { Narrator, createNarrator, DensityFilter, createDensityFilter, DENSITY_CONFIGS } from '../narration/index.js';
+import {
+  Narrator,
+  createNarrator,
+  DensityFilter,
+  createDensityFilter,
+  DENSITY_CONFIGS,
+} from '../narration/index.js';
 import type { ThemeInstance, ThemeSummary } from '../themes/types.js';
 
 /**
@@ -143,23 +149,17 @@ export class PostWritePipeline {
   private readonly lineMemoryConfig: LineMemoryConfig;
   private lineMemory: LineMemory | undefined;
 
-  constructor(
-    client: OpenAIClient | undefined,
-    config: Partial<PostWritePipelineConfig> = {},
-  ) {
+  constructor(client: OpenAIClient | undefined, config: Partial<PostWritePipelineConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
 
     // Merge line memory config
     this.lineMemoryConfig = { ...DEFAULT_LINE_MEMORY_CONFIG, ...this.config.lineMemory };
 
     // Create narrator with merged config
-    this.narrator = createNarrator(
-      this.config.useLlm ? client : undefined,
-      {
-        densityLevel: this.config.density,
-        ...this.config.narrator,
-      },
-    );
+    this.narrator = createNarrator(this.config.useLlm ? client : undefined, {
+      densityLevel: this.config.density,
+      ...this.config.narrator,
+    });
 
     // Create density filter
     this.densityFilter = createDensityFilter(DENSITY_CONFIGS[this.config.density]);
@@ -174,7 +174,11 @@ export class PostWritePipeline {
     onWarning?: (warning: string) => void,
   ): Promise<PostWritePipelineResult> {
     const warnings: string[] = [];
-    const warn = onWarning ?? ((msg: string) => warnings.push(msg));
+    const warn =
+      onWarning ??
+      ((msg: string): void => {
+        warnings.push(msg);
+      });
 
     // Phase 1: Density filtering
     onProgress?.({
@@ -219,7 +223,8 @@ export class PostWritePipeline {
             {
               text: `${theme.type}: ${theme.explanation}`,
               type: 'theme_emerged',
-              priority: theme.severity === 'critical' ? 10 : theme.severity === 'significant' ? 7 : 5,
+              priority:
+                theme.severity === 'critical' ? 10 : theme.severity === 'significant' ? 7 : 5,
             },
             this.lineMemoryConfig,
           );
