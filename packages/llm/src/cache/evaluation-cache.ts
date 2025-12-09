@@ -1,6 +1,18 @@
 /**
  * Global evaluation cache with depth-aware and multipv-aware lookup
  *
+ * @deprecated This module is deprecated in favor of the new Ultra-Fast Coach architecture.
+ * Use {@link ArtifactCache} from '@chessbeast/core' instead.
+ *
+ * The new ArtifactCache provides:
+ * - Multi-layer caching (engine evals, themes, candidates)
+ * - Position-key based indexing with Zobrist hashing
+ * - LRU eviction with configurable limits
+ * - Integration with the staged analysis pipeline
+ *
+ * This legacy evaluation cache will be removed in a future version.
+ *
+ * Original description:
  * Avoids redundant Stockfish calls by caching evaluations keyed by normalized FEN.
  * Cache hit only if cached depth >= requested depth and cached multipv >= requested multipv.
  */

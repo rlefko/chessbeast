@@ -1,6 +1,17 @@
 /**
  * Tree-based variation structure for agentic exploration.
  *
+ * @deprecated This module is deprecated in favor of the new Ultra-Fast Coach architecture.
+ * Use {@link VariationDAG} from '@chessbeast/core' instead.
+ *
+ * The new VariationDAG provides:
+ * - DAG structure with transposition support
+ * - Integration with ArtifactCache for computed artifacts
+ * - Better memory efficiency via position key indexing
+ *
+ * This legacy variation tree will be removed in a future version.
+ *
+ * Original description:
  * Each node represents a chess position with:
  * - Move that led to this position
  * - Metadata (comments, NAGs, engine eval)
