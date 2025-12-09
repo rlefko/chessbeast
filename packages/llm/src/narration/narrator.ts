@@ -334,8 +334,12 @@ Output only the comment text, no formatting or labels.`;
 
     // Add explicit guidance for blunders and mistakes
     if (intent.type === 'blunder_explanation') {
-      parts.push(`\nIMPORTANT: This move is a BLUNDER. Explain WHY it is bad - what does the opponent get to do now?`);
-      parts.push(`Do NOT describe the move positively. Focus on what goes wrong for the player who made this move.`);
+      parts.push(
+        `\nIMPORTANT: This move is a BLUNDER. Explain WHY it is bad - what does the opponent get to do now?`,
+      );
+      parts.push(
+        `Do NOT describe the move positively. Focus on what goes wrong for the player who made this move.`,
+      );
     } else if (intent.type === 'what_was_missed') {
       parts.push(`\nThis move is a MISTAKE or INACCURACY. Explain what better option was missed.`);
     }
