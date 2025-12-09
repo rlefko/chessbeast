@@ -85,3 +85,13 @@ export {
   type EngineCandidate,
   type MaiaPrediction,
 } from './candidate-classifier.js';
+
+// Engine-driven explorer (new Ultra-Fast Coach architecture)
+export {
+  EngineDrivenExplorer,
+  createEngineDrivenExplorer,
+  type EngineDrivenExplorerConfig,
+  type EngineDrivenExplorerProgress,
+  type EngineDrivenExplorerResult,
+  type ThemeVerbosity,
+} from './engine-driven-explorer.js';
