@@ -11,7 +11,12 @@
  * - LLM generates comments post-write (1 call per comment)
  */
 
-import { createArtifactCache, createVariationDAG, type GameAnalysis } from '@chessbeast/core';
+import {
+  createArtifactCache,
+  createVariationDAG,
+  type GameAnalysis,
+  type VariationDAG,
+} from '@chessbeast/core';
 import {
   OpenAIClient,
   createLLMConfig,
@@ -127,7 +132,19 @@ export async function runUltraFastCoachFull(
   const audience = (coachConfig.narration.audience ?? 'club') as AudienceLevel;
   const targetRating = config.ratings.targetAudienceRating ?? config.ratings.defaultRating;
 
-  // Create the explorer
+  // Create the SHARED DAG upfront with mainline moves
+  // This ensures explored variations are added to the same DAG as the mainline
+  const startingFen =
+    analysis.moves[0]?.fenBefore ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const sharedDag: VariationDAG = createVariationDAG(startingFen);
+
+  // Add the main line FIRST (so principal path is established)
+  for (const move of analysis.moves) {
+    sharedDag.addMove(move.san, '', move.fenAfter, 'mainline', { makePrincipal: true });
+  }
+
+  // Create the explorer with the shared DAG
+  // The explorer will navigate to each critical position and add variations there
   const explorer = createEngineDrivenExplorer(engineAdapter, cache, {
     maxNodes: coachConfig.variations.maxNodes,
     maxDepth: coachConfig.variations.maxDepth,
@@ -136,6 +153,7 @@ export async function runUltraFastCoachFull(
     themeVerbosity,
     audience,
     targetRating,
+    sharedDag, // Pass the shared DAG so explored variations are integrated
   });
 
   // Phase 1: Engine-driven exploration (using deep_analysis phase)
@@ -230,18 +248,10 @@ export async function runUltraFastCoachFull(
 
   reporter.completePhase('llm_annotation', `${pipelineResult.stats.commentsGenerated} comments`);
 
-  // Create a simple DAG for the main line to transform
-  const startingFen =
-    analysis.moves[0]?.fenBefore ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-  const dag = createVariationDAG(startingFen);
-
-  // Add the main line to the DAG
-  for (const move of analysis.moves) {
-    dag.addMove(move.san, '', move.fenAfter, 'mainline', { makePrincipal: true });
-  }
-
-  // Transform DAG to moves with comments attached
-  const annotatedMoves = transformDagToMoves(dag, {
+  // Transform the shared DAG (which now contains mainline + explored variations) to moves
+  // Navigate to root first to ensure we start from the beginning
+  sharedDag.goToRoot();
+  const annotatedMoves = transformDagToMoves(sharedDag, {
     comments: pipelineResult.comments,
     nags: pipelineResult.nags,
   });

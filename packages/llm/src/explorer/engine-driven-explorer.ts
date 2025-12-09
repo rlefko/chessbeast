@@ -76,12 +76,20 @@ export interface EngineDrivenExplorerConfig {
 
   /** Density level for comment filtering */
   density?: DensityLevel;
+
+  /**
+   * Optional shared DAG to use instead of creating a new one.
+   * When provided, the explorer will navigate to the root position
+   * and add variations to this DAG instead of creating a fresh one.
+   * This allows multiple explorations to share a single DAG with mainline.
+   */
+  sharedDag?: VariationDAG;
 }
 
 /**
- * Default configuration
+ * Default configuration (sharedDag is intentionally omitted - it has no sensible default)
  */
-const DEFAULT_CONFIG: Required<EngineDrivenExplorerConfig> = {
+const DEFAULT_CONFIG: Required<Omit<EngineDrivenExplorerConfig, 'sharedDag'>> = {
   maxNodes: 200,
   maxDepth: 30,
   budgetMs: 30000,
@@ -158,7 +166,9 @@ export interface EngineDrivenExplorerResult {
 export class EngineDrivenExplorer {
   private readonly engine: EngineService;
   private readonly cache: ArtifactCache;
-  private readonly config: Required<EngineDrivenExplorerConfig>;
+  private readonly config: Required<Omit<EngineDrivenExplorerConfig, 'sharedDag'>> & {
+    sharedDag?: VariationDAG;
+  };
   private readonly detectorRegistry: ReturnType<typeof createFullDetectorRegistry>;
   private readonly lifecycleTracker: ThemeLifecycleTracker;
 
@@ -215,8 +225,19 @@ export class EngineDrivenExplorer {
       this.currentGamePly = (moveNum - 1) * 2 + (turn === 'w' ? 0 : 1);
     }
 
-    // Create a fresh DAG for this exploration
-    const dag = createVariationDAG(rootFen);
+    // Use shared DAG if provided, otherwise create a fresh one
+    const dag = this.config.sharedDag ?? createVariationDAG(rootFen);
+
+    // If using shared DAG, navigate to the exploration root position
+    // This allows adding variations from any position in the game
+    if (this.config.sharedDag) {
+      const navResult = dag.goToFen(rootFen);
+      if (!navResult.success) {
+        // Position not in DAG yet - this shouldn't happen if mainline was added first
+        // Fall back to root and log warning
+        dag.goToRoot();
+      }
+    }
 
     // Create the priority queue explorer
     const explorer = new PriorityQueueExplorer(this.engine, {

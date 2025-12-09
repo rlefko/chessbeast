@@ -345,6 +345,16 @@ export class PriorityQueueExplorer {
     const maxPvMoves = 3;
     let currentFen = parent.fen;
 
+    // Navigate the DAG to the parent position before adding moves
+    // This ensures moves are added from the correct position in the tree
+    if (this.dag) {
+      const navResult = this.dag.goToFen(parent.fen);
+      if (!navResult.success) {
+        // Parent position not in DAG - skip adding PV moves
+        return;
+      }
+    }
+
     for (let i = 0; i < Math.min(pv.length, maxPvMoves); i++) {
       const moveUci = pv[i]!;
 
