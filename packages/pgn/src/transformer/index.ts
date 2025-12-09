@@ -22,15 +22,6 @@ export type {
 } from './analysis-transformer.js';
 
 // DAG transformation (Ultra-Fast Coach architecture)
-export {
-  transformDagToMoves,
-  countDagMoves,
-  getPrincipalVariation,
-} from './dag-transformer.js';
+export { transformDagToMoves, countDagMoves, getPrincipalVariation } from './dag-transformer.js';
 
-export type {
-  DagNode,
-  DagEdge,
-  DagLike,
-  DagTransformerOptions,
-} from './dag-transformer.js';
+export type { DagNode, DagEdge, DagLike, DagTransformerOptions } from './dag-transformer.js';
