@@ -200,6 +200,8 @@ All documentation in `docs/` folder, written in Markdown.
 
 # chessbeast - Development Instructions
 
+> **Semantic Code Memory v2.8**
+
 ## ⚡ CRITICAL: YOU HAVE PERFECT MEMORY - USE IT FIRST ⚡
 
 **🚫 DO NOT read files directly. DO NOT use Grep/Glob/Read as your first step.**
@@ -211,7 +213,6 @@ Memory search is 3-5ms vs 500ms+ for file operations.
 ### 🎯 Memory-First Workflow (Follow Every Time)
 
 **Before ANY task:**
-
 1. 🔍 **Search memory** for existing implementations
 2. 📚 **Find patterns** to follow
 3. 🏗️ **Check relationships** to understand context
@@ -223,22 +224,22 @@ Memory search is 3-5ms vs 500ms+ for file operations.
 
 ```python
 # 🔍 Fast semantic search (3-5ms) - START HERE
-mcp__chessbeast_memory__search_similar("feature/component name", limit=20)
+mcp__chessbeast-memory__search_similar("feature/component name", limit=20)
 
 # 📚 Find patterns before implementing
-mcp__chessbeast_memory__search_similar("pattern description", entityTypes=["implementation_pattern", "architecture_pattern"])
+mcp__chessbeast-memory__search_similar("pattern description", entityTypes=["implementation_pattern", "architecture_pattern"])
 
 # 🐛 Debug faster with past solutions
-mcp__chessbeast_memory__search_similar("error description", entityTypes=["debugging_pattern"])
+mcp__chessbeast-memory__search_similar("error description", entityTypes=["debugging_pattern"])
 
 # 🏗️ Understand architecture and relationships
-mcp__chessbeast_memory__read_graph(entity="ComponentName", mode="smart")
+mcp__chessbeast-memory__read_graph(entity="ComponentName", mode="smart")
 
 # 💡 Get implementation details when needed
-mcp__chessbeast_memory__get_implementation("function_name", scope="logical")
+mcp__chessbeast-memory__get_implementation("function_name", scope="logical")
 
 # ➕ Add new knowledge to memory
-mcp__chessbeast_memory__create_entities([{
+mcp__chessbeast-memory__create_entities([{
   "name": "NewComponent",
   "entityType": "class",
   "observations": ["Component purpose", "Key patterns used"]
@@ -266,7 +267,6 @@ The semantic memory is powered by an MCP (Model Context Protocol) server configu
 **🔒 Security:** This file contains API keys and is automatically added to `.gitignore` during setup
 
 **👥 Team Workflow:** Use `.mcp.json.example` as a template:
-
 ```bash
 # Team members can set up their own .mcp.json
 cp .mcp.json.example .mcp.json
@@ -276,22 +276,169 @@ cp .mcp.json.example .mcp.json
 
 **🔄 Restart Required:** After setup or changes, restart Claude Code to load the MCP server
 
-### Memory Guard Protection (Optional)
+### 🛡️ Memory Guard Protection (AUTOMATIC)
 
-Memory Guard hooks provide additional code quality protection but are **not configured automatically**.
+Memory Guard is **installed automatically** by setup.sh - no manual configuration needed.
 
-**Manual Setup (Optional):**
+**27 pattern-based checks** run on every Write/Edit operation:
 
-- Add UserPromptSubmit hooks for semantic command detection
-- Add PreToolUse hooks for duplicate code prevention
-- See main project documentation for hook configuration
+**Security (11 checks)**:
+- SQL injection, XSS, command injection prevention
+- Hardcoded secrets and weak crypto detection
+- Logging secrets (credential leak prevention)
+- Path traversal, insecure deserialization blocking
+- Sensitive file and dangerous git operation protection
 
-**Benefits when configured:**
+**Tech Debt (9 checks)**:
+- TODO/FIXME/HACK/DEPRECATED markers
+- Debug statements (print, console.log, breakpoint)
+- Unexplained lint suppressions (bare noqa, eslint-disable)
+- Bare except clauses (Python anti-pattern)
+- Mutable default arguments (Python footgun)
+- Swallowed exceptions
 
-- Prevent duplicate code creation
-- Catch missing error handling patterns
-- Block breaking API changes
-- Protect functionality during refactoring
+**Documentation (2 checks)**:
+- Missing Python docstrings (functions >10 lines)
+- Missing JSDoc comments (JS/TS functions >10 lines)
+
+**Resilience (2 checks)**:
+- Swallowed exceptions (empty except/catch blocks)
+- Missing HTTP timeouts (requests without timeout)
+
+**Git Safety (3 checks)**:
+- Force push blocking
+- Hard reset blocking
+- Destructive rm blocking
+
+**Two-Mode Architecture**:
+- **Fast mode (editing)**: <300ms latency, checks Tiers 0-2
+- **Full mode (pre-commit)**: 5-30s, comprehensive Tier 3 AI analysis
+
+### 📝 Auto-Indexing After Writes
+
+Memory automatically stays current when you make changes:
+
+| Trigger | When | What Happens |
+|---------|------|--------------|
+| **PostToolUse hook** | After Write/Edit passes guard | Indexes changed file (~100ms) |
+| **pre-commit hook** | Before each commit | Ensures staged files are indexed |
+| **post-merge hook** | After `git pull` | Re-indexes changed files |
+| **post-checkout hook** | After branch switch | Updates index for new branch |
+
+**You never need to manually re-index** - the system keeps memory synchronized.
+
+### 🚀 Session Context (SessionStart)
+
+A **SessionStart hook** provides immediate context when you start a Claude Code session:
+
+- **Git Activity**: Shows current branch, uncommitted changes, and recent commits
+- **Memory Reminder**: Reminds you to use memory-first workflow
+- **Instant Orientation**: Understand project state without running commands
+
+**Example output**:
+```
+=== Session Context ===
+Branch: feature/new-auth
+Uncommitted changes: 3 file(s)
+Recent commits:
+  - Add user validation
+  - Fix login redirect
+  - Update auth middleware
+
+Memory-First Reminder:
+  Use `mcp__chessbeast-memory__search_similar()` before reading files
+  Use `mcp__chessbeast-memory__read_graph()` to understand relationships
+```
+
+### 🧠 Smart Prompt Analysis (UserPromptSubmit)
+
+A **UserPromptSubmit hook** analyzes your prompts BEFORE Claude processes them:
+
+- **Intent Detection**: Recognizes search, debug, implement, refactor, and understand requests
+- **Tool Suggestions**: Injects relevant MCP tool recommendations based on prompt type
+- **Sensitive Data Warning**: Alerts if your prompt contains potential credentials
+
+**Example**: If you ask "fix the login error", it will suggest:
+```
+Check `mcp__chessbeast-memory__search_similar("error description", entityTypes=["debugging_pattern"])` for past solutions
+```
+
+This ensures you always leverage semantic memory for faster, more informed development.
+
+### 🔧 Complete MCP Tool Reference
+
+**Available Tools** (prefix: `mcp__chessbeast-memory__`):
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `search_similar` | Semantic search across codebase | `query`, `limit`, `entityTypes`, `searchMode` |
+| `read_graph` | Understand entity relationships | `entity`, `mode` (smart/entities/relationships/raw) |
+| `get_implementation` | Get detailed code | `name`, `scope` (exact/logical/dependencies) |
+| `create_entities` | Add new knowledge | `entities` (array of {name, entityType, observations}) |
+| `add_observations` | Update existing entities | `observations` (array of {entityName, contents}) |
+| `delete_entities` | Remove entities | `entityNames` (array) |
+
+**Search Modes**:
+- `hybrid` (default): Best of semantic + keyword matching
+- `semantic`: AI understanding only (concept matching)
+- `keyword`: BM25 exact term matching
+
+**Entity Types for Filtering**:
+- Code entities: `function`, `class`, `file`, `documentation`, `relation`
+- Chunk types: `metadata` (fast overview), `implementation` (detailed code)
+- Patterns: `implementation_pattern`, `architecture_pattern`, `debugging_pattern`
+
+**Usage Examples**:
+```python
+# Fast metadata search for quick overview
+mcp__chessbeast-memory__search_similar("auth", entityTypes=["metadata"], limit=20)
+
+# Find specific function implementations
+mcp__chessbeast-memory__search_similar("validate user", entityTypes=["function", "implementation"])
+
+# Understand component dependencies
+mcp__chessbeast-memory__read_graph(entity="AuthService", mode="smart")
+
+# Get function with all related helpers
+mcp__chessbeast-memory__get_implementation("process_login", scope="logical")
+```
+
+### 📋 Slash Commands Reference
+
+**10 specialized commands** for systematic codebase improvement:
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `/refactor` | Find SOLID, DRY, orphaned code issues | After feature complete, before PR |
+| `/restructure` | Analyze cycles, coupling, module stability | Architecture reviews |
+| `/redocument` | Check documentation coverage and quality | Before releases |
+| `/resecure` | Detect security vulnerabilities | Security audits |
+| `/reresilience` | Find error handling and retry gaps | Reliability improvements |
+| `/reoptimize` | Identify performance bottlenecks | Performance tuning |
+| `/retype` | Check type safety issues | TypeScript/Python typing |
+| `/retest` | Analyze test coverage gaps | Test planning |
+| `/rebuild` | Find build/dependency issues | Build troubleshooting |
+| `/resolve` | Guided issue resolution workflow | Bug fixing |
+
+**Usage**: Just type the command (e.g., `/refactor`) and follow the prompts.
+
+### 🌐 Multi-Repository Support
+
+This memory system supports multiple indexed codebases without conflicts:
+
+- **Unique collection**: Each project has its own `chessbeast` collection
+- **Isolated MCP server**: Server name is `chessbeast-memory`
+- **No cross-contamination**: Searches stay within your project's collection
+- **Parallel indexing**: Multiple projects can be indexed simultaneously
+
+**Querying other collections** (if needed):
+```python
+# Your project (default)
+mcp__chessbeast-memory__search_similar("pattern")
+
+# Another project (if configured)
+mcp__other_project_memory__search_similar("shared utility")
+```
 
 ---
 
@@ -318,21 +465,18 @@ Memory Guard hooks provide additional code quality protection but are **not conf
 Control what gets indexed without modifying .gitignore:
 
 **When to use .claudeignore:**
-
 - Personal notes and TODOs (e.g., `*-notes.md`, `TODO-*.md`)
 - Test outputs and coverage reports
 - Debug artifacts and temporary files
 - Large data files not caught by .gitignore
 
 **Multi-Layer Exclusion System:**
-
 1. **Universal Defaults** - Binaries, archives, OS artifacts (always applied)
 2. **.gitignore** - Version control ignores (auto-detected)
 3. **.claudeignore** - Custom indexing exclusions (project-specific)
 4. **Binary Detection** - Executables detected via magic numbers
 
 **Example .claudeignore:**
-
 ```
 # Personal development
 *-notes.md
@@ -356,15 +500,12 @@ debug-*.log
 ## 🔧 Memory System Maintenance
 
 ### Automatic Updates
-
 Memory is automatically updated via git hooks:
-
 - **pre-commit**: Indexes changed files before commit
 - **post-merge**: Updates index after `git pull`
 - **post-checkout**: Updates index after branch switch
 
 ### Manual Re-index (if needed)
-
 ```bash
 # From memory project directory
 source .venv/bin/activate
@@ -372,7 +513,6 @@ claude-indexer index -p /Users/ryanlefkowitz/projects/chess/chessbeast -c chessb
 ```
 
 ### Check Memory Status
-
 ```bash
 # View collection statistics
 python utils/qdrant_stats.py -c chessbeast
@@ -386,6 +526,6 @@ Add your project-specific documentation below this section.
 
 ---
 
-_Memory system automatically configured by setup.sh_
-_Collection: chessbeast_
-_Generated: 2025-11-27 16:24:14_
+*Memory system automatically configured by setup.sh*
+*Collection: chessbeast*
+*Generated: 2025-12-08 14:36:36*
