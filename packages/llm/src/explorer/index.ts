@@ -1,10 +1,10 @@
 /**
  * Variation Explorer module
  *
- * Iteratively explores chess variations with engine and LLM guidance.
+ * Provides variation exploration for chess analysis.
  */
 
-// Original variation explorer
+// Original variation explorer (used by Annotator)
 export {
   VariationExplorer,
   createVariationExplorer,
@@ -17,46 +17,6 @@ export {
   type MaiaService,
   type EngineEvaluation,
 } from './variation-explorer.js';
-
-// Agentic variation explorer
-export {
-  AgenticVariationExplorer,
-  createAgenticExplorer,
-  type AgenticExplorerConfig,
-  type AgenticExplorerProgress,
-  type AgenticExplorerResult,
-} from './agentic-explorer.js';
-
-// Exploration state management
-export { ExplorationState, type ExploredMove, type ExploredBranch } from './exploration-state.js';
-
-// Exploration tools
-export { EXPLORATION_TOOLS, EXPLORATION_TOOL_NAMES } from './exploration-tools.js';
-
-// Stopping heuristics
-export {
-  assessContinuation,
-  shouldHardStop,
-  getBudgetGuidance,
-  DEFAULT_STOPPING_CONFIG,
-  type ContinuationAssessment,
-  type StoppingConfig,
-} from './stopping-heuristics.js';
-
-// Tree-based variation structure
-export {
-  VariationTree,
-  type VariationNode,
-  type CachedEval,
-  type TreeOperationResult,
-  type NodeInfo,
-} from './variation-tree.js';
-
-// Winning position filter
-export {
-  assessExplorationWorthiness,
-  type ExplorationWorthiness,
-} from './winning-position-filter.js';
 
 // Candidate classification types
 export {
@@ -86,7 +46,7 @@ export {
   type MaiaPrediction,
 } from './candidate-classifier.js';
 
-// Engine-driven explorer (new Ultra-Fast Coach architecture)
+// Engine-driven explorer (Ultra-Fast Coach architecture)
 export {
   EngineDrivenExplorer,
   createEngineDrivenExplorer,
