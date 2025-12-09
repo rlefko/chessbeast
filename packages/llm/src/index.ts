@@ -713,3 +713,62 @@ export {
   getComplexTermsForAudience,
   needsReframing,
 } from './roles/index.js';
+
+// Theme Detection
+export {
+  // Types
+  type ThemeStatus,
+  type ThemeInstance,
+  type ThemeDelta,
+  type ThemeSummary,
+  generateThemeKey,
+  calculateNoveltyScore,
+  createThemeInstance,
+  createThemeDelta,
+  createEmptyThemeSummary,
+  buildThemeSummary,
+  // Detector interface
+  type DetectorPosition,
+  type DetectorContext,
+  type DetectorResult,
+  type ThemeDetector,
+  BaseThemeDetector,
+  DetectorRegistry,
+  createDetectorRegistry,
+  // Lifecycle tracking
+  type LifecycleTrackerConfig,
+  DEFAULT_LIFECYCLE_CONFIG,
+  ThemeLifecycleTracker,
+  createLifecycleTracker,
+  filterSignificantDeltas,
+  getNovelThemes,
+  sortThemesByImportance,
+  // Detectors
+  PinDetector,
+  createPinDetector,
+  ForkDetector,
+  createForkDetector,
+  createFullDetectorRegistry,
+  createTacticalDetectorRegistry,
+} from './themes/index.js';
+
+// Engine-Driven Explorer (Ultra-Fast Coach architecture)
+export {
+  EngineDrivenExplorer,
+  createEngineDrivenExplorer,
+  type EngineDrivenExplorerConfig,
+  type EngineDrivenExplorerProgress,
+  type EngineDrivenExplorerResult,
+  type ThemeVerbosity,
+} from './explorer/index.js';
+
+// Annotation Pipeline (Ultra-Fast Coach architecture)
+export {
+  PostWritePipeline,
+  createPostWritePipeline,
+  annotateWithPostWrite,
+  type PostWritePipelineConfig,
+  type PostWritePipelineProgress,
+  type PostWritePipelineInput,
+  type PostWritePipelineResult,
+} from './annotation/index.js';
