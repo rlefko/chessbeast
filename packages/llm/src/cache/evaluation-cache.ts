@@ -1,20 +1,8 @@
 /**
- * Global evaluation cache with depth-aware and multipv-aware lookup
+ * Evaluation cache types for Stockfish evaluation caching
  *
- * @deprecated This module is deprecated in favor of the new Ultra-Fast Coach architecture.
- * Use {@link ArtifactCache} from '@chessbeast/core' instead.
- *
- * The new ArtifactCache provides:
- * - Multi-layer caching (engine evals, themes, candidates)
- * - Position-key based indexing with Zobrist hashing
- * - LRU eviction with configurable limits
- * - Integration with the staged analysis pipeline
- *
- * This legacy evaluation cache will be removed in a future version.
- *
- * Original description:
- * Avoids redundant Stockfish calls by caching evaluations keyed by normalized FEN.
- * Cache hit only if cached depth >= requested depth and cached multipv >= requested multipv.
+ * These types support depth-aware and multipv-aware lookup to avoid
+ * redundant Stockfish calls by caching evaluations keyed by normalized FEN.
  */
 
 import type { CacheConfig } from '../config/llm-config.js';
@@ -101,26 +89,26 @@ export class EvaluationCache {
       return undefined;
     }
 
-    // Check if expired
+    // Check if entry has expired
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
       this.misses++;
       return undefined;
     }
 
-    // Check if depth is sufficient
+    // Check if cached depth is sufficient
     if (entry.value.depth < minDepth) {
       this.misses++;
       return undefined;
     }
 
-    // Check if multipv is sufficient
+    // Check if cached multipv is sufficient
     if (entry.value.multipv < minMultipv) {
       this.misses++;
       return undefined;
     }
 
-    // Update access time for LRU
+    // Update last access time
     entry.lastAccess = Date.now();
     this.hits++;
 
@@ -130,32 +118,18 @@ export class EvaluationCache {
   /**
    * Store evaluation in cache
    *
-   * Only updates if new evaluation is deeper or has more lines
-   *
    * @param fen - Position in FEN notation
    * @param evaluation - Evaluation to cache
    */
   set(fen: string, evaluation: CachedEvaluation): void {
     const key = this.normalizeKey(fen);
-    const existing = this.cache.get(key);
+    const now = Date.now();
 
-    // Only update if new evaluation is better
-    if (existing && Date.now() <= existing.expiresAt) {
-      // Keep existing if it's deeper or has more lines
-      if (
-        existing.value.depth > evaluation.depth ||
-        (existing.value.depth === evaluation.depth && existing.value.multipv >= evaluation.multipv)
-      ) {
-        return;
-      }
-    }
-
-    // Evict if at capacity
-    if (this.cache.size >= this.config.maxSize && !existing) {
+    // Enforce size limit with LRU eviction
+    if (this.cache.size >= this.config.maxSize) {
       this.evictLRU();
     }
 
-    const now = Date.now();
     this.cache.set(key, {
       value: evaluation,
       createdAt: now,
@@ -165,63 +139,13 @@ export class EvaluationCache {
   }
 
   /**
-   * Check if key exists with sufficient depth/multipv
-   */
-  has(fen: string, minDepth: number, minMultipv: number = 1): boolean {
-    const result = this.get(fen, minDepth, minMultipv);
-    // Don't double-count the miss from get()
-    if (!result) {
-      this.misses--; // Undo the miss count from get()
-    } else {
-      this.hits--; // Undo the hit count from get()
-    }
-    return result !== undefined;
-  }
-
-  /**
-   * Get cache statistics
-   */
-  getStats(): {
-    hits: number;
-    misses: number;
-    hitRate: number;
-    size: number;
-    maxSize: number;
-  } {
-    this.cleanExpired();
-    const total = this.hits + this.misses;
-    return {
-      hits: this.hits,
-      misses: this.misses,
-      hitRate: total > 0 ? this.hits / total : 0,
-      size: this.cache.size,
-      maxSize: this.config.maxSize,
-    };
-  }
-
-  /**
-   * Clear the entire cache and reset stats
-   */
-  clear(): void {
-    this.cache.clear();
-    this.hits = 0;
-    this.misses = 0;
-  }
-
-  /**
    * Evict least recently used entry
    */
   private evictLRU(): void {
     let oldestKey: string | undefined;
     let oldestAccess = Infinity;
 
-    for (const [key, entry] of this.cache) {
-      // Also clean expired entries
-      if (Date.now() > entry.expiresAt) {
-        this.cache.delete(key);
-        continue;
-      }
-
+    for (const [key, entry] of this.cache.entries()) {
       if (entry.lastAccess < oldestAccess) {
         oldestAccess = entry.lastAccess;
         oldestKey = key;
@@ -234,14 +158,24 @@ export class EvaluationCache {
   }
 
   /**
-   * Clean expired entries
+   * Get cache statistics
    */
-  private cleanExpired(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.cache) {
-      if (now > entry.expiresAt) {
-        this.cache.delete(key);
-      }
-    }
+  getStats(): { hits: number; misses: number; size: number; hitRate: number } {
+    const total = this.hits + this.misses;
+    return {
+      hits: this.hits,
+      misses: this.misses,
+      size: this.cache.size,
+      hitRate: total > 0 ? this.hits / total : 0,
+    };
+  }
+
+  /**
+   * Clear all cached evaluations
+   */
+  clear(): void {
+    this.cache.clear();
+    this.hits = 0;
+    this.misses = 0;
   }
 }

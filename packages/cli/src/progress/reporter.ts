@@ -543,7 +543,7 @@ export class ProgressReporter {
   }
 
   /**
-   * Display agentic tool call progress
+   * Display LLM tool call progress
    */
   displayToolCall(
     moveNotation: string,
@@ -656,7 +656,6 @@ export function createPipelineProgressCallback(
       deep_analysis: 'deep_analysis',
       maia_analysis: 'maia_analysis',
       llm_annotation: 'llm_annotation',
-      agentic_annotation: 'agentic_annotation',
       complete: 'complete',
     };
 

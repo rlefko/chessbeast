@@ -69,7 +69,7 @@ chessbeast analyze --input game.pgn --token-budget 30000
 chessbeast analyze --input game.pgn --verbose
 
 # Enable debug mode for full LLM observability (FEN, eval, tool calls)
-chessbeast analyze --input game.pgn --agentic --debug 2> debug.log
+chessbeast analyze --input game.pgn --ultra-fast-coach --debug 2> debug.log
 
 # Skip external services for offline analysis
 chessbeast analyze --input game.pgn --skip-maia --skip-llm
@@ -98,13 +98,12 @@ chessbeast analyze --show-config
 | `--reasoning-effort <level>` | LLM reasoning effort: `none`, `low`, `medium`, `high` (default: medium) |
 | `--verbose` | Enable verbose mode with real-time LLM reasoning display |
 | `--debug` | Enable debug mode with full LLM reasoning, move context, and tool call details |
-| `--agentic` | Enable agentic mode with tool calling for critical moments |
-| `--agentic-all` | Enable agentic mode for all moves (not just critical) |
-| `--max-tool-calls <n>` | Max tool calls per position in agentic mode (default: 5) |
-| `--show-costs` | Display LLM cost summary after analysis |
-| `--agentic-exploration` | Enable agentic variation exploration |
-| `--exploration-max-tool-calls <n>` | Max tool calls per variation exploration (default: 40) |
-| `--exploration-max-depth <n>` | Max depth for variation exploration (default: 50) |
+| `--ultra-fast-coach` | Enable Ultra-Fast Coach annotation mode |
+| `--speed <tier>` | Analysis speed: `fast`, `normal`, `deep` (default: normal) |
+| `--themes <level>` | Theme verbosity: `none`, `important`, `all` (default: important) |
+| `--variations <depth>` | Variation depth: `low`, `medium`, `high` (default: medium) |
+| `--comment-density <level>` | Comment density: `sparse`, `normal`, `verbose` (default: normal) |
+| `--audience <level>` | Audience level: `beginner`, `club`, `expert` (default: club) |
 | `--show-config` | Print resolved configuration and exit |
 | `--no-color` | Disable colored output (useful for piping) |
 | `--dry-run` | Validate setup and configuration without running analysis |
@@ -160,65 +159,41 @@ Control whose point of view the annotations use:
 
 This is useful when analyzing your own games - set `--perspective white` if you played White to get personalized "we/they" commentary.
 
-### Agentic Mode
+### Ultra-Fast Coach Mode
 
-Agentic mode enables the LLM to query external services using OpenAI function calling for deeper analysis:
-
-```bash
-# Enable agentic mode for critical moments
-chessbeast analyze --input game.pgn --agentic
-
-# Enable agentic mode for all moves (more thorough, higher cost)
-chessbeast analyze --input game.pgn --agentic-all
-
-# Limit tool calls per position
-chessbeast analyze --input game.pgn --agentic --max-tool-calls 3
-
-# Show cost summary after analysis
-chessbeast analyze --input game.pgn --agentic --show-costs
-```
-
-**Available Tools:**
-
-| Tool | Description |
-|------|-------------|
-| `evaluate_position` | Get Stockfish evaluation for a position |
-| `predict_human_moves` | Get Maia predictions for human-likely moves |
-| `lookup_opening` | Query ECO database for opening name |
-| `find_reference_games` | Search Lichess Elite games database |
-| `make_move` | Apply a move and get resulting position |
-
-Agentic mode produces richer annotations by allowing the LLM to explore positions dynamically.
-
-### Agentic Exploration Mode
-
-Agentic exploration gives the LLM full control over variation exploration, allowing it to leave comments throughout variations (not just at the start/end) and decide which lines are worth pursuing:
+Ultra-Fast Coach mode uses engine-driven exploration with a priority queue for efficient variation discovery, followed by LLM-powered narrative synthesis:
 
 ```bash
-# Enable agentic exploration for deep variation analysis
-chessbeast analyze --input game.pgn --agentic-exploration
+# Enable Ultra-Fast Coach for rich annotations
+chessbeast analyze --input game.pgn --ultra-fast-coach
 
-# Combine with standard agentic mode for comprehensive analysis
-chessbeast analyze --input game.pgn --agentic --agentic-exploration
+# Customize analysis speed tier
+chessbeast analyze --input game.pgn --ultra-fast-coach --speed deep
 
-# Customize exploration limits
-chessbeast analyze --input game.pgn --agentic-exploration \
-  --exploration-max-tool-calls 60 --exploration-max-depth 40
+# Target beginner audience with verbose comments
+chessbeast analyze --input game.pgn --ultra-fast-coach --audience beginner --comment-density verbose
+
+# Thorough theme detection with all variations
+chessbeast analyze --input game.pgn --ultra-fast-coach --themes all --variations high
 ```
 
-**Exploration Tools:**
+**Key Features:**
 
-| Tool | Description |
-|------|-------------|
-| `get_board` | ASCII board visualization for the current position |
-| `push_move` / `pop_move` | Navigate through positions |
-| `start_branch` / `end_branch` | Manage variation branches |
-| `add_comment` / `add_nag` | Annotate positions dynamically |
-| `suggest_nag` | Get engine-based NAG suggestion for move quality |
-| `get_eval_nag` | Get position evaluation NAG (+=, -+, etc.) |
-| `assess_continuation` | Check if exploration should continue |
+| Feature | Description |
+|---------|-------------|
+| Staged Analysis | Three-tier depth (shallow/standard/full) for efficiency |
+| Theme Detection | Tactical, structural, positional, and dynamic themes |
+| Priority Queue | Best-first exploration based on criticality scores |
+| DAG Variations | Transposition-aware variation tree |
+| Post-Write Narration | LLM narrates after engine exploration |
 
-Agentic exploration uses intelligent caching for expensive Stockfish evaluations to avoid redundant analysis.
+**Speed Tiers:**
+
+| Tier | Depth | MultiPV | Best For |
+|------|-------|---------|----------|
+| `fast` | 12 | 1 | Quick overview |
+| `normal` | 18 | 3 | Balanced analysis (default) |
+| `deep` | 22 | 5 | Thorough study |
 
 ### Configuration
 

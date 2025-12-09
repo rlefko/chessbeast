@@ -442,24 +442,6 @@ export {
   type MaiaService,
 } from './explorer/index.js';
 
-// Agentic variation exploration
-export {
-  AgenticVariationExplorer,
-  createAgenticExplorer,
-  assessExplorationWorthiness,
-  type AgenticExplorerConfig,
-  type AgenticExplorerProgress,
-  type AgenticExplorerResult,
-  type ExplorationWorthiness,
-} from './explorer/index.js';
-
-// Agentic annotation
-export {
-  AgenticCommentGenerator,
-  type AgenticProgress,
-  type AgenticResult,
-} from './generator/agentic-generator.js';
-
 export {
   formatRichContext,
   buildRichContext,

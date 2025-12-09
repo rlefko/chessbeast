@@ -127,25 +127,23 @@ Common emoji prefixes:
 
 **Maia models**: Rating bands 1100-1900 (100-point increments), loaded on demand
 
-**Variation Exploration** (see `packages/llm/src/explorer/`):
+**Ultra-Fast Coach Mode** (see `packages/llm/src/` and `packages/core/src/`):
 
-- `VariationExplorer`: Iterative engine + Maia + LLM dialogue for deep variations
-- Max variation depth: 40 moves (depth-first exploration)
-- LLM call budget: 15-20 soft cap, 22 hard cap per position
-- `PlannedVariation` interface ensures LLM references actual PGN output
+- Opt-in via `--ultra-fast-coach` CLI flag
+- Engine-driven exploration with priority queue for efficient variation discovery
+- Three-tier staged analysis: shallow (depth 12), standard (depth 18), full (depth 22)
+- Multi-factor criticality scoring for intelligent position selection
+- Theme detection with lifecycle tracking (emerged, persisting, escalated, resolved)
+- Post-write annotation: engine explores first, LLM narrates after
 
-**NAG (Numeric Annotation Glyph) behavior**:
+**CLI Options for Ultra-Fast Coach**:
 
-- Position NAG threshold: 150cp (significant eval change required)
-- `$1` (good move) only added for critical positions
-- Max 2 consecutive position NAGs (clustering prevention)
-
-**Agentic Annotation Mode** (see `packages/llm/src/generator/agentic-generator.ts`):
-
-- Opt-in via `--agentic` CLI flag
-- `--agentic-all` annotates all moves (not just critical moments)
-- `--show-costs` displays LLM cost summary at end
-- Cost tracking in `packages/llm/src/cost/` (model pricing per 1M tokens)
+- `--ultra-fast-coach`: Enable Ultra-Fast Coach annotation mode
+- `--speed=fast|normal|deep`: Analysis speed tier
+- `--themes=none|important|all`: Theme output verbosity
+- `--variations=low|medium|high`: Variation exploration depth
+- `--comment-density=sparse|normal|verbose`: Comment density control
+- `--audience=beginner|club|expert`: Target audience level
 
 **Model Selection** (see `packages/llm/src/cost/pricing.ts`):
 
@@ -154,33 +152,18 @@ Common emoji prefixes:
 - Available models: `gpt-5-codex`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
 - Pricing tracked in `packages/llm/src/cost/pricing.ts`
 
-**Agentic Exploration Mode** (see `packages/llm/src/explorer/` and `docs/agentic-annotation.md`):
+**Variation Exploration** (see `packages/llm/src/explorer/`):
 
-- Opt-in via `--agentic` CLI flag
-- LLM navigates a tree structure with tool-calling loop
-- Components: `agentic-explorer.ts`, `variation-tree.ts`, `exploration-tools.ts`, `stopping-heuristics.ts`, `candidate-classifier.ts`, `types.ts`
-- Tree-based architecture: Root = position before move, LLM starts AT the played move
-- Navigation tools: `get_position`, `add_move`, `add_alternative`, `go_to`, `go_to_parent`, `get_tree`
-- Annotation tools: `set_comment`, `get_comment`, `add_move_nag`, `set_position_nag`, `get_nags`, `clear_nags`, `set_principal`
-- Work queue: `mark_interesting`, `get_interesting`, `clear_interesting`
-- Analysis tools: `get_candidate_moves`, `evaluate_position`, `predict_human_moves`, `lookup_opening`, `find_reference_games`
-- Control: `assess_continuation`, `finish_exploration`
-- Sub-exploration: `mark_for_sub_exploration` - flag interesting branch points for later analysis
-- NAG rules: Move NAGs ($1-$6) use freely, Position NAGs ($10-$19) ONLY at end of variation
-- Side-to-move context: LLM told explicitly which color's alternatives to explore
-- **"Show Don't Tell" Philosophy**: Comments point to concepts, variations demonstrate specific moves
-  - Strategic plans: Can mention moves ("preparing ...c5", "developing toward f3")
-  - Specific alternatives: Use concepts only (explorer shows the moves)
-  - Tactical blows: Can name the killing move ("drops material after Bxf7+")
-- Comment types: `initial` (50-100 chars), `pointer` (50-100 chars), `summary` (100-150 chars)
-- Comment validation: Context-aware limits, lowercase, no meta-commentary, verbose pattern cleanup
-- **Candidate Source Classification**: `get_candidate_moves` returns sources: `engine_best`, `near_best`, `human_popular`, `maia_preferred`, `attractive_but_bad`, `sacrifice`, `scary_check`, `scary_capture`, `blunder`, `quiet_improvement`
-- **Attractive-But-Bad Detection**: Rating-dependent thresholds identify tempting moves that lose - perfect for showing refutations
-- Move validation: Soft warnings if moves not in engine candidates list
-- Intelligent caching for Stockfish evaluations (depth ≥ 14)
-- Default max 200 tool calls, soft cap at 80 (`--exploration-max-tool-calls`)
-- Deep exploration: Continues until positions are resolved (10-30 move variations)
-- Default max 100 half-moves depth (`--exploration-max-depth`)
+- `VariationExplorer`: Iterative engine + Maia + LLM dialogue for variations
+- `EngineDrivenExplorer`: Priority queue exploration for Ultra-Fast Coach
+- Max variation depth: 40 moves (configurable)
+- DAG-based variation tree with transposition detection
+
+**NAG (Numeric Annotation Glyph) behavior**:
+
+- Position NAG threshold: 150cp (significant eval change required)
+- `$1` (good move) only added for critical positions
+- Max 2 consecutive position NAGs (clustering prevention)
 
 ## Testing Requirements
 
