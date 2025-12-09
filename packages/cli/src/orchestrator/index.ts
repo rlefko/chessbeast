@@ -33,3 +33,7 @@ export {
   shouldCommentPosition,
   getUltraFastTierConfig,
 } from './ultra-fast-coach.js';
+
+// Ultra-Fast Coach runner (engine-driven exploration + post-write annotation)
+export type { UltraFastCoachRunnerResult } from './ultra-fast-coach-runner.js';
+export { runUltraFastCoachAnnotation, runUltraFastCoachFull } from './ultra-fast-coach-runner.js';

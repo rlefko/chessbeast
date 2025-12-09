@@ -124,3 +124,7 @@ export type {
 } from './transformer/index.js';
 
 export { transformAnalysisToGame, hasAnnotations, countAnnotations } from './transformer/index.js';
+
+// DAG transformation (Ultra-Fast Coach architecture)
+export type { DagNode, DagEdge, DagLike, DagTransformerOptions } from './transformer/index.js';
+export { transformDagToMoves, countDagMoves, getPrincipalVariation } from './transformer/index.js';
