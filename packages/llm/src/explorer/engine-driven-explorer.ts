@@ -244,9 +244,6 @@ export class EngineDrivenExplorer {
 
     // Build initial candidates from position analysis
     const candidates = await this.buildInitialCandidates(rootFen, playedMove, classification);
-    console.log(
-      `[EngineDrivenExplorer] Built ${candidates.length} candidates for position (playedMove: ${playedMove})`,
-    );
 
     // Run exploration
     onProgress?.({
@@ -260,16 +257,9 @@ export class EngineDrivenExplorer {
 
     const explorationResult = await explorer.explore(rootFen, candidates);
 
-    console.log(
-      `[EngineDrivenExplorer] Exploration complete: ${explorationResult.nodesExplored} nodes, ${allIntents.length} intents`,
-    );
-
     // Fallback: For critical moments with no intents, create a basic intent
     // This ensures we always have something to annotate for important moves
     if (allIntents.length === 0 && playedMove && classification) {
-      console.log(
-        `[EngineDrivenExplorer] No intents generated - creating fallback intent for ${classification} move ${playedMove}`,
-      );
       const fallbackIntent = this.createCriticalMomentIntent(playedMove, rootFen, classification);
       if (fallbackIntent) {
         allIntents.push(fallbackIntent);
@@ -523,11 +513,6 @@ export class EngineDrivenExplorer {
 
     // Use the higher of calculated criticality or node's criticality score
     criticalityScore.score = Math.max(criticalityScore.score, node.criticalityScore);
-
-    // Log node characteristics for debugging
-    console.log(
-      `[EngineDrivenExplorer] Node ${node.nodeId}: criticality=${node.criticalityScore}, priority=${node.explorationPriority}, themes=${deltas.length}`,
-    );
 
     // Generate intent if we have interesting content (lowered thresholds from 40/60 to 20/30)
     const hasThemeContent = deltas.length > 0;

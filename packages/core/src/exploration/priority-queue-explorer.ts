@@ -316,7 +316,13 @@ export class PriorityQueueExplorer {
 
     // Notify callback
     if (this.onNodeExploredCallback) {
-      this.onNodeExploredCallback(node);
+      try {
+        this.onNodeExploredCallback(node);
+      } catch (callbackError) {
+        console.error(
+          `[PQE] Callback error: ${callbackError instanceof Error ? callbackError.message : String(callbackError)}`,
+        );
+      }
     }
 
     // Add children to queue (from PV line)
@@ -343,31 +349,35 @@ export class PriorityQueueExplorer {
       // We'd need a chess library to compute the resulting FEN
       // For now, we'll skip adding children unless we have the DAG
       if (this.dag) {
-        const result = this.dag.addMove(
-          moveUci, // Using UCI as placeholder for SAN
-          moveUci,
-          currentFen, // This would need to be computed
-          'exploration',
-        );
-
-        if (result.isNewNode) {
-          const childPosKey = generatePositionKey(result.node.fen);
-          const childNode = createExplorationNode(
-            generateNodeId(childPosKey.key, parent.explorationDepth + 1 + i),
-            childPosKey.key,
-            result.node.fen,
-            parent.ply + 1 + i,
-            parent.explorationDepth + 1 + i,
-            {
-              parentNodeId: parent.nodeId,
-              parentMoveUci: moveUci,
-              noveltyScore: 0.8 - i * 0.1, // Decreasing novelty for later PV moves
-            },
+        try {
+          const result = this.dag.addMove(
+            moveUci, // Using UCI as placeholder for SAN
+            moveUci,
+            currentFen, // This would need to be computed
+            'exploration',
           );
-          this.queue.push(childNode);
-        }
 
-        currentFen = result.node.fen;
+          if (result.isNewNode) {
+            const childPosKey = generatePositionKey(result.node.fen);
+            const childNode = createExplorationNode(
+              generateNodeId(childPosKey.key, parent.explorationDepth + 1 + i),
+              childPosKey.key,
+              result.node.fen,
+              parent.ply + 1 + i,
+              parent.explorationDepth + 1 + i,
+              {
+                parentNodeId: parent.nodeId,
+                parentMoveUci: moveUci,
+                noveltyScore: 0.8 - i * 0.1, // Decreasing novelty for later PV moves
+              },
+            );
+            this.queue.push(childNode);
+          }
+
+          currentFen = result.node.fen;
+        } catch {
+          // DAG errors are non-fatal - continue with next move
+        }
       }
     }
   }
