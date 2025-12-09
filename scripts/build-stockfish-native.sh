@@ -68,8 +68,8 @@ rm -f "$BIN_DIR/.stockfish-sha"
 
 echo "Checking latest Stockfish from master..."
 
-# Clone or update repo
-if [ -d "$SF_LATEST_DIR/.git" ]; then
+# Clone or update repo (validate git repo is not corrupted)
+if [ -d "$SF_LATEST_DIR/.git" ] && git -C "$SF_LATEST_DIR" rev-parse --git-dir >/dev/null 2>&1; then
     cd "$SF_LATEST_DIR"
     git fetch origin master --depth 1
     git reset --hard origin/master
@@ -117,7 +117,8 @@ if [ -f "$BIN_DIR/stockfish-16" ] && [ "$FORCE_REBUILD" != "1" ]; then
     echo "Stockfish 16 already built, skipping"
 else
     echo "Building Stockfish 16..."
-    if [ ! -d "$SF16_DIR/.git" ]; then
+    # Validate git repo is not corrupted before using it
+    if [ ! -d "$SF16_DIR/.git" ] || ! git -C "$SF16_DIR" rev-parse --git-dir >/dev/null 2>&1; then
         rm -rf "$SF16_DIR"
         git clone --depth 1 --branch sf_16 https://github.com/official-stockfish/Stockfish.git "$SF16_DIR"
     fi
