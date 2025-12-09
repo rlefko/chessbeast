@@ -442,7 +442,6 @@ export {
   type MaiaService,
 } from './explorer/index.js';
 
-
 export {
   formatRichContext,
   buildRichContext,

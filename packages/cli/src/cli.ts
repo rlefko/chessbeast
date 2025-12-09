@@ -52,7 +52,6 @@ const REASONING_EFFORT_HELP = `LLM reasoning effort (for gpt-5-codex, o1, o3):
     medium - Balanced reasoning for quality analysis [default]
     high   - Maximum reasoning for complex positions`;
 
-
 /**
  * Analysis speed descriptions for help text
  */
