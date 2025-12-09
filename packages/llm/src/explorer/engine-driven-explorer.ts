@@ -684,7 +684,6 @@ export class EngineDrivenExplorer {
     return summary;
   }
 
-
   /**
    * Convert exploration result to legacy ExploredLine format
    */
