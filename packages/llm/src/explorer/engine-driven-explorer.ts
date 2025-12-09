@@ -270,11 +270,7 @@ export class EngineDrivenExplorer {
       console.log(
         `[EngineDrivenExplorer] No intents generated - creating fallback intent for ${classification} move ${playedMove}`,
       );
-      const fallbackIntent = this.createCriticalMomentIntent(
-        playedMove,
-        rootFen,
-        classification,
-      );
+      const fallbackIntent = this.createCriticalMomentIntent(playedMove, rootFen, classification);
       if (fallbackIntent) {
         allIntents.push(fallbackIntent);
       }
