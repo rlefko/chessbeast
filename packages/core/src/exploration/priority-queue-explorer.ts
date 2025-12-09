@@ -198,7 +198,7 @@ export class PriorityQueueExplorer {
       { criticalityScore: 50 }, // Root has medium priority
     );
     markExplored(rootNode);
-    this.exploredNodes.set(rootNode.nodeId, rootNode);
+    this.exploredNodes.set(rootNode.positionKey, rootNode);
 
     // Add initial candidates to queue
     for (const candidate of candidates) {
