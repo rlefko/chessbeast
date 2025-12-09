@@ -104,6 +104,13 @@ const AUDIENCE_HELP = `Target audience skill level:
     expert   - Advanced terminology`;
 
 /**
+ * Ultra-Fast Coach mode descriptions for help text
+ */
+const ULTRA_FAST_COACH_HELP = `Enable Ultra-Fast Coach annotation mode.
+    Uses engine-driven exploration with post-write LLM annotation
+    for faster, more efficient analysis.`;
+
+/**
  * Create and configure the CLI program
  */
 export function createProgram(): Command {
@@ -162,6 +169,7 @@ export function createProgram(): Command {
     .option('--variations <level>', VARIATIONS_HELP, 'medium')
     .option('--comment-density <level>', DENSITY_HELP, 'normal')
     .option('--audience <level>', AUDIENCE_HELP, 'club')
+    .option('--ultra-fast-coach', ULTRA_FAST_COACH_HELP)
     .action(async (options) => {
       // Import dynamically to avoid circular dependencies
       const { analyzeCommand } = await import('./commands/analyze.js');
@@ -216,6 +224,8 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['commentDensity'] !== undefined)
     result.commentDensity = options['commentDensity'] as CommentDensity;
   if (options['audience'] !== undefined) result.audience = options['audience'] as AudienceLevel;
+  if (options['ultraFastCoach'] !== undefined)
+    result.ultraFastCoach = options['ultraFastCoach'] as boolean;
 
   return result;
 }

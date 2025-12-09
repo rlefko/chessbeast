@@ -195,6 +195,8 @@ export interface OutputConfigSchema {
  * theme detection, and post-write comment synthesis.
  */
 export interface UltraFastCoachConfigSchema {
+  /** Enable Ultra-Fast Coach annotation mode */
+  enabled: boolean;
   /** Analysis speed tier */
   speed: AnalysisSpeed;
   /** Theme output verbosity */
@@ -291,4 +293,6 @@ export interface CliOptions {
   commentDensity?: CommentDensity;
   /** Target audience level (beginner/club/expert) */
   audience?: AudienceLevel;
+  /** Enable Ultra-Fast Coach annotation mode */
+  ultraFastCoach?: boolean;
 }
