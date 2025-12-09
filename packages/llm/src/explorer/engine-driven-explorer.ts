@@ -162,6 +162,9 @@ export class EngineDrivenExplorer {
   private readonly detectorRegistry: ReturnType<typeof createFullDetectorRegistry>;
   private readonly lifecycleTracker: ThemeLifecycleTracker;
 
+  /** Game ply for current exploration (used to attach intents to the correct move) */
+  private currentGamePly: number = 0;
+
   constructor(
     engine: EngineService,
     cache: ArtifactCache,
@@ -181,6 +184,8 @@ export class EngineDrivenExplorer {
    * @param playedMove - The move that was played (SAN)
    * @param classification - Move classification (blunder, mistake, etc.)
    * @param onProgress - Progress callback
+   * @param gamePly - The actual game ply for this position (0-indexed). If not provided,
+   *                  will be calculated from the FEN's move number.
    * @returns Exploration result with themes and intents
    */
   async explore(
@@ -188,8 +193,21 @@ export class EngineDrivenExplorer {
     playedMove?: string,
     classification?: MoveClassification,
     onProgress?: (progress: EngineDrivenExplorerProgress) => void,
+    gamePly?: number,
   ): Promise<EngineDrivenExplorerResult> {
     const startTime = Date.now();
+
+    // Store game ply for intent generation
+    // If not provided, calculate from FEN (position is before the move)
+    if (gamePly !== undefined) {
+      this.currentGamePly = gamePly;
+    } else {
+      const position = new ChessPosition(rootFen);
+      const moveNum = position.moveNumber();
+      const turn = position.turn();
+      // 0-based ply: move 1 white = 0, move 1 black = 1, etc.
+      this.currentGamePly = (moveNum - 1) * 2 + (turn === 'w' ? 0 : 1);
+    }
 
     // Create a fresh DAG for this exploration
     const dag = createVariationDAG(rootFen);
@@ -521,11 +539,15 @@ export class EngineDrivenExplorer {
 
     // Generate intent for positions with interesting characteristics
     if (hasThemeContent || hasHighCriticality || hasSignificantPriority) {
+      // Use the game ply (the actual move in the game) for intent placement,
+      // not the exploration depth. All intents from this exploration should
+      // attach to the critical moment's ply.
+      const targetPly = this.currentGamePly;
       const input: IntentInput = {
         move: node.parentMove ?? '',
-        moveNumber: Math.floor(node.ply / 2) + 1,
-        isWhiteMove: node.ply % 2 === 1,
-        plyIndex: node.ply,
+        moveNumber: Math.floor(targetPly / 2) + 1,
+        isWhiteMove: targetPly % 2 === 0, // 0-based: even = white, odd = black
+        plyIndex: targetPly,
         criticalityScore,
         themeDeltas: deltas,
         activeThemes: themes,
@@ -803,7 +825,8 @@ export class EngineDrivenExplorer {
       const position = new ChessPosition(fen);
       const moveNum = position.moveNumber();
       const turn = position.turn();
-      const ply = moveNum * 2 - (turn === 'w' ? 1 : 0);
+      // Use 0-based ply: move 1 white = 0, move 1 black = 1, move 2 white = 2, etc.
+      const ply = (moveNum - 1) * 2 + (turn === 'w' ? 0 : 1);
 
       // Determine intent type based on classification
       const intentType: CommentIntent['type'] =
