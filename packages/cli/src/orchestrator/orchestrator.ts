@@ -27,6 +27,7 @@ import {
 import { runAgenticAnnotation } from './agentic-runner.js';
 import { toAnalysisInput } from './converters.js';
 import type { Services } from './services.js';
+import { runUltraFastCoachAnnotation } from './ultra-fast-coach-runner.js';
 import { createUltraFastCoachConfig, getUltraFastTierConfig } from './ultra-fast-coach.js';
 
 /**
@@ -138,7 +139,25 @@ export async function orchestrateAnalysis(
 
     // Annotate with LLM if enabled
     if (!config.analysis.skipLlm && config.llm.apiKey) {
-      if (config.agentic.enabled) {
+      if (config.ultraFastCoach.enabled) {
+        // Ultra-Fast Coach annotation with engine-driven exploration
+        reporter.startPhase('llm_annotation');
+        try {
+          const annotationCount = await runUltraFastCoachAnnotation(
+            analysis,
+            config,
+            services,
+            reporter,
+          );
+          totalAnnotations += annotationCount;
+          reporter.completePhase('llm_annotation', `${annotationCount} annotations`);
+        } catch (error) {
+          reporter.failPhase(
+            'llm_annotation',
+            error instanceof Error ? error.message : 'unknown error',
+          );
+        }
+      } else if (config.agentic.enabled) {
         // Agentic annotation with tool calling
         reporter.startPhase('agentic_annotation');
         try {
