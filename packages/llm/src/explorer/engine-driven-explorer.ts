@@ -276,6 +276,9 @@ export class EngineDrivenExplorer {
 
   /**
    * Build initial candidates from position analysis
+   *
+   * The played move is added FIRST to guarantee at least one candidate
+   * even if engine evaluation fails or returns empty PVs.
    */
   private async buildInitialCandidates(
     fen: string,
@@ -285,7 +288,37 @@ export class EngineDrivenExplorer {
     const candidates: CandidateMove[] = [];
     const position = new ChessPosition(fen);
 
-    // Get engine evaluation for candidates
+    // FIRST: Add played move as a guaranteed candidate
+    // This ensures exploration has at least one move even if engine fails
+    if (playedMove) {
+      try {
+        const resultingFen = this.getResultingFen(position, playedMove);
+        if (resultingFen) {
+          const uci = this.sanToUci(position, playedMove) ?? playedMove;
+          candidates.push({
+            san: playedMove,
+            uci,
+            resultingFen,
+            priority:
+              classification === 'blunder'
+                ? 95
+                : classification === 'mistake'
+                  ? 90
+                  : classification === 'inaccuracy'
+                    ? 85
+                    : 80,
+          });
+        } else {
+          console.warn(
+            `[EngineDrivenExplorer] Could not get resulting FEN for played move ${playedMove} in ${fen}`,
+          );
+        }
+      } catch (e) {
+        console.warn(`[EngineDrivenExplorer] Failed to add played move ${playedMove}: ${e}`);
+      }
+    }
+
+    // THEN: Get engine evaluations for additional candidates
     try {
       const evals = await this.engine.evaluateMultiPv(fen, {
         depth: 18,
@@ -297,8 +330,14 @@ export class EngineDrivenExplorer {
           // evaluation.pv already contains SAN moves (converted by adapter)
           const moveSan = evaluation.pv[0]!;
 
+          // Skip if this is the played move (already added above)
+          if (moveSan === playedMove) continue;
+
           const resultingFen = this.getResultingFen(position, moveSan);
-          if (!resultingFen) continue;
+          if (!resultingFen) {
+            console.warn(`[EngineDrivenExplorer] Could not get FEN for engine move ${moveSan}`);
+            continue;
+          }
 
           const priority = this.calculateCandidatePriority(
             moveSan,
@@ -325,32 +364,21 @@ export class EngineDrivenExplorer {
         }
       }
 
-      // Log warning if engine returned no usable candidates
-      if (candidates.length === 0 && evals.length > 0) {
+      // Log if engine returned no usable PVs (beyond the played move)
+      if (evals.length > 0 && candidates.length <= 1) {
         console.warn(
-          `[EngineDrivenExplorer] No candidates generated from ${evals.length} engine evaluations for position ${fen}`,
+          `[EngineDrivenExplorer] Only ${candidates.length} candidate(s) from ${evals.length} evaluations for ${fen}`,
         );
       }
-    } catch {
-      // If engine fails, just use played move if available
+    } catch (e) {
+      console.warn(`[EngineDrivenExplorer] Engine evaluation failed: ${e}`);
     }
 
-    // Ensure played move is in candidates with high priority
-    if (playedMove && !candidates.some((c) => c.san === playedMove)) {
-      try {
-        const resultingFen = this.getResultingFen(position, playedMove);
-        if (resultingFen) {
-          const uci = this.sanToUci(position, playedMove);
-          candidates.unshift({
-            san: playedMove,
-            uci: uci ?? playedMove,
-            resultingFen,
-            priority: classification === 'blunder' ? 90 : 70,
-          });
-        }
-      } catch {
-        // Ignore invalid played move
-      }
+    // Final check - should never happen if playedMove is valid
+    if (candidates.length === 0) {
+      console.error(
+        `[EngineDrivenExplorer] NO CANDIDATES for position ${fen} (playedMove: ${playedMove})`,
+      );
     }
 
     return candidates;
