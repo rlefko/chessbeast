@@ -137,6 +137,7 @@ export type AudienceLevel = 'beginner' | 'club' | 'expert';
  * Ultra-Fast Coach configuration
  */
 export interface UltraFastCoachConfigSchema {
+  enabled: boolean;
   speed: AnalysisSpeed;
   themes: ThemeVerbosity;
   variations: VariationDepth;
@@ -246,6 +247,7 @@ const DEFAULT_CONFIG: ChessBeastConfig = {
     perspective: 'neutral',
   },
   ultraFastCoach: {
+    enabled: false,
     speed: 'normal',
     themes: 'important',
     variations: 'medium',
@@ -494,12 +496,16 @@ export class ConfigBuilder {
    * Configure Ultra-Fast Coach options
    */
   withUltraFastCoach(options: {
+    enabled?: boolean;
     speed?: AnalysisSpeed;
     themes?: ThemeVerbosity;
     variations?: VariationDepth;
     commentDensity?: CommentDensity;
     audience?: AudienceLevel;
   }): this {
+    if (options.enabled !== undefined) {
+      this.config.ultraFastCoach.enabled = options.enabled;
+    }
     if (options.speed !== undefined) {
       this.config.ultraFastCoach.speed = options.speed;
     }

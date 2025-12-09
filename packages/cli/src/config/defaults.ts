@@ -126,6 +126,7 @@ export const DEFAULT_OUTPUT_CONFIG = {
  * Default Ultra-Fast Coach configuration
  */
 export const DEFAULT_ULTRA_FAST_COACH_CONFIG = {
+  enabled: false,
   speed: 'normal' as const,
   themes: 'important' as const,
   variations: 'medium' as const,

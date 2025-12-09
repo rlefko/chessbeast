@@ -65,6 +65,7 @@ const ENV_VAR_MAP: Record<string, string> = {
   CHESSBEAST_PERSPECTIVE: 'output.perspective',
 
   // Ultra-Fast Coach
+  CHESSBEAST_ULTRA_FAST_COACH: 'ultraFastCoach.enabled',
   CHESSBEAST_SPEED: 'ultraFastCoach.speed',
   CHESSBEAST_THEMES: 'ultraFastCoach.themes',
   CHESSBEAST_VARIATIONS: 'ultraFastCoach.variations',
@@ -379,6 +380,13 @@ function mapCliToConfig(options: CliOptions): Partial<ChessBeastConfig> {
   }
 
   // Ultra-Fast Coach options
+  if (options.ultraFastCoach !== undefined) {
+    config.ultraFastCoach = {
+      ...config.ultraFastCoach,
+      enabled: options.ultraFastCoach,
+    } as ChessBeastConfig['ultraFastCoach'];
+  }
+
   if (options.speed !== undefined) {
     const speedMap: Record<AnalysisSpeed, AnalysisSpeed> = {
       fast: 'fast',
