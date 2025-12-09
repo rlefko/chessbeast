@@ -259,6 +259,10 @@ export class PriorityQueueExplorer {
    * Explore a single node
    */
   private async exploreNode(node: ExplorationNode): Promise<void> {
+    // Always count the node as explored when we process it
+    // This ensures nodesExplored reflects actual work done, even if evaluation fails
+    this.state.nodesExplored++;
+
     // Check cache first
     const cached = this.getCachedEval(node.positionKey, node.tier);
     let evalResult: EngineEvaluation | undefined;
@@ -275,13 +279,10 @@ export class PriorityQueueExplorer {
         result.mate = cached.mate;
       }
       evalResult = result;
-      this.state.nodesExplored++; // Still counts as explored
     } else {
       // Compute evaluation
       evalResult = await this.evaluatePosition(node);
       if (evalResult) {
-        this.state.nodesExplored++;
-
         // Cache the result
         this.cacheEval(node.positionKey, node.tier, evalResult);
       }

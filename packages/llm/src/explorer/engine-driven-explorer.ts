@@ -244,6 +244,9 @@ export class EngineDrivenExplorer {
 
     // Build initial candidates from position analysis
     const candidates = await this.buildInitialCandidates(rootFen, playedMove, classification);
+    console.log(
+      `[EngineDrivenExplorer] Built ${candidates.length} candidates for position (playedMove: ${playedMove})`,
+    );
 
     // Run exploration
     onProgress?.({
@@ -256,6 +259,26 @@ export class EngineDrivenExplorer {
     });
 
     const explorationResult = await explorer.explore(rootFen, candidates);
+
+    console.log(
+      `[EngineDrivenExplorer] Exploration complete: ${explorationResult.nodesExplored} nodes, ${allIntents.length} intents`,
+    );
+
+    // Fallback: For critical moments with no intents, create a basic intent
+    // This ensures we always have something to annotate for important moves
+    if (allIntents.length === 0 && playedMove && classification) {
+      console.log(
+        `[EngineDrivenExplorer] No intents generated - creating fallback intent for ${classification} move ${playedMove}`,
+      );
+      const fallbackIntent = this.createCriticalMomentIntent(
+        playedMove,
+        rootFen,
+        classification,
+      );
+      if (fallbackIntent) {
+        allIntents.push(fallbackIntent);
+      }
+    }
 
     // Convert to legacy format for backward compatibility
     const variations = this.convertToExploredLines(explorationResult);
@@ -505,10 +528,15 @@ export class EngineDrivenExplorer {
     // Use the higher of calculated criticality or node's criticality score
     criticalityScore.score = Math.max(criticalityScore.score, node.criticalityScore);
 
-    // Generate intent if we have interesting content
+    // Log node characteristics for debugging
+    console.log(
+      `[EngineDrivenExplorer] Node ${node.nodeId}: criticality=${node.criticalityScore}, priority=${node.explorationPriority}, themes=${deltas.length}`,
+    );
+
+    // Generate intent if we have interesting content (lowered thresholds from 40/60 to 20/30)
     const hasThemeContent = deltas.length > 0;
-    const hasHighCriticality = node.criticalityScore >= 40 || criticalityScore.score >= 40;
-    const hasSignificantPriority = node.explorationPriority >= 60;
+    const hasHighCriticality = node.criticalityScore >= 20 || criticalityScore.score >= 20;
+    const hasSignificantPriority = node.explorationPriority >= 30;
 
     // Generate intent for positions with interesting characteristics
     if (hasThemeContent || hasHighCriticality || hasSignificantPriority) {
@@ -775,6 +803,74 @@ export class EngineDrivenExplorer {
       return cloned.fen();
     } catch {
       return undefined;
+    }
+  }
+
+  /**
+   * Create a fallback intent for critical moments that produced no intents from exploration
+   *
+   * This ensures we always have something to annotate for important moves like
+   * blunders, mistakes, and inaccuracies even if the exploration didn't find
+   * interesting themes or positions.
+   */
+  private createCriticalMomentIntent(
+    move: string,
+    fen: string,
+    classification: MoveClassification,
+  ): CommentIntent | null {
+    try {
+      const position = new ChessPosition(fen);
+      const moveNum = position.moveNumber();
+      const turn = position.turn();
+      const ply = moveNum * 2 - (turn === 'w' ? 1 : 0);
+
+      // Determine intent type based on classification
+      const intentType: CommentIntent['type'] =
+        classification === 'blunder'
+          ? 'blunder_explanation'
+          : classification === 'mistake'
+            ? 'what_was_missed'
+            : 'critical_moment';
+
+      // Calculate priority based on classification
+      const basePriority =
+        classification === 'blunder'
+          ? 0.9
+          : classification === 'mistake'
+            ? 0.8
+            : classification === 'inaccuracy'
+              ? 0.7
+              : 0.6;
+
+      return {
+        type: intentType,
+        plyIndex: ply,
+        priority: basePriority,
+        mandatory: classification === 'blunder' || classification === 'mistake',
+        suggestedLength: classification === 'blunder' ? 'detailed' : 'standard',
+        content: {
+          move,
+          moveNumber: moveNum,
+          isWhiteMove: turn === 'b', // After the move, turn has changed
+          ideaKeys: [
+            {
+              key: `fallback_${classification}_${move}`,
+              type: 'tactic',
+              concept: classification,
+            },
+          ],
+        },
+        scoreBreakdown: {
+          criticality: basePriority,
+          themeNovelty: 0,
+          instructionalValue: 0.3,
+          redundancyPenalty: 0,
+          totalScore: basePriority,
+        },
+      };
+    } catch (e) {
+      console.warn(`[EngineDrivenExplorer] Failed to create fallback intent: ${e}`);
+      return null;
     }
   }
 }
