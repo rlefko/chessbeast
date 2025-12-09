@@ -1,6 +1,20 @@
 /**
  * Agentic Variation Explorer (Tree-Based)
  *
+ * @deprecated This module is deprecated in favor of the new Ultra-Fast Coach architecture.
+ * Use {@link EngineDrivenExplorer} from './engine-driven-explorer.js' instead.
+ *
+ * The new architecture:
+ * - Engine explores via PriorityQueueExplorer (no LLM calls during exploration)
+ * - LLM generates comments post-write via PostWritePipeline
+ * - Much faster (engine-driven) and more cost-effective (1 LLM call per comment)
+ *
+ * This legacy agentic explorer:
+ * - Uses LLM tool-calling loop (20+ LLM calls per position)
+ * - LLM navigates a variation tree in real-time
+ * - Still works but will be removed in a future version
+ *
+ * Original description:
  * A fully agentic system where the LLM navigates a variation tree:
  * - Each node = one move with metadata (comment, NAGs, engine cache)
  * - One child marked "principal" = main line
