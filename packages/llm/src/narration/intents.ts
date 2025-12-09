@@ -502,7 +502,7 @@ export function sortIntentsByPriority(intents: CommentIntent[]): CommentIntent[]
 export function getIntentTypeDescription(type: CommentIntentType): string {
   const descriptions: Record<CommentIntentType, string> = {
     why_this_move: 'Explain why this move is good',
-    what_was_missed: 'Show what better move was missed',
+    what_was_missed: 'Explain what better move was missed and why it was superior',
     tactical_shot: 'Highlight tactical opportunity',
     strategic_plan: 'Explain strategic ideas',
     endgame_technique: 'Demonstrate endgame technique',
@@ -510,7 +510,7 @@ export function getIntentTypeDescription(type: CommentIntentType): string {
     theme_emergence: 'New theme has appeared',
     theme_resolution: 'Theme has been resolved',
     critical_moment: 'Game-changing moment',
-    blunder_explanation: 'Explain the mistake',
+    blunder_explanation: 'Explain why this move is BAD and what the opponent can exploit',
   };
 
   return descriptions[type];

@@ -165,6 +165,9 @@ export class EngineDrivenExplorer {
   /** Game ply for current exploration (used to attach intents to the correct move) */
   private currentGamePly: number = 0;
 
+  /** Best move from engine evaluation (used to suggest alternatives) */
+  private currentBestMove: string | undefined = undefined;
+
   constructor(
     engine: EngineService,
     cache: ArtifactCache,
@@ -196,6 +199,9 @@ export class EngineDrivenExplorer {
     gamePly?: number,
   ): Promise<EngineDrivenExplorerResult> {
     const startTime = Date.now();
+
+    // Reset context for intent generation
+    this.currentBestMove = undefined; // Will be set from engine evaluation
 
     // Store game ply for intent generation
     // If not provided, calculate from FEN (position is before the move)
@@ -275,12 +281,18 @@ export class EngineDrivenExplorer {
 
     const explorationResult = await explorer.explore(rootFen, candidates);
 
-    // Fallback: For critical moments with no intents, create a basic intent
-    // This ensures we always have something to annotate for important moves
-    if (allIntents.length === 0 && playedMove && classification) {
-      const fallbackIntent = this.createCriticalMomentIntent(playedMove, rootFen, classification);
-      if (fallbackIntent) {
-        allIntents.push(fallbackIntent);
+    // ALWAYS create a primary intent for the PLAYED MOVE when it has a classification
+    // This ensures the comment is about the move that was played, not explored alternatives
+    if (playedMove && classification) {
+      const playedMoveIntent = this.createPlayedMoveIntent(
+        playedMove,
+        rootFen,
+        classification,
+        this.currentBestMove,
+      );
+      if (playedMoveIntent) {
+        // Insert at the beginning so it's the primary comment
+        allIntents.unshift(playedMoveIntent);
       }
     }
 
@@ -351,6 +363,11 @@ export class EngineDrivenExplorer {
         depth: 18,
         numLines: 5,
       });
+
+      // Capture the best move from the first (best) line
+      if (evals.length > 0 && evals[0]?.pv && evals[0].pv.length > 0) {
+        this.currentBestMove = evals[0].pv[0]!;
+      }
 
       for (const evaluation of evals) {
         if (evaluation.pv && evaluation.pv.length > 0) {
@@ -810,16 +827,21 @@ export class EngineDrivenExplorer {
   }
 
   /**
-   * Create a fallback intent for critical moments that produced no intents from exploration
+   * Create an intent for the PLAYED MOVE with proper classification context
    *
-   * This ensures we always have something to annotate for important moves like
-   * blunders, mistakes, and inaccuracies even if the exploration didn't find
-   * interesting themes or positions.
+   * This is the primary intent for critical moments - it ensures the comment
+   * is about the actual move played, not explored alternatives.
+   *
+   * @param move - The move that was played (SAN)
+   * @param fen - Position before the move
+   * @param classification - Move classification (blunder, mistake, etc.)
+   * @param bestMove - The best move according to engine (may be different from played)
    */
-  private createCriticalMomentIntent(
+  private createPlayedMoveIntent(
     move: string,
     fen: string,
     classification: MoveClassification,
+    bestMove?: string,
   ): CommentIntent | null {
     try {
       const position = new ChessPosition(fen);
@@ -834,17 +856,38 @@ export class EngineDrivenExplorer {
           ? 'blunder_explanation'
           : classification === 'mistake'
             ? 'what_was_missed'
-            : 'critical_moment';
+            : classification === 'inaccuracy'
+              ? 'what_was_missed'
+              : 'critical_moment';
 
-      // Calculate priority based on classification
+      // Calculate priority based on classification - highest priority for blunders
       const basePriority =
         classification === 'blunder'
-          ? 0.9
+          ? 1.0 // Highest priority - must explain
           : classification === 'mistake'
-            ? 0.8
+            ? 0.95
             : classification === 'inaccuracy'
-              ? 0.7
-              : 0.6;
+              ? 0.85
+              : 0.7;
+
+      // Build content with best alternative if different from played move
+      const content: CommentIntent['content'] = {
+        move,
+        moveNumber: moveNum,
+        isWhiteMove: turn === 'w', // Move was played by the side to move
+        ideaKeys: [
+          {
+            key: `played_${classification}_${move}`,
+            type: classification === 'blunder' || classification === 'mistake' ? 'tactic' : 'plan',
+            concept: classification,
+          },
+        ],
+      };
+
+      // Add best alternative if different from played move
+      if (bestMove && bestMove !== move) {
+        content.bestAlternative = bestMove;
+      }
 
       return {
         type: intentType,
@@ -852,28 +895,17 @@ export class EngineDrivenExplorer {
         priority: basePriority,
         mandatory: classification === 'blunder' || classification === 'mistake',
         suggestedLength: classification === 'blunder' ? 'detailed' : 'standard',
-        content: {
-          move,
-          moveNumber: moveNum,
-          isWhiteMove: turn === 'b', // After the move, turn has changed
-          ideaKeys: [
-            {
-              key: `fallback_${classification}_${move}`,
-              type: 'tactic',
-              concept: classification,
-            },
-          ],
-        },
+        content,
         scoreBreakdown: {
           criticality: basePriority,
           themeNovelty: 0,
-          instructionalValue: 0.3,
+          instructionalValue: classification === 'blunder' ? 0.5 : 0.3,
           redundancyPenalty: 0,
           totalScore: basePriority,
         },
       };
     } catch (e) {
-      console.warn(`[EngineDrivenExplorer] Failed to create fallback intent: ${e}`);
+      console.warn(`[EngineDrivenExplorer] Failed to create played move intent: ${e}`);
       return null;
     }
   }
