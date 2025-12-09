@@ -158,6 +158,7 @@ export async function runUltraFastCoachFull(
     reporter.updateMoveProgress(i + 1, criticalMoments.length, `Exploring ${moveNotation}`);
 
     try {
+      // Pass the plyIndex so intents are attached to the correct move
       const explorationResult = await explorer.explore(
         move.fenBefore,
         move.san,
@@ -169,6 +170,7 @@ export async function runUltraFastCoachFull(
             `${moveNotation}: ${progress.nodesExplored} nodes`,
           );
         },
+        moment.plyIndex, // Pass the game ply for correct intent placement
       );
 
       totalNodesExplored += explorationResult.nodesExplored;
