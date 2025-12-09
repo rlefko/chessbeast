@@ -24,7 +24,6 @@ import {
   createOpeningAdapter,
   createReferenceGameAdapter,
 } from './adapters.js';
-import { runAgenticAnnotation } from './agentic-runner.js';
 import { toAnalysisInput } from './converters.js';
 import type { Services } from './services.js';
 import { runUltraFastCoachAnnotation } from './ultra-fast-coach-runner.js';
@@ -154,19 +153,6 @@ export async function orchestrateAnalysis(
         } catch (error) {
           reporter.failPhase(
             'llm_annotation',
-            error instanceof Error ? error.message : 'unknown error',
-          );
-        }
-      } else if (config.agentic.enabled) {
-        // Agentic annotation with tool calling
-        reporter.startPhase('agentic_annotation');
-        try {
-          const annotationCount = await runAgenticAnnotation(analysis, config, services, reporter);
-          totalAnnotations += annotationCount;
-          reporter.completePhase('agentic_annotation', `${annotationCount} annotations`);
-        } catch (error) {
-          reporter.failPhase(
-            'agentic_annotation',
             error instanceof Error ? error.message : 'unknown error',
           );
         }

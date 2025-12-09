@@ -31,7 +31,6 @@ export type AnalysisPhase =
   | 'deep_analysis'
   | 'maia_analysis'
   | 'llm_annotation'
-  | 'agentic_annotation'
   | 'rendering'
   | 'complete';
 
@@ -47,7 +46,6 @@ export const PHASE_NAMES: Record<AnalysisPhase, string> = {
   deep_analysis: 'Deep analysis',
   maia_analysis: 'Maia analysis',
   llm_annotation: 'LLM annotation',
-  agentic_annotation: 'Agentic annotation',
   rendering: 'Rendering output',
   complete: 'Complete',
 };

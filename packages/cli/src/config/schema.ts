@@ -105,26 +105,6 @@ export interface LLMConfigSchema {
 }
 
 /**
- * Agentic annotation configuration
- */
-export interface AgenticConfigSchema {
-  /** Enable agentic annotation mode (default: false) */
-  enabled: boolean;
-  /** Annotate all moves, not just critical (default: false) */
-  annotateAll: boolean;
-  /** Maximum tool calls per position (default: 5) */
-  maxToolCalls: number;
-  /** Show cost summary at end (default: true) */
-  showCosts: boolean;
-  /** Enable agentic variation exploration (default: false) */
-  agenticExploration: boolean;
-  /** Maximum tool calls for exploration (default: 40) */
-  explorationMaxToolCalls: number;
-  /** Maximum depth for variation exploration (default: 50) */
-  explorationMaxDepth: number;
-}
-
-/**
  * Service endpoint configuration
  */
 export interface ServiceEndpoint {
@@ -219,8 +199,6 @@ export interface ChessBeastConfig {
   ratings: RatingsConfigSchema;
   /** LLM settings */
   llm: LLMConfigSchema;
-  /** Agentic annotation settings */
-  agentic: AgenticConfigSchema;
   /** Service endpoints */
   services: ServicesConfigSchema;
   /** Database paths */
@@ -269,20 +247,6 @@ export interface CliOptions {
   verbose?: boolean;
   /** Enable detailed debug output with full LLM reasoning and tool call details */
   debug?: boolean;
-  /** Enable agentic annotation with tool calling */
-  agentic?: boolean;
-  /** Use agentic annotation for all moves, not just critical */
-  agenticAll?: boolean;
-  /** Maximum tool calls per position in agentic mode */
-  maxToolCalls?: number;
-  /** Show cost summary at end of analysis */
-  showCosts?: boolean;
-  /** Enable agentic variation exploration */
-  agenticExploration?: boolean;
-  /** Maximum tool calls for agentic exploration */
-  explorationMaxToolCalls?: number;
-  /** Maximum depth for agentic exploration */
-  explorationMaxDepth?: number;
   /** Analysis speed tier (fast/normal/deep) */
   speed?: AnalysisSpeed;
   /** Theme output verbosity (none/important/all) */
