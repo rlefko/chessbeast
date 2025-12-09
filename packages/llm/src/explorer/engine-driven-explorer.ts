@@ -294,9 +294,8 @@ export class EngineDrivenExplorer {
 
       for (const evaluation of evals) {
         if (evaluation.pv && evaluation.pv.length > 0) {
-          const moveUci = evaluation.pv[0]!;
-          const moveSan = this.uciToSan(position, moveUci);
-          if (!moveSan) continue;
+          // evaluation.pv already contains SAN moves (converted by adapter)
+          const moveSan = evaluation.pv[0]!;
 
           const resultingFen = this.getResultingFen(position, moveSan);
           if (!resultingFen) continue;
@@ -308,9 +307,12 @@ export class EngineDrivenExplorer {
             evaluation.cp,
           );
 
+          // Convert SAN to UCI for proper storage
+          const uci = this.sanToUci(position, moveSan) ?? moveSan;
+
           const candidate: CandidateMove = {
             san: moveSan,
-            uci: moveUci,
+            uci,
             resultingFen,
             priority,
           };
@@ -321,6 +323,13 @@ export class EngineDrivenExplorer {
 
           candidates.push(candidate);
         }
+      }
+
+      // Log warning if engine returned no usable candidates
+      if (candidates.length === 0 && evals.length > 0) {
+        console.warn(
+          `[EngineDrivenExplorer] No candidates generated from ${evals.length} engine evaluations for position ${fen}`,
+        );
       }
     } catch {
       // If engine fails, just use played move if available
@@ -715,17 +724,6 @@ export class EngineDrivenExplorer {
   private determinePurpose(): LinePurpose {
     // Default to best line
     return 'best';
-  }
-
-  /**
-   * Convert UCI move to SAN using position
-   */
-  private uciToSan(position: ChessPosition, uci: string): string | undefined {
-    try {
-      return position.uciToSan(uci);
-    } catch {
-      return undefined;
-    }
   }
 
   /**
