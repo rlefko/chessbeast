@@ -10,6 +10,8 @@
  * 6. Return analysis results
  */
 
+import { ChessPosition } from '@chessbeast/pgn';
+
 import {
   detectCriticalMoments,
   detectPhaseTransitions,
@@ -469,16 +471,39 @@ export class AnalysisPipeline {
         // First PV updates the evaluation
         if (multiPvResults[0]) {
           move.evalBefore = multiPvResults[0];
-          move.bestMove = multiPvResults[0].pv[0] ?? move.san;
+          let bestMove = multiPvResults[0].pv[0] ?? move.san;
+          // Convert UCI to SAN if needed (e.g., "e2e4" -> "e4")
+          if (bestMove && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(bestMove)) {
+            try {
+              const pos = new ChessPosition(move.fenBefore);
+              bestMove = pos.uciToSan(bestMove);
+            } catch {
+              // Keep original if conversion fails
+            }
+          }
+          move.bestMove = bestMove;
         }
 
         // Additional PVs become alternatives
-        move.alternatives = multiPvResults.slice(1).map(
-          (pv): AlternativeMove => ({
-            san: pv.pv[0] ?? '',
-            eval: pv,
-          }),
-        );
+        // Ensure moves are in SAN format (engine may return UCI)
+        // Filter out moves that can't be converted (illegal in position)
+        move.alternatives = multiPvResults
+          .slice(1)
+          .map((pv): AlternativeMove | null => {
+            let san = pv.pv[0] ?? '';
+            // Check if it looks like UCI (4-5 lowercase chars, e.g., "e2e4", "e7e8q")
+            if (san && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(san)) {
+              try {
+                const pos = new ChessPosition(move.fenBefore);
+                san = pos.uciToSan(san);
+              } catch {
+                // Move is illegal in this position - skip it
+                return null;
+              }
+            }
+            return { san, eval: pv };
+          })
+          .filter((alt): alt is AlternativeMove => alt !== null);
 
         processed++;
       }

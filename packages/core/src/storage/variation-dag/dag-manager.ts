@@ -5,6 +5,8 @@
  * Provides navigation, modification, and serialization capabilities.
  */
 
+import { ChessPosition } from '@chessbeast/pgn';
+
 import { generatePositionKey } from '../position-key.js';
 
 import type { EdgeSource, VariationEdge } from './edge.js';
@@ -157,10 +159,45 @@ export class VariationDAG {
     const currentNode = this.getCurrentNode();
     const resultingPositionKey = generatePositionKey(resultingFen);
 
+    // Ensure san is proper SAN notation, not UCI
+    // UCI format: 4-5 lowercase chars like "e2e4" or "e7e8q"
+    let sanMove = san;
+    if (san && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(san)) {
+      // san parameter is actually UCI, try to convert it
+      try {
+        const position = new ChessPosition(currentNode.fen);
+        sanMove = position.uciToSan(san);
+        // If uci param is empty, populate it with the original UCI
+        if (!uci) {
+          uci = san;
+        }
+      } catch {
+        // Move is illegal in this position - skip it entirely
+        // This can happen when the wrong position is being used
+        // (e.g., Black's move being added when it's White's turn)
+        console.warn(`DAG: Skipping illegal UCI move "${san}" at position ${currentNode.fen.split(' ')[0]}`);
+        return {
+          node: currentNode,
+          edge: {
+            edgeId: '' as EdgeId,
+            san: '',
+            uci: san,
+            source: source,
+            fromNode: currentNode.nodeId,
+            toNode: currentNode.nodeId,
+            nags: [],
+            isTransposition: false,
+          } as unknown as VariationEdge,
+          isTransposition: false,
+          isNewNode: false,
+        };
+      }
+    }
+
     // Check for existing edge with this move
     for (const edgeId of currentNode.childEdges) {
       const edge = this.edges.get(edgeId)!;
-      if (edge.san === san || edge.uci === uci) {
+      if (edge.san === sanMove || edge.uci === uci) {
         const targetNode = this.nodes.get(edge.toNode)!;
         visitNode(targetNode);
 
@@ -181,7 +218,7 @@ export class VariationDAG {
     const existingNode = this.findNodeByPositionKey(resultingPositionKey.key);
     if (existingNode) {
       // Create edge to existing node (transposition)
-      const edge = this.createEdge(currentNode.nodeId, existingNode.nodeId, san, uci, source);
+      const edge = this.createEdge(currentNode.nodeId, existingNode.nodeId, sanMove, uci, source);
 
       existingNode.parentEdges.push(edge.edgeId);
       currentNode.childEdges.push(edge.edgeId);
@@ -212,7 +249,7 @@ export class VariationDAG {
       source === 'mainline' ? 'mainline' : 'exploration',
     );
 
-    const edge = this.createEdge(currentNode.nodeId, newNode.nodeId, san, uci, source);
+    const edge = this.createEdge(currentNode.nodeId, newNode.nodeId, sanMove, uci, source);
 
     newNode.parentEdges.push(edge.edgeId);
     currentNode.childEdges.push(edge.edgeId);
