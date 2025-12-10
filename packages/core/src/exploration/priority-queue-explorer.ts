@@ -6,6 +6,8 @@
  * the artifact cache for efficient transposition handling.
  */
 
+import { ChessPosition } from '@chessbeast/pgn';
+
 import { recommendMultipv } from '../classifier/adaptive-multipv.js';
 import { calculateCriticality } from '../classifier/criticality-scorer.js';
 import type { EngineService, EvaluationOptions } from '../pipeline/analysis-pipeline.js';
@@ -343,17 +345,40 @@ export class PriorityQueueExplorer {
     const maxPvMoves = 3;
     let currentFen = parent.fen;
 
+    // Navigate the DAG to the parent position before adding moves
+    // This ensures moves are added from the correct position in the tree
+    if (this.dag) {
+      const navResult = this.dag.goToFen(parent.fen);
+      if (!navResult.success) {
+        // Parent position not in DAG - skip adding PV moves
+        return;
+      }
+    }
+
     for (let i = 0; i < Math.min(pv.length, maxPvMoves); i++) {
       const moveUci = pv[i]!;
 
-      // We'd need a chess library to compute the resulting FEN
-      // For now, we'll skip adding children unless we have the DAG
+      // We need the DAG for storing variations
       if (this.dag) {
         try {
+          // Convert UCI to SAN using the current position
+          const position = new ChessPosition(currentFen);
+          let moveSan: string;
+          try {
+            moveSan = position.uciToSan(moveUci);
+          } catch {
+            // If UCI conversion fails, skip this move
+            continue;
+          }
+
+          // Make the move to get the resulting FEN
+          position.move(moveSan);
+          const resultingFen = position.fen();
+
           const result = this.dag.addMove(
-            moveUci, // Using UCI as placeholder for SAN
-            moveUci,
-            currentFen, // This would need to be computed
+            moveSan, // Proper SAN notation for display
+            moveUci, // UCI for internal reference
+            resultingFen,
             'exploration',
           );
 
@@ -367,6 +392,7 @@ export class PriorityQueueExplorer {
               parent.explorationDepth + 1 + i,
               {
                 parentNodeId: parent.nodeId,
+                parentMove: moveSan,
                 parentMoveUci: moveUci,
                 noveltyScore: 0.8 - i * 0.1, // Decreasing novelty for later PV moves
               },
