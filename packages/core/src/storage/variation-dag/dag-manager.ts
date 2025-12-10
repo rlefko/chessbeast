@@ -175,7 +175,9 @@ export class VariationDAG {
         // Move is illegal in this position - skip it entirely
         // This can happen when the wrong position is being used
         // (e.g., Black's move being added when it's White's turn)
-        console.warn(`DAG: Skipping illegal UCI move "${san}" at position ${currentNode.fen.split(' ')[0]}`);
+        console.warn(
+          `DAG: Skipping illegal UCI move "${san}" at position ${currentNode.fen.split(' ')[0]}`,
+        );
         return {
           node: currentNode,
           edge: {
