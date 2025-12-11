@@ -41,6 +41,14 @@ import {
 } from './stopping-conditions.js';
 
 /**
+ * Check if a move string is in UCI format (e.g., "e2e4", "e7e8q")
+ * UCI moves are 4-5 characters: source square + target square + optional promotion
+ */
+function isUciFormat(move: string): boolean {
+  return /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/i.test(move);
+}
+
+/**
  * Configuration for the priority queue explorer
  */
 export interface ExplorerConfig {
@@ -356,18 +364,39 @@ export class PriorityQueueExplorer {
     }
 
     for (let i = 0; i < Math.min(pv.length, maxPvMoves); i++) {
-      const moveUci = pv[i]!;
+      const pvMove = pv[i]!;
 
       // We need the DAG for storing variations
       if (this.dag) {
         try {
-          // Convert UCI to SAN using the current position
           const position = new ChessPosition(currentFen);
           let moveSan: string;
+          let moveUci: string;
+
+          // Detect if PV contains UCI or SAN and convert accordingly
+          // Engine adapter may have already converted to SAN, or cache may have UCI
           try {
-            moveSan = position.uciToSan(moveUci);
-          } catch {
-            // If UCI conversion fails, skip this move
+            if (isUciFormat(pvMove)) {
+              // PV contains UCI - convert to SAN
+              moveSan = position.uciToSan(pvMove);
+              moveUci = pvMove;
+            } else {
+              // PV contains SAN - derive UCI
+              moveSan = pvMove;
+              moveUci = position.sanToUci(pvMove);
+            }
+          } catch (e) {
+            console.warn(
+              `[PQE] Failed to process PV move "${pvMove}" at ${currentFen.split(' ')[0]}: ${e instanceof Error ? e.message : String(e)}`,
+            );
+            continue;
+          }
+
+          // Validate moveSan is proper SAN (not UCI format) - catch upstream bugs
+          if (isUciFormat(moveSan)) {
+            console.error(
+              `[PQE] BUG: moveSan "${moveSan}" still looks like UCI after conversion from "${pvMove}"`,
+            );
             continue;
           }
 
@@ -401,8 +430,11 @@ export class PriorityQueueExplorer {
           }
 
           currentFen = result.node.fen;
-        } catch {
-          // DAG errors are non-fatal - continue with next move
+        } catch (e) {
+          // DAG errors are non-fatal - log and continue with next move
+          console.warn(
+            `[PQE] DAG error adding child from PV: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     }

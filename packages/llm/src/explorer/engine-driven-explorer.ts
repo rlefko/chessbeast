@@ -45,6 +45,14 @@ import type { ThemeInstance, ThemeDelta, ThemeSummary } from '../themes/types.js
 import type { EngineService, ExploredLine, LinePurpose, LineSource } from './variation-explorer.js';
 
 /**
+ * Check if a move string is in UCI format (e.g., "e2e4", "e7e8q")
+ * UCI moves are 4-5 characters: source square + target square + optional promotion
+ */
+function isUciFormat(move: string): boolean {
+  return /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/i.test(move);
+}
+
+/**
  * Theme verbosity levels
  */
 export type ThemeVerbosity = 'none' | 'important' | 'all';
@@ -833,6 +841,12 @@ export class EngineDrivenExplorer {
    * Convert SAN to UCI using position
    */
   private sanToUci(position: ChessPosition, san: string): string | undefined {
+    // Validate input is not already UCI format - catch upstream bugs
+    if (isUciFormat(san)) {
+      console.warn(
+        `[EDE] sanToUci called with UCI-like input "${san}" at ${position.fen().split(' ')[0]} - possible upstream bug`,
+      );
+    }
     try {
       return position.sanToUci(san);
     } catch {

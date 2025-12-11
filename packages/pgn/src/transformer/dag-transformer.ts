@@ -152,9 +152,11 @@ function edgeToMoveInfo(
       const pos = new ChessPosition(fromNode.fen);
       san = pos.uciToSan(san);
     } catch (e) {
-      // Log detailed error for debugging UCI leaks
+      // Log detailed error - this is a CRITICAL bug that must be fixed upstream
       console.error(
-        `[DAG Transformer] UCI leak detected and conversion failed: "${edge.san}" at ply ${fromNode.ply}, FEN: ${fromNode.fen}, error: ${e}`,
+        `[DAG Transformer] CRITICAL BUG: UCI leak in edge.san="${edge.san}" ` +
+          `at ply ${fromNode.ply}, move ${moveNumber}${isWhiteMove ? '.' : '...'}, ` +
+          `FEN: ${fromNode.fen}. This should never happen - fix upstream! Error: ${e}`,
       );
       // Keep original UCI - PGN will still be readable, but malformed
     }
