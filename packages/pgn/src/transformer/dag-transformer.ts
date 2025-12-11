@@ -8,8 +8,8 @@
  * variations and builds a DAG, then comments are attached post-write.
  */
 
-import type { MoveInfo } from '../index.js';
 import { ChessPosition } from '../chess/position.js';
+import type { MoveInfo } from '../index.js';
 
 /**
  * Check if a string is in UCI format (e.g., "e2e4", "e7e8q")
