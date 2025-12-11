@@ -588,6 +588,7 @@ export class EngineDrivenExplorer {
       const targetPly = this.currentGamePly;
       const input: IntentInput = {
         move: node.parentMove ?? '',
+        fen: node.fen,
         moveNumber: Math.floor(targetPly / 2) + 1,
         isWhiteMove: targetPly % 2 === 0, // 0-based: even = white, odd = black
         plyIndex: targetPly,
@@ -830,13 +831,13 @@ export class EngineDrivenExplorer {
 
   /**
    * Convert SAN to UCI using position
-   * Note: This is a simplified version that attempts to make the move
-   * and derive the UCI from the from/to squares.
    */
-  private sanToUci(_position: ChessPosition, san: string): string | undefined {
-    // For now, return the SAN as a fallback - proper UCI conversion
-    // would require more complex logic or exposing chess.js internals
-    return san;
+  private sanToUci(position: ChessPosition, san: string): string | undefined {
+    try {
+      return position.sanToUci(san);
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -901,6 +902,7 @@ export class EngineDrivenExplorer {
       // Build content with best alternative if different from played move
       const content: CommentIntent['content'] = {
         move,
+        fen,
         moveNumber: moveNum,
         isWhiteMove: turn === 'w', // Move was played by the side to move
         ideaKeys: [

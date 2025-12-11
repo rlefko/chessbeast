@@ -322,6 +322,11 @@ Output only the comment text, no formatting or labels.`;
   ): string {
     const parts: string[] = [];
 
+    // Position context (FEN) - critical for accurate comments
+    if (intent.content.fen) {
+      parts.push(`Position (FEN): ${intent.content.fen}`);
+    }
+
     // Move context
     const moveColor = intent.content.isWhiteMove ? 'White' : 'Black';
     parts.push(

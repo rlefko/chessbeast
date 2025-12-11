@@ -33,6 +33,9 @@ export interface IntentContent {
   /** The move being commented on (SAN) */
   move: string;
 
+  /** FEN of position BEFORE the move (for board context) */
+  fen: string;
+
   /** Move number */
   moveNumber: number;
 
@@ -156,6 +159,9 @@ export const DEFAULT_INTENT_CONFIG: IntentGeneratorConfig = {
 export interface IntentInput {
   /** Move being analyzed */
   move: string;
+
+  /** FEN of position BEFORE the move */
+  fen: string;
 
   /** Move number */
   moveNumber: number;
@@ -430,6 +436,7 @@ export function createCommentIntent(
 
   const content: IntentContent = {
     move: input.move,
+    fen: input.fen,
     moveNumber: input.moveNumber,
     isWhiteMove: input.isWhiteMove,
     ideaKeys,

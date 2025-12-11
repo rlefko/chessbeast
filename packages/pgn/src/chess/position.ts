@@ -192,6 +192,36 @@ export class ChessPosition {
   }
 
   /**
+   * Convert a SAN move to UCI notation
+   * @param san - Move in SAN format (e.g., "e4", "Nf3", "e8=Q")
+   * @returns Move in UCI format (e.g., "e2e4", "g1f3", "e7e8q")
+   * @throws IllegalMoveError if the move is not legal
+   */
+  sanToUci(san: string): string {
+    const fenBefore = this.chess.fen();
+    try {
+      const result = this.chess.move(san);
+      if (!result) {
+        throw new IllegalMoveError(san, fenBefore);
+      }
+      // Undo the move to keep position unchanged
+      this.chess.undo();
+      // Build UCI string from from/to squares
+      let uci = result.from + result.to;
+      // Add promotion piece if applicable (lowercase)
+      if (result.promotion) {
+        uci += result.promotion;
+      }
+      return uci;
+    } catch (err) {
+      if (err instanceof IllegalMoveError) {
+        throw err;
+      }
+      throw new IllegalMoveError(san, fenBefore);
+    }
+  }
+
+  /**
    * Convert a sequence of UCI moves to SAN notation
    * Makes moves on a cloned position to get correct SAN for each move in context
    * @param uciMoves - Array of UCI moves
