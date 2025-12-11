@@ -161,12 +161,11 @@ export async function runUltraFastCoachFull(
   const sharedDag: VariationDAG = createVariationDAG(startingFen);
 
   // Add the main line FIRST (so principal path is established)
-  // Derive UCI from SAN for each move to ensure edge deduplication works correctly
+  // Use moveWithUci() to get both SAN and UCI in one operation (avoids move/undo overhead)
   const currentPosition = new ChessPosition(startingFen);
   for (const move of analysis.moves) {
-    const moveUci = currentPosition.sanToUci(move.san);
-    sharedDag.addMove(move.san, moveUci, move.fenAfter, 'mainline', { makePrincipal: true });
-    currentPosition.move(move.san);
+    const result = currentPosition.moveWithUci(move.san);
+    sharedDag.addMove(move.san, result.uci, move.fenAfter, 'mainline', { makePrincipal: true });
   }
 
   // Create the explorer with the shared DAG

@@ -143,20 +143,26 @@ function edgeToMoveInfo(
   const isWhiteMove = fromNode.sideToMove === 'w';
   const moveNumber = Math.floor(fromNode.ply / 2) + 1;
 
-  // Validate and convert SAN - ensure it's not UCI format
+  // Validate SAN - ensure it's not UCI format
+  // After performance fix PR, upstream should always provide proper SAN - this check catches bugs
   let san = edge.san;
   if (san && isUciFormat(san)) {
-    // CRITICAL: UCI notation leaked into edge.san - this is a bug upstream
-    // Attempt to convert UCI to SAN
+    // DEPRECATED: This conversion should not be needed after upstream fixes
+    // Log warning to catch any remaining DAG corruption
+    console.warn(
+      `[DAG Transformer] PERFORMANCE WARNING: UCI leak in edge.san="${edge.san}" ` +
+        `at ply ${fromNode.ply}, move ${moveNumber}${isWhiteMove ? '.' : '...'}, ` +
+        `FEN: ${fromNode.fen}. This triggers expensive position creation. Fix upstream!`,
+    );
     try {
       const pos = new ChessPosition(fromNode.fen);
       san = pos.uciToSan(san);
     } catch (e) {
       // Log detailed error - this is a CRITICAL bug that must be fixed upstream
       console.error(
-        `[DAG Transformer] CRITICAL BUG: UCI leak in edge.san="${edge.san}" ` +
+        `[DAG Transformer] CRITICAL BUG: Failed to convert UCI "${edge.san}" to SAN ` +
           `at ply ${fromNode.ply}, move ${moveNumber}${isWhiteMove ? '.' : '...'}, ` +
-          `FEN: ${fromNode.fen}. This should never happen - fix upstream! Error: ${e}`,
+          `FEN: ${fromNode.fen}. Error: ${e}`,
       );
       // Keep original UCI - PGN will still be readable, but malformed
     }

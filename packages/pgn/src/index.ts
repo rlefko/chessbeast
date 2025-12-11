@@ -70,7 +70,7 @@ export type { RenderOptions, PgnFixResult } from './renderer/pgn-renderer.js';
 
 // Re-export chess position utilities
 export { ChessPosition, STARTING_FEN } from './chess/position.js';
-export type { MoveResult } from './chess/position.js';
+export type { MoveResult, MoveResultWithUci } from './chess/position.js';
 
 // Re-export tension detection utilities
 export {

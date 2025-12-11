@@ -46,6 +46,7 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
         cp: result.cp,
         depth: result.depth,
         pv: convertPvToSan(result.bestLine, fen),
+        pvUci: result.bestLine, // Preserve original UCI to avoid expensive re-derivation
       };
       if (result.mate !== 0) {
         eval_.mate = result.mate;
@@ -94,6 +95,7 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
         cp: result.cp,
         depth: result.depth,
         pv: convertPvToSan(result.bestLine, fen),
+        pvUci: result.bestLine, // Preserve original UCI to avoid expensive re-derivation
       };
       if (result.mate !== 0) {
         firstEval.mate = result.mate;
@@ -107,6 +109,7 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
             cp: alt.cp,
             depth: alt.depth,
             pv: convertPvToSan(alt.bestLine, fen),
+            pvUci: alt.bestLine, // Preserve original UCI to avoid expensive re-derivation
           };
           if (alt.mate !== 0) {
             altEval.mate = alt.mate;

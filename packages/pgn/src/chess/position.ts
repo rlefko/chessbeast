@@ -15,6 +15,15 @@ export interface MoveResult {
 }
 
 /**
+ * Result of applying a move with UCI notation included
+ * Avoids the overhead of separate sanToUci() call which does move/undo internally
+ */
+export interface MoveResultWithUci extends MoveResult {
+  /** The move in UCI notation (e.g., "e2e4", "e7e8q") */
+  uci: string;
+}
+
+/**
  * Standard starting position FEN
  */
 export const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -80,6 +89,37 @@ export class ChessPosition {
       };
     } catch (err) {
       // chess.js throws Error for invalid moves, wrap in our custom error
+      if (err instanceof IllegalMoveError) {
+        throw err;
+      }
+      throw new IllegalMoveError(san, fenBefore);
+    }
+  }
+
+  /**
+   * Apply a move and return both SAN and UCI notation
+   * More efficient than calling move() followed by sanToUci() since it avoids move/undo overhead
+   * @throws IllegalMoveError if the move is not legal
+   */
+  moveWithUci(san: string): MoveResultWithUci {
+    const fenBefore = this.chess.fen();
+    try {
+      const result = this.chess.move(san);
+      if (!result) {
+        throw new IllegalMoveError(san, fenBefore);
+      }
+      // Build UCI from from/to squares (same logic as sanToUci but without move/undo)
+      let uci = result.from + result.to;
+      if (result.promotion) {
+        uci += result.promotion;
+      }
+      return {
+        san: result.san,
+        uci,
+        fenBefore,
+        fenAfter: this.chess.fen(),
+      };
+    } catch (err) {
       if (err instanceof IllegalMoveError) {
         throw err;
       }
