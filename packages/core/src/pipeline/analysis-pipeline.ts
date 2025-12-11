@@ -478,7 +478,9 @@ export class AnalysisPipeline {
               const pos = new ChessPosition(move.fenBefore);
               bestMove = pos.uciToSan(bestMove);
             } catch {
-              // Keep original if conversion fails
+              // Fall back to played move - never leave UCI in output
+              console.warn(`[AnalysisPipeline] Failed to convert UCI move: ${bestMove}`);
+              bestMove = move.san;
             }
           }
           move.bestMove = bestMove;

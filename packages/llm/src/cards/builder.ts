@@ -410,16 +410,19 @@ export class PositionCardBuilder {
       if (result.bestLine && result.bestLine.length > 0) {
         const uciMove = result.bestLine[0]!;
         const sanMove = this.uciToSanSafe(pos, uciMove);
-        const mainCandidate: EngineCandidate = {
-          move: sanMove,
-          evaluation: result.mate !== 0 ? (result.mate > 0 ? 10000 : -10000) : result.cp,
-          isMate: result.mate !== 0,
-          pv: result.bestLine,
-        };
-        if (result.mate !== 0) {
-          mainCandidate.mateIn = Math.abs(result.mate);
+        // Skip if UCI conversion failed
+        if (sanMove !== null) {
+          const mainCandidate: EngineCandidate = {
+            move: sanMove,
+            evaluation: result.mate !== 0 ? (result.mate > 0 ? 10000 : -10000) : result.cp,
+            isMate: result.mate !== 0,
+            pv: result.bestLine,
+          };
+          if (result.mate !== 0) {
+            mainCandidate.mateIn = Math.abs(result.mate);
+          }
+          candidates.push(mainCandidate);
         }
-        candidates.push(mainCandidate);
       }
 
       // Process alternatives (multipv, convert UCI to SAN)
@@ -428,16 +431,19 @@ export class PositionCardBuilder {
           if (alt.bestLine && alt.bestLine.length > 0) {
             const uciMove = alt.bestLine[0]!;
             const sanMove = this.uciToSanSafe(pos, uciMove);
-            const altCandidate: EngineCandidate = {
-              move: sanMove,
-              evaluation: alt.mate !== 0 ? (alt.mate > 0 ? 10000 : -10000) : alt.cp,
-              isMate: alt.mate !== 0,
-              pv: alt.bestLine,
-            };
-            if (alt.mate !== 0) {
-              altCandidate.mateIn = Math.abs(alt.mate);
+            // Skip if UCI conversion failed
+            if (sanMove !== null) {
+              const altCandidate: EngineCandidate = {
+                move: sanMove,
+                evaluation: alt.mate !== 0 ? (alt.mate > 0 ? 10000 : -10000) : alt.cp,
+                isMate: alt.mate !== 0,
+                pv: alt.bestLine,
+              };
+              if (alt.mate !== 0) {
+                altCandidate.mateIn = Math.abs(alt.mate);
+              }
+              candidates.push(altCandidate);
             }
-            candidates.push(altCandidate);
           }
         }
       }
@@ -497,16 +503,19 @@ export class PositionCardBuilder {
     if (cached.bestLine && cached.bestLine.length > 0) {
       const uciMove = cached.bestLine[0]!;
       const sanMove = this.uciToSanSafe(pos, uciMove);
-      const mainCandidate: EngineCandidate = {
-        move: sanMove,
-        evaluation: cached.mate !== 0 ? (cached.mate > 0 ? 10000 : -10000) : cached.cp,
-        isMate: cached.mate !== 0,
-        pv: cached.bestLine,
-      };
-      if (cached.mate !== 0) {
-        mainCandidate.mateIn = Math.abs(cached.mate);
+      // Skip if UCI conversion failed
+      if (sanMove !== null) {
+        const mainCandidate: EngineCandidate = {
+          move: sanMove,
+          evaluation: cached.mate !== 0 ? (cached.mate > 0 ? 10000 : -10000) : cached.cp,
+          isMate: cached.mate !== 0,
+          pv: cached.bestLine,
+        };
+        if (cached.mate !== 0) {
+          mainCandidate.mateIn = Math.abs(cached.mate);
+        }
+        candidates.push(mainCandidate);
       }
-      candidates.push(mainCandidate);
     }
 
     // Process alternatives (convert UCI to SAN)
@@ -515,16 +524,19 @@ export class PositionCardBuilder {
         if (alt.bestLine && alt.bestLine.length > 0) {
           const uciMove = alt.bestLine[0]!;
           const sanMove = this.uciToSanSafe(pos, uciMove);
-          const altCandidate: EngineCandidate = {
-            move: sanMove,
-            evaluation: alt.mate !== 0 ? (alt.mate > 0 ? 10000 : -10000) : alt.cp,
-            isMate: alt.mate !== 0,
-            pv: alt.bestLine,
-          };
-          if (alt.mate !== 0) {
-            altCandidate.mateIn = Math.abs(alt.mate);
+          // Skip if UCI conversion failed
+          if (sanMove !== null) {
+            const altCandidate: EngineCandidate = {
+              move: sanMove,
+              evaluation: alt.mate !== 0 ? (alt.mate > 0 ? 10000 : -10000) : alt.cp,
+              isMate: alt.mate !== 0,
+              pv: alt.bestLine,
+            };
+            if (alt.mate !== 0) {
+              altCandidate.mateIn = Math.abs(alt.mate);
+            }
+            candidates.push(altCandidate);
           }
-          candidates.push(altCandidate);
         }
       }
     }
@@ -826,18 +838,19 @@ export class PositionCardBuilder {
 
   /**
    * Convert UCI move to SAN with error handling
-   * Falls back to UCI if conversion fails
+   * Returns null if conversion fails (to prevent UCI leaking into output)
    *
    * @param pos - Chess position
    * @param uciMove - Move in UCI notation (e.g., "e2e4")
-   * @returns Move in SAN notation (e.g., "e4"), or UCI if conversion fails
+   * @returns Move in SAN notation (e.g., "e4"), or null if conversion fails
    */
-  private uciToSanSafe(pos: ChessPosition, uciMove: string): string {
+  private uciToSanSafe(pos: ChessPosition, uciMove: string): string | null {
     try {
       return pos.uciToSan(uciMove);
     } catch {
-      // Fall back to UCI if conversion fails
-      return uciMove;
+      // Return null to prevent UCI from leaking into output
+      console.warn(`[PositionCardBuilder] Failed to convert UCI move: ${uciMove}`);
+      return null;
     }
   }
 }
