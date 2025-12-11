@@ -24,7 +24,8 @@
     "@chessbeast/database": "workspace:*",
     "@chessbeast/grpc-client": "workspace:*",
     "@chessbeast/pgn": "workspace:*",
-    "openai": "^6.9.1"
+    "openai": "^6.9.1",
+    "p-limit": "^7.2.0"
   },
   "devDependencies": {
     "vitest": "^2.1.0"
