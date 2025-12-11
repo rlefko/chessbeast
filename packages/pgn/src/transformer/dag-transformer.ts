@@ -9,6 +9,14 @@
  */
 
 import type { MoveInfo } from '../index.js';
+import { ChessPosition } from '../chess/position.js';
+
+/**
+ * Check if a string is in UCI format (e.g., "e2e4", "e7e8q")
+ */
+function isUciFormat(move: string): boolean {
+  return /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/i.test(move);
+}
 
 /**
  * Minimal VariationNode interface (compatible with @chessbeast/core)
@@ -135,9 +143,22 @@ function edgeToMoveInfo(
   const isWhiteMove = fromNode.sideToMove === 'w';
   const moveNumber = Math.floor(fromNode.ply / 2) + 1;
 
+  // Validate and convert SAN - ensure it's not UCI format
+  let san = edge.san;
+  if (san && isUciFormat(san)) {
+    // Attempt to convert UCI to SAN
+    try {
+      const pos = new ChessPosition(fromNode.fen);
+      san = pos.uciToSan(san);
+    } catch {
+      // Keep original if conversion fails - better to show UCI than nothing
+      console.warn(`[DAG Transformer] Failed to convert UCI "${edge.san}" at ${fromNode.fen}`);
+    }
+  }
+
   const moveInfo: MoveInfo = {
     moveNumber,
-    san: edge.san,
+    san,
     isWhiteMove,
     fenBefore: fromNode.fen,
     fenAfter: toNode.fen,
@@ -207,8 +228,21 @@ function attachVariations(
       }
     }
 
-    if (variations.length > 0) {
-      move.variations = variations;
+    // Filter out empty/meaningless variations (only NAGs, no comments or nested variations)
+    // A variation is meaningful if it has explanatory content
+    const meaningfulVariations = variations.filter((variation) => {
+      if (variation.length === 0) return false;
+      const firstMove = variation[0]!;
+      // Keep if has comment, or has nested variations with content
+      // NAGs alone are not enough - they need explanation
+      return (
+        firstMove.commentAfter !== undefined ||
+        (firstMove.variations !== undefined && firstMove.variations.length > 0)
+      );
+    });
+
+    if (meaningfulVariations.length > 0) {
+      move.variations = meaningfulVariations;
     }
 
     // Move to next node

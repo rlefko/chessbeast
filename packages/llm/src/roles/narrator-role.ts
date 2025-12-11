@@ -106,6 +106,11 @@ export class NarratorRole {
 
 Style: ${styleDesc}
 
+CRITICAL LENGTH REQUIREMENTS:
+- Maximum 100 characters for standard comments
+- Maximum 150 characters for detailed explanations
+- Prefer brevity - say more with less
+
 Guidelines:
 - Write clear, instructive comments focused on the key idea
 - Use standard algebraic notation correctly (e.g., Nf3, O-O, exd5)
@@ -273,17 +278,41 @@ Output only the comment text, no formatting or labels.`;
    * Clean up generated comment
    */
   private cleanComment(text: string): string {
-    return (
-      text
-        .trim()
-        // Remove quotes
-        .replace(/^["']|["']$/g, '')
-        .trim()
-        // Normalize whitespace
-        .replace(/\s+/g, ' ')
-        // Ensure ends with punctuation
-        .replace(/([^.!?])$/, '$1.')
-    );
+    let cleaned = text
+      .trim()
+      // Remove quotes
+      .replace(/^["']|["']$/g, '')
+      .trim()
+      // Normalize whitespace
+      .replace(/\s+/g, ' ')
+      // Ensure ends with punctuation
+      .replace(/([^.!?])$/, '$1.');
+
+    // Enforce maximum length (150 chars)
+    const maxLength = 150;
+    if (cleaned.length > maxLength) {
+      const truncated = cleaned.substring(0, maxLength);
+      // Try to break at sentence or clause boundary
+      const lastPeriod = truncated.lastIndexOf('.');
+      const lastSemicolon = truncated.lastIndexOf(';');
+      const lastComma = truncated.lastIndexOf(',');
+      const breakPoint = Math.max(lastPeriod, lastSemicolon, lastComma);
+
+      if (breakPoint > maxLength * 0.5) {
+        // Found a good break point
+        cleaned = truncated.substring(0, breakPoint + 1).trim();
+      } else {
+        // No good break point - truncate at word boundary
+        const lastSpace = truncated.lastIndexOf(' ');
+        if (lastSpace > maxLength * 0.5) {
+          cleaned = truncated.substring(0, lastSpace).trim() + '...';
+        } else {
+          cleaned = truncated.trim() + '...';
+        }
+      }
+    }
+
+    return cleaned;
   }
 
   /**
