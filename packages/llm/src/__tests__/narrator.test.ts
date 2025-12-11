@@ -126,13 +126,9 @@ describe('Narrator', () => {
       const intents = createTestIntents(5);
       const warnings: string[] = [];
 
-      const result = await narrator.narrate(
-        { intents, totalPlies: 100 },
-        undefined,
-        (w) => {
-          warnings.push(w);
-        },
-      );
+      const result = await narrator.narrate({ intents, totalPlies: 100 }, undefined, (w) => {
+        warnings.push(w);
+      });
 
       // All should have comments (4 LLM + 1 fallback)
       expect(result.comments.size).toBe(5);
