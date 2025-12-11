@@ -159,11 +159,17 @@ export class VariationDAG {
     const currentNode = this.getCurrentNode();
     const resultingPositionKey = generatePositionKey(resultingFen);
 
-    // Ensure san is proper SAN notation, not UCI
+    // Validate that san is proper SAN notation, not UCI
     // UCI format: 4-5 chars like "e2e4" or "e7e8q" (with optional promotion piece)
+    // After performance fix PR, callers should always provide proper SAN - this check catches bugs
     let sanMove = san;
     if (san && /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/i.test(san)) {
-      // san parameter is actually UCI, try to convert it
+      // DEPRECATED: This conversion should not be needed after upstream fixes
+      // Log warning to catch any remaining callers that pass UCI as SAN
+      console.warn(
+        `[DAG] PERFORMANCE WARNING: UCI "${san}" passed as SAN parameter at ${currentNode.fen.split(' ')[0]}. ` +
+          `This triggers expensive position creation. Fix the caller to provide proper SAN.`,
+      );
       try {
         const position = new ChessPosition(currentNode.fen);
         sanMove = position.uciToSan(san);

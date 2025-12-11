@@ -28,6 +28,8 @@ export interface EngineEvaluation {
   depth: number;
   /** Principal variation (best line) in SAN notation */
   pv: string[];
+  /** Principal variation in UCI notation (parallel array to pv) - avoids expensive re-derivation */
+  pvUci?: string[];
   /** Number of nodes searched */
   nodes?: number;
 }

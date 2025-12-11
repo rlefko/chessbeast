@@ -341,101 +341,89 @@ export class PriorityQueueExplorer {
       evalResult.pv.length > 0 &&
       node.explorationDepth < this.config.maxDepth
     ) {
-      await this.addChildrenFromPV(node, evalResult.pv);
+      await this.addChildrenFromPV(node, evalResult.pv, evalResult.pvUci);
     }
   }
 
   /**
    * Add child nodes from principal variation
+   * @param parent - Parent node to add children to
+   * @param pvSan - PV moves in SAN notation
+   * @param pvUci - PV moves in UCI notation (parallel array, optional - avoids re-derivation)
    */
-  private async addChildrenFromPV(parent: ExplorationNode, pv: string[]): Promise<void> {
+  private async addChildrenFromPV(
+    parent: ExplorationNode,
+    pvSan: string[],
+    pvUci?: string[],
+  ): Promise<void> {
     // Only explore the first few moves of the PV
     const maxPvMoves = 3;
-    let currentFen = parent.fen;
+
+    // We need the DAG for storing variations
+    if (!this.dag) return;
 
     // Navigate the DAG to the parent position before adding moves
     // This ensures moves are added from the correct position in the tree
-    if (this.dag) {
-      const navResult = this.dag.goToFen(parent.fen);
-      if (!navResult.success) {
-        // Parent position not in DAG - skip adding PV moves
-        return;
-      }
+    const navResult = this.dag.goToFen(parent.fen);
+    if (!navResult.success) {
+      // Parent position not in DAG - skip adding PV moves
+      return;
     }
 
-    for (let i = 0; i < Math.min(pv.length, maxPvMoves); i++) {
-      const pvMove = pv[i]!;
+    // Create position ONCE and reuse it by advancing through moves
+    // This is the key optimization - avoids creating a new ChessPosition per PV move
+    const position = new ChessPosition(parent.fen);
 
-      // We need the DAG for storing variations
-      if (this.dag) {
-        try {
-          const position = new ChessPosition(currentFen);
-          let moveSan: string;
-          let moveUci: string;
+    for (let i = 0; i < Math.min(pvSan.length, maxPvMoves); i++) {
+      const moveSan = pvSan[i]!;
 
-          // Detect if PV contains UCI or SAN and convert accordingly
-          // Engine adapter may have already converted to SAN, or cache may have UCI
-          try {
-            if (isUciFormat(pvMove)) {
-              // PV contains UCI - convert to SAN
-              moveSan = position.uciToSan(pvMove);
-              moveUci = pvMove;
-            } else {
-              // PV contains SAN - derive UCI
-              moveSan = pvMove;
-              moveUci = position.sanToUci(pvMove);
-            }
-          } catch (e) {
-            console.warn(
-              `[PQE] Failed to process PV move "${pvMove}" at ${currentFen.split(' ')[0]}: ${e instanceof Error ? e.message : String(e)}`,
-            );
-            continue;
-          }
+      // Validate moveSan is proper SAN (not UCI format) - catch upstream bugs
+      if (isUciFormat(moveSan)) {
+        console.error(
+          `[PQE] BUG: pvSan[${i}] "${moveSan}" is UCI format - upstream should provide SAN`,
+        );
+        break; // Position is invalid for further processing
+      }
 
-          // Validate moveSan is proper SAN (not UCI format) - catch upstream bugs
-          if (isUciFormat(moveSan)) {
-            console.error(
-              `[PQE] BUG: moveSan "${moveSan}" still looks like UCI after conversion from "${pvMove}"`,
-            );
-            continue;
-          }
+      try {
+        // Use pre-computed UCI from engine adapter when available, otherwise derive once
+        // The pvUci array should be parallel to pvSan - same index corresponds to same move
+        const moveUci = pvUci?.[i] ?? position.sanToUci(moveSan);
 
-          // Make the move to get the resulting FEN
-          position.move(moveSan);
-          const resultingFen = position.fen();
+        // Make the move to advance position for next iteration and get resulting FEN
+        position.move(moveSan);
+        const resultingFen = position.fen();
 
-          const result = this.dag.addMove(
-            moveSan, // Proper SAN notation for display
-            moveUci, // UCI for internal reference
-            resultingFen,
-            'exploration',
+        const result = this.dag.addMove(
+          moveSan, // Proper SAN notation for display
+          moveUci, // UCI for internal reference
+          resultingFen,
+          'exploration',
+        );
+
+        if (result.isNewNode) {
+          const childPosKey = generatePositionKey(result.node.fen);
+          const childNode = createExplorationNode(
+            generateNodeId(childPosKey.key, parent.explorationDepth + 1 + i),
+            childPosKey.key,
+            result.node.fen,
+            parent.ply + 1 + i,
+            parent.explorationDepth + 1 + i,
+            {
+              parentNodeId: parent.nodeId,
+              parentMove: moveSan,
+              parentMoveUci: moveUci,
+              noveltyScore: 0.8 - i * 0.1, // Decreasing novelty for later PV moves
+            },
           );
-
-          if (result.isNewNode) {
-            const childPosKey = generatePositionKey(result.node.fen);
-            const childNode = createExplorationNode(
-              generateNodeId(childPosKey.key, parent.explorationDepth + 1 + i),
-              childPosKey.key,
-              result.node.fen,
-              parent.ply + 1 + i,
-              parent.explorationDepth + 1 + i,
-              {
-                parentNodeId: parent.nodeId,
-                parentMove: moveSan,
-                parentMoveUci: moveUci,
-                noveltyScore: 0.8 - i * 0.1, // Decreasing novelty for later PV moves
-              },
-            );
-            this.queue.push(childNode);
-          }
-
-          currentFen = result.node.fen;
-        } catch (e) {
-          // DAG errors are non-fatal - log and continue with next move
-          console.warn(
-            `[PQE] DAG error adding child from PV: ${e instanceof Error ? e.message : String(e)}`,
-          );
+          this.queue.push(childNode);
         }
+      } catch (e) {
+        // Move processing errors are fatal for the rest of the PV - position is now invalid
+        console.warn(
+          `[PQE] Failed to process PV move "${moveSan}" at ply ${parent.ply + i}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+        break;
       }
     }
   }
