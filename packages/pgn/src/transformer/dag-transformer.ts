@@ -146,13 +146,17 @@ function edgeToMoveInfo(
   // Validate and convert SAN - ensure it's not UCI format
   let san = edge.san;
   if (san && isUciFormat(san)) {
+    // CRITICAL: UCI notation leaked into edge.san - this is a bug upstream
     // Attempt to convert UCI to SAN
     try {
       const pos = new ChessPosition(fromNode.fen);
       san = pos.uciToSan(san);
-    } catch {
-      // Keep original if conversion fails - better to show UCI than nothing
-      console.warn(`[DAG Transformer] Failed to convert UCI "${edge.san}" at ${fromNode.fen}`);
+    } catch (e) {
+      // Log detailed error for debugging UCI leaks
+      console.error(
+        `[DAG Transformer] UCI leak detected and conversion failed: "${edge.san}" at ply ${fromNode.ply}, FEN: ${fromNode.fen}, error: ${e}`,
+      );
+      // Keep original UCI - PGN will still be readable, but malformed
     }
   }
 
@@ -228,15 +232,15 @@ function attachVariations(
       }
     }
 
-    // Filter out empty/meaningless variations (only NAGs, no comments or nested variations)
-    // A variation is meaningful if it has explanatory content
+    // Filter out empty/meaningless variations
+    // A variation is meaningful if it has explanatory content or NAGs indicating quality
     const meaningfulVariations = variations.filter((variation) => {
       if (variation.length === 0) return false;
       const firstMove = variation[0]!;
-      // Keep if has comment, or has nested variations with content
-      // NAGs alone are not enough - they need explanation
+      // Keep if has comment, NAGs (indicating move quality), or nested variations
       return (
         firstMove.commentAfter !== undefined ||
+        (firstMove.nags !== undefined && firstMove.nags.length > 0) ||
         (firstMove.variations !== undefined && firstMove.variations.length > 0)
       );
     });
