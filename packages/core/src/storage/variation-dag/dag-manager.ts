@@ -172,27 +172,15 @@ export class VariationDAG {
           uci = san;
         }
       } catch {
-        // Move is illegal in this position - skip it entirely
-        // This can happen when the wrong position is being used
-        // (e.g., Black's move being added when it's White's turn)
-        console.warn(
-          `DAG: Skipping illegal UCI move "${san}" at position ${currentNode.fen.split(' ')[0]}`,
+        // Move is illegal in this position - this is a bug upstream
+        // Callers must validate moves before adding to DAG
+        console.error(
+          `[DAG] CRITICAL: Illegal UCI move "${san}" at position ${currentNode.fen.split(' ')[0]}. ` +
+            `This indicates a bug in the caller - moves should be validated before adding to DAG.`,
         );
-        return {
-          node: currentNode,
-          edge: {
-            edgeId: '' as EdgeId,
-            san: '',
-            uci: san,
-            source: source,
-            fromNode: currentNode.nodeId,
-            toNode: currentNode.nodeId,
-            nags: [],
-            isTransposition: false,
-          } as unknown as VariationEdge,
-          isTransposition: false,
-          isNewNode: false,
-        };
+        throw new Error(
+          `Illegal move "${san}" cannot be added to DAG at position ${currentNode.fen}`,
+        );
       }
     }
 

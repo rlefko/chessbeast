@@ -30,7 +30,7 @@ import {
   type CommentIntent,
   type ThemeInstance,
 } from '@chessbeast/llm';
-import { transformDagToMoves, type MoveInfo } from '@chessbeast/pgn';
+import { transformDagToMoves, ChessPosition, type MoveInfo } from '@chessbeast/pgn';
 
 import type { ChessBeastConfig } from '../config/schema.js';
 import type { ProgressReporter } from '../progress/reporter.js';
@@ -161,8 +161,12 @@ export async function runUltraFastCoachFull(
   const sharedDag: VariationDAG = createVariationDAG(startingFen);
 
   // Add the main line FIRST (so principal path is established)
+  // Derive UCI from SAN for each move to ensure edge deduplication works correctly
+  const currentPosition = new ChessPosition(startingFen);
   for (const move of analysis.moves) {
-    sharedDag.addMove(move.san, '', move.fenAfter, 'mainline', { makePrincipal: true });
+    const moveUci = currentPosition.sanToUci(move.san);
+    sharedDag.addMove(move.san, moveUci, move.fenAfter, 'mainline', { makePrincipal: true });
+    currentPosition.move(move.san);
   }
 
   // Create the explorer with the shared DAG
