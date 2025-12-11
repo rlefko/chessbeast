@@ -6,6 +6,8 @@
  * LLM-based text generation for final PGN annotations.
  */
 
+import pLimit from 'p-limit';
+
 import type { OpenAIClient } from '../client/openai-client.js';
 import { CircuitOpenError, RateLimitError } from '../errors.js';
 import type { LineMemory } from '../memory/line-memory.js';
@@ -49,6 +51,9 @@ export interface NarratorConfig {
 
   /** Temperature for LLM generation */
   temperature: number;
+
+  /** Maximum concurrent LLM calls (default: 5) */
+  concurrency: number;
 }
 
 /**
@@ -61,6 +66,7 @@ export const DEFAULT_NARRATOR_CONFIG: NarratorConfig = {
   includeVariations: true,
   showEvaluations: false,
   temperature: 0.7,
+  concurrency: 5,
 };
 
 /**
@@ -176,56 +182,86 @@ export class Narrator {
     // Sort by ply for chronological processing
     intentsToProcess.sort((a, b) => a.plyIndex - b.plyIndex);
 
-    // Generate comments
+    // Generate comments in parallel with concurrency limit
+    const limit = pLimit(this.config.concurrency);
     const comments = new Map<number, GeneratedNarration>();
     let totalTokensUsed = 0;
     let totalCommentLength = 0;
+    let completedCount = 0;
 
-    for (let i = 0; i < intentsToProcess.length; i++) {
-      const intent = intentsToProcess[i]!;
+    // Create tasks for all intents
+    const tasks = intentsToProcess.map((intent) => {
       const isBriefReference = redundancyResult.briefReferenceIntents.includes(intent);
 
-      onProgress?.({
-        current: i + 1,
-        total: intentsToProcess.length,
-      });
-
-      try {
-        const narration = await this.generateComment(
-          intent,
-          isBriefReference,
-          input.lineMemory,
-          warn,
-        );
-
-        if (narration.comment.length > 0) {
-          comments.set(intent.plyIndex, narration);
-          totalTokensUsed += narration.tokensUsed ?? 0;
-          totalCommentLength += narration.comment.split(/\s+/).length;
-
-          onProgress?.({
-            current: i + 1,
-            total: intentsToProcess.length,
-            comment: narration.comment,
-          });
-        }
-      } catch (error) {
-        if (error instanceof CircuitOpenError) {
-          warn('LLM circuit breaker open, using fallback comments');
-        } else if (error instanceof RateLimitError) {
-          warn('Rate limit reached, using fallback comments');
-        } else {
-          warn(
-            `Comment generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      return limit(async () => {
+        try {
+          const narration = await this.generateComment(
+            intent,
+            isBriefReference,
+            input.lineMemory,
+            warn,
           );
-        }
 
-        // Use fallback
-        const fallback = this.generateFallbackComment(intent, isBriefReference);
-        if (fallback.comment.length > 0) {
-          comments.set(intent.plyIndex, fallback);
-          totalCommentLength += fallback.comment.split(/\s+/).length;
+          // Update progress (atomic in single-threaded JS)
+          completedCount++;
+
+          // Report progress (may fire out of order due to parallelism)
+          if (narration.comment.length > 0) {
+            onProgress?.({
+              current: completedCount,
+              total: intentsToProcess.length,
+              comment: narration.comment,
+            });
+          } else {
+            onProgress?.({
+              current: completedCount,
+              total: intentsToProcess.length,
+            });
+          }
+
+          return { intent, narration };
+        } catch (error) {
+          if (error instanceof CircuitOpenError) {
+            warn('LLM circuit breaker open, using fallback comments');
+          } else if (error instanceof RateLimitError) {
+            warn('Rate limit reached, using fallback comments');
+          } else {
+            warn(
+              `Comment generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+          }
+
+          // Use fallback
+          const fallback = this.generateFallbackComment(intent, isBriefReference);
+          completedCount++;
+
+          if (fallback.comment.length > 0) {
+            onProgress?.({
+              current: completedCount,
+              total: intentsToProcess.length,
+              comment: fallback.comment,
+            });
+          } else {
+            onProgress?.({
+              current: completedCount,
+              total: intentsToProcess.length,
+            });
+          }
+
+          return { intent, narration: fallback };
         }
+      });
+    });
+
+    // Wait for all tasks to complete
+    const results = await Promise.all(tasks);
+
+    // Aggregate results
+    for (const { intent, narration } of results) {
+      if (narration.comment.length > 0) {
+        comments.set(intent.plyIndex, narration);
+        totalTokensUsed += narration.tokensUsed ?? 0;
+        totalCommentLength += narration.comment.split(/\s+/).length;
       }
     }
 
