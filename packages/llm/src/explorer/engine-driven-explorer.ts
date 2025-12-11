@@ -873,8 +873,10 @@ export class EngineDrivenExplorer {
       const position = new ChessPosition(fen);
       const moveNum = position.moveNumber();
       const turn = position.turn();
-      // Use 0-based ply: move 1 white = 0, move 1 black = 1, move 2 white = 2, etc.
-      const ply = (moveNum - 1) * 2 + (turn === 'w' ? 0 : 1);
+      // Calculate ply of the RESULTING position (after the move)
+      // FEN is the position BEFORE the move, but comments are looked up by toNode.ply
+      // (the position AFTER), so we add 1 to align with dag-transformer lookups
+      const ply = (moveNum - 1) * 2 + (turn === 'w' ? 0 : 1) + 1;
 
       // Determine intent type based on classification
       const intentType: CommentIntent['type'] =

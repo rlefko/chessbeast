@@ -160,9 +160,9 @@ export class VariationDAG {
     const resultingPositionKey = generatePositionKey(resultingFen);
 
     // Ensure san is proper SAN notation, not UCI
-    // UCI format: 4-5 lowercase chars like "e2e4" or "e7e8q"
+    // UCI format: 4-5 chars like "e2e4" or "e7e8q" (with optional promotion piece)
     let sanMove = san;
-    if (san && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(san)) {
+    if (san && /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/i.test(san)) {
       // san parameter is actually UCI, try to convert it
       try {
         const position = new ChessPosition(currentNode.fen);
