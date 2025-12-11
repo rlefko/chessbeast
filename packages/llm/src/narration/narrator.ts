@@ -335,13 +335,25 @@ Output only the comment text, no formatting or labels.`;
     // Add explicit guidance for blunders and mistakes
     if (intent.type === 'blunder_explanation') {
       parts.push(
-        `\nIMPORTANT: This move is a BLUNDER. Explain WHY it is bad - what does the opponent get to do now?`,
+        `\n⚠️ CRITICAL: This move (${intent.content.move}) is a BLUNDER.`,
       );
       parts.push(
-        `Do NOT describe the move positively. Focus on what goes wrong for the player who made this move.`,
+        `Your comment MUST explain what's WRONG with this move.`,
       );
+      parts.push(
+        `Focus on: What threat did Black/White create? What material or position is now lost?`,
+      );
+      parts.push(
+        `NEVER describe the played move positively - it was a bad move!`,
+      );
+      if (intent.content.bestAlternative) {
+        parts.push(`The correct move was ${intent.content.bestAlternative}.`);
+      }
     } else if (intent.type === 'what_was_missed') {
-      parts.push(`\nThis move is a MISTAKE or INACCURACY. Explain what better option was missed.`);
+      parts.push(
+        `\nThis move (${intent.content.move}) is a MISTAKE or INACCURACY.`,
+      );
+      parts.push(`Explain what better option was missed and why the played move is inferior.`);
     }
 
     // Brief reference instruction
@@ -382,13 +394,14 @@ Output only the comment text, no formatting or labels.`;
       parts.push(`\nCurrent focus: ${lineMemory.narrativeFocus}`);
     }
 
-    // Length guidance
+    // Length guidance (reduced from original for conciseness)
     const lengthGuidance: Record<typeof intent.suggestedLength, string> = {
-      brief: '15-25 words',
-      standard: '25-40 words',
-      detailed: '40-60 words',
+      brief: '10-20 words',
+      standard: '20-35 words',
+      detailed: '35-50 words',
     };
     parts.push(`\nTarget length: ${lengthGuidance[intent.suggestedLength]}`);
+    parts.push(`Be concise. Do not exceed ${lengthGuidance[intent.suggestedLength]}.`);
 
     return parts.join('\n');
   }

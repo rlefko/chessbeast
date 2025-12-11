@@ -76,12 +76,34 @@ export async function runUltraFastCoachAnnotation(
 ): Promise<number> {
   const result = await runUltraFastCoachFull(analysis, config, services, reporter);
 
-  // Apply comments to analysis moves
+  // Apply comments AND variations from DAG to analysis moves
   for (const annotatedMove of result.annotatedMoves) {
     const plyIndex = (annotatedMove.moveNumber - 1) * 2 + (annotatedMove.isWhiteMove ? 0 : 1);
     const analysisMove = analysis.moves[plyIndex];
-    if (analysisMove && annotatedMove.commentAfter) {
-      analysisMove.comment = annotatedMove.commentAfter;
+    if (analysisMove) {
+      if (annotatedMove.commentAfter) {
+        analysisMove.comment = annotatedMove.commentAfter;
+      }
+      // Apply variations from the explored DAG (replaces legacy alternatives)
+      if (annotatedMove.variations && annotatedMove.variations.length > 0) {
+        analysisMove.exploredVariations = annotatedMove.variations.map((varLine) => {
+          // Extract SAN moves from MoveInfo objects
+          const moves = varLine.map((m) => m.san);
+          // Build annotations map from any comments in the variation
+          const annotations: Record<number, string> = {};
+          varLine.forEach((m, idx) => {
+            if (m.commentAfter) {
+              annotations[idx] = m.commentAfter;
+            }
+          });
+          return {
+            moves,
+            ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
+            purpose: 'best' as const,
+            source: 'engine' as const,
+          };
+        });
+      }
     }
   }
 

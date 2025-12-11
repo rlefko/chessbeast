@@ -178,6 +178,9 @@ export class EngineDrivenExplorer {
   /** Best move from engine evaluation (used to suggest alternatives) */
   private currentBestMove: string | undefined = undefined;
 
+  /** Evaluation (in centipawns) before the move - for blunder context */
+  private currentEvalBefore: number | undefined = undefined;
+
   constructor(
     engine: EngineService,
     cache: ArtifactCache,
@@ -212,6 +215,7 @@ export class EngineDrivenExplorer {
 
     // Reset context for intent generation
     this.currentBestMove = undefined; // Will be set from engine evaluation
+    this.currentEvalBefore = undefined; // Will be set from engine evaluation
 
     // Store game ply for intent generation
     // If not provided, calculate from FEN (position is before the move)
@@ -385,9 +389,10 @@ export class EngineDrivenExplorer {
         numLines: 5,
       });
 
-      // Capture the best move from the first (best) line
+      // Capture the best move and evaluation from the first (best) line
       if (evals.length > 0 && evals[0]?.pv && evals[0].pv.length > 0) {
         this.currentBestMove = evals[0].pv[0]!;
+        this.currentEvalBefore = evals[0].cp;
       }
 
       for (const evaluation of evals) {
@@ -905,9 +910,21 @@ export class EngineDrivenExplorer {
         ],
       };
 
+      // Add eval context if available (conditional to satisfy exactOptionalPropertyTypes)
+      if (this.currentEvalBefore !== undefined) {
+        content.evalBefore = this.currentEvalBefore;
+      }
+
       // Add best alternative if different from played move
       if (bestMove && bestMove !== move) {
         content.bestAlternative = bestMove;
+      }
+
+      // Add theme explanation for blunders - focus on what's wrong
+      if (classification === 'blunder' || classification === 'mistake') {
+        content.themeExplanation = bestMove
+          ? `This move is a ${classification}. Better was ${bestMove}.`
+          : `This move is a ${classification} that allows the opponent to gain advantage.`;
       }
 
       return {
