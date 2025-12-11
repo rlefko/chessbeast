@@ -334,25 +334,17 @@ Output only the comment text, no formatting or labels.`;
 
     // Add explicit guidance for blunders and mistakes
     if (intent.type === 'blunder_explanation') {
-      parts.push(
-        `\n⚠️ CRITICAL: This move (${intent.content.move}) is a BLUNDER.`,
-      );
-      parts.push(
-        `Your comment MUST explain what's WRONG with this move.`,
-      );
+      parts.push(`\n⚠️ CRITICAL: This move (${intent.content.move}) is a BLUNDER.`);
+      parts.push(`Your comment MUST explain what's WRONG with this move.`);
       parts.push(
         `Focus on: What threat did Black/White create? What material or position is now lost?`,
       );
-      parts.push(
-        `NEVER describe the played move positively - it was a bad move!`,
-      );
+      parts.push(`NEVER describe the played move positively - it was a bad move!`);
       if (intent.content.bestAlternative) {
         parts.push(`The correct move was ${intent.content.bestAlternative}.`);
       }
     } else if (intent.type === 'what_was_missed') {
-      parts.push(
-        `\nThis move (${intent.content.move}) is a MISTAKE or INACCURACY.`,
-      );
+      parts.push(`\nThis move (${intent.content.move}) is a MISTAKE or INACCURACY.`);
       parts.push(`Explain what better option was missed and why the played move is inferior.`);
     }
 
