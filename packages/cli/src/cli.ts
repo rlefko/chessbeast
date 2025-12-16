@@ -99,6 +99,11 @@ const ULTRA_FAST_COACH_HELP = `Enable Ultra-Fast Coach annotation mode.
     Uses engine-driven exploration with post-write LLM annotation
     for faster, more efficient analysis.`;
 
+const DEBUG_GUI_HELP = `Start Debug GUI WebSocket server for real-time debugging.
+    Launches a WebSocket server that streams analysis events.
+    Connect with: chessbeast-debug-gui ws://localhost:[port]
+    Default port: 9222`;
+
 /**
  * Create and configure the CLI program
  */
@@ -140,6 +145,7 @@ export function createProgram(): Command {
     .option('--comment-density <level>', DENSITY_HELP, 'normal')
     .option('--audience <level>', AUDIENCE_HELP, 'club')
     .option('--ultra-fast-coach', ULTRA_FAST_COACH_HELP)
+    .option('--debug-gui [port]', DEBUG_GUI_HELP)
     .action(async (options) => {
       // Import dynamically to avoid circular dependencies
       const { analyzeCommand } = await import('./commands/analyze.js');
@@ -185,6 +191,16 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['audience'] !== undefined) result.audience = options['audience'] as AudienceLevel;
   if (options['ultraFastCoach'] !== undefined)
     result.ultraFastCoach = options['ultraFastCoach'] as boolean;
+  if (options['debugGui'] !== undefined) {
+    const val = options['debugGui'];
+    if (typeof val === 'string') {
+      // Parse port number
+      const port = parseInt(val, 10);
+      result.debugGui = isNaN(port) ? true : port;
+    } else {
+      result.debugGui = val as boolean;
+    }
+  }
 
   return result;
 }

@@ -39,6 +39,9 @@ import { createEngineAdapter } from './adapters.js';
 import type { Services } from './services.js';
 import { createUltraFastCoachConfig } from './ultra-fast-coach.js';
 
+// Debug GUI event emitter (no-op if not enabled)
+import { debugGuiEmitter } from '@chessbeast/debug-gui';
+
 /**
  * Result from Ultra-Fast Coach annotation runner
  */
@@ -181,8 +184,19 @@ export async function runUltraFastCoachFull(
     sharedDag, // Pass the shared DAG so explored variations are integrated
   });
 
+  // Emit session start event
+  debugGuiEmitter.sessionStart({
+    white: analysis.metadata.white ?? 'Unknown',
+    black: analysis.metadata.black ?? 'Unknown',
+    totalMoves: analysis.moves.length,
+    event: analysis.metadata.event,
+    date: analysis.metadata.date,
+    result: analysis.metadata.result,
+  });
+
   // Phase 1: Engine-driven exploration (using deep_analysis phase)
   reporter.startPhase('deep_analysis');
+  debugGuiEmitter.phaseStart('deep_analysis', 'Engine Exploration');
 
   let totalNodesExplored = 0;
   const allIntents: CommentIntent[] = [];
@@ -200,6 +214,29 @@ export async function runUltraFastCoachFull(
     const moveNotation = `${move.moveNumber}${move.isWhiteMove ? '.' : '...'} ${move.san}`;
     reporter.updateMoveProgress(i + 1, criticalMoments.length, `Exploring ${moveNotation}`);
 
+    // Emit position update for Debug GUI
+    debugGuiEmitter.positionUpdate({
+      fen: move.fenBefore,
+      moveNotation,
+      moveNumber: move.moveNumber,
+      isWhiteMove: move.isWhiteMove,
+      evaluation: move.evalBefore ? {
+        cp: move.evalBefore.cp,
+        mate: move.evalBefore.mate,
+      } : undefined,
+      bestMove: move.bestMove,
+      classification: move.classification,
+      cpLoss: move.cpLoss,
+    });
+
+    // Emit critical moment detected
+    debugGuiEmitter.engineCriticalMoment({
+      plyIndex: moment.plyIndex,
+      momentType: moment.type ?? 'critical',
+      score: moment.score ?? 0,
+      reason: `${move.classification ?? 'unknown'} move`,
+    });
+
     try {
       // Pass the plyIndex so intents are attached to the correct move
       const explorationResult = await explorer.explore(
@@ -212,6 +249,16 @@ export async function runUltraFastCoachFull(
             criticalMoments.length,
             `${moveNotation}: ${progress.nodesExplored} nodes`,
           );
+
+          // Emit exploration progress to Debug GUI
+          debugGuiEmitter.engineExplorationProgress({
+            nodesExplored: progress.nodesExplored,
+            maxNodes: progress.maxNodes ?? coachConfig.variations.maxNodes,
+            currentDepth: progress.currentDepth ?? 0,
+            phase: progress.phase as 'exploring' | 'detecting_themes' | 'generating_intents',
+            themesDetected: progress.themesDetected,
+            intentsGenerated: progress.intentsGenerated,
+          });
         },
         moment.plyIndex, // Pass the game ply for correct intent placement
       );
@@ -235,9 +282,11 @@ export async function runUltraFastCoachFull(
   }
 
   reporter.completePhase('deep_analysis', `${totalNodesExplored} nodes explored`);
+  debugGuiEmitter.phaseComplete('deep_analysis', 0, `${totalNodesExplored} nodes explored`);
 
   // Phase 2: Post-write annotation (using llm_annotation phase)
   reporter.startPhase('llm_annotation');
+  debugGuiEmitter.phaseStart('llm_annotation', 'LLM Annotation', allIntents.length);
 
   const pipeline = createPostWritePipeline(client, {
     narrator: {
@@ -264,6 +313,14 @@ export async function runUltraFastCoachFull(
           progress.totalIntents,
           progress.currentComment ?? 'Generating comments...',
         );
+
+        // Emit progress to Debug GUI
+        debugGuiEmitter.phaseProgress(
+          'llm_annotation',
+          progress.intentsProcessed,
+          progress.totalIntents,
+          progress.currentComment,
+        );
       }
     },
     (warning: string) => {
@@ -272,6 +329,11 @@ export async function runUltraFastCoachFull(
   );
 
   reporter.completePhase('llm_annotation', `${pipelineResult.stats.commentsGenerated} comments`);
+  debugGuiEmitter.phaseComplete(
+    'llm_annotation',
+    0,
+    `${pipelineResult.stats.commentsGenerated} comments`,
+  );
 
   // Transform the shared DAG (which now contains mainline + explored variations) to moves
   // Navigate to root first to ensure we start from the beginning
@@ -279,6 +341,14 @@ export async function runUltraFastCoachFull(
   const annotatedMoves = transformDagToMoves(sharedDag, {
     comments: pipelineResult.comments,
     nags: pipelineResult.nags,
+  });
+
+  // Emit session end event
+  debugGuiEmitter.sessionEnd({
+    gamesAnalyzed: 1,
+    criticalMoments: criticalMoments.length,
+    annotationsGenerated: pipelineResult.stats.commentsGenerated,
+    totalTimeMs: 0, // TODO: track actual time
   });
 
   return {

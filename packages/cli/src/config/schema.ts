@@ -259,4 +259,6 @@ export interface CliOptions {
   audience?: AudienceLevel;
   /** Enable Ultra-Fast Coach annotation mode */
   ultraFastCoach?: boolean;
+  /** Enable Debug GUI WebSocket server (port number or true for default) */
+  debugGui?: number | boolean;
 }
