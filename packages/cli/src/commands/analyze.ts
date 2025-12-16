@@ -6,6 +6,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 
+import {
+  createDebugGuiServer,
+  DEFAULT_DEBUG_GUI_PORT,
+  type DebugGuiServer,
+} from '@chessbeast/debug-gui';
+
 import { parseCliOptions, VERSION } from '../cli.js';
 import { loadConfig, formatConfig } from '../config/loader.js';
 import { InputError, OutputError, handleError, resolveAbsolutePath } from '../errors/index.js';
@@ -99,7 +105,38 @@ export async function analyzeCommand(rawOptions: Record<string, unknown>): Promi
   }
   const reporter = new ProgressReporter(reporterOptions);
 
+  // Debug GUI server (if enabled)
+  let debugGuiServer: DebugGuiServer | null = null;
+
   try {
+    // Start Debug GUI server if requested
+    if (options.debugGui) {
+      const port = typeof options.debugGui === 'number' ? options.debugGui : DEFAULT_DEBUG_GUI_PORT;
+      try {
+        debugGuiServer = await createDebugGuiServer(port, {
+          onConnection: (count) => {
+            reporter.printMessage(`[Debug GUI] Client connected (${count} total)`);
+          },
+          onDisconnection: (count) => {
+            reporter.printMessage(`[Debug GUI] Client disconnected (${count} remaining)`);
+          },
+          onError: (err) => {
+            reporter.printWarning(`[Debug GUI] Error: ${err.message}`);
+          },
+        });
+        reporter.printMessage(`[Debug GUI] Server listening on ws://localhost:${port}`);
+        reporter.printMessage(
+          `[Debug GUI] Connect with: chessbeast-debug-gui ws://localhost:${port}`,
+        );
+        reporter.printMessage('');
+      } catch (err) {
+        reporter.printWarning(
+          `[Debug GUI] Failed to start server: ${err instanceof Error ? err.message : 'unknown error'}`,
+        );
+        reporter.printWarning('[Debug GUI] Continuing without debug GUI...');
+      }
+    }
+
     // Load configuration
     const config = await loadConfig(options);
 
@@ -199,5 +236,10 @@ export async function analyzeCommand(rawOptions: Record<string, unknown>): Promi
   } catch (error) {
     reporter.stop();
     handleError(error);
+  } finally {
+    // Clean up Debug GUI server
+    if (debugGuiServer) {
+      await debugGuiServer.stop();
+    }
   }
 }

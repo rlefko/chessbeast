@@ -16,7 +16,8 @@
     "format": "prettier --write \"packages/**/*.{ts,tsx,json}\"",
     "format:check": "prettier --check \"packages/**/*.{ts,tsx,json}\"",
     "prepare": "bash scripts/install-hooks.sh",
-    "chessbeast": "node packages/cli/dist/index.js"
+    "chessbeast": "node packages/cli/dist/index.js",
+    "debug-gui": "node packages/debug-gui/dist/bin/debug-gui.js"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

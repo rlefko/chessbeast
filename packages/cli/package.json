@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@chessbeast/core": "workspace:*",
+    "@chessbeast/debug-gui": "workspace:*",
     "@chessbeast/pgn": "workspace:*",
     "@chessbeast/grpc-client": "workspace:*",
     "@chessbeast/database": "workspace:*",

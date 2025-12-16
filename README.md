@@ -98,6 +98,7 @@ chessbeast analyze --show-config
 | `--reasoning-effort <level>` | LLM reasoning effort: `none`, `low`, `medium`, `high` (default: medium) |
 | `--verbose` | Enable verbose mode with real-time LLM reasoning display |
 | `--debug` | Enable debug mode with full LLM reasoning, move context, and tool call details |
+| `--debug-gui [port]` | Start debug GUI WebSocket server (default port: 9222) |
 | `--ultra-fast-coach` | Enable Ultra-Fast Coach annotation mode |
 | `--speed <tier>` | Analysis speed: `fast`, `normal`, `deep` (default: normal) |
 | `--themes <level>` | Theme verbosity: `none`, `important`, `all` (default: important) |
@@ -194,6 +195,32 @@ chessbeast analyze --input game.pgn --ultra-fast-coach --themes all --variations
 | `fast` | 12 | 1 | Quick overview |
 | `normal` | 18 | 3 | Balanced analysis (default) |
 | `deep` | 22 | 5 | Thorough study |
+
+### Debug GUI
+
+Visualize Ultra-Fast Coach analysis in real-time with a terminal-based debug GUI.
+
+**Terminal 1** - Run analysis with debug server:
+```bash
+chessbeast analyze --input game.pgn --ultra-fast-coach --debug-gui
+```
+
+**Terminal 2** - Connect the debug GUI:
+```bash
+pnpm debug-gui
+```
+
+The GUI shows 4 panels: chess board with eval bar, LLM streaming output, tool call history, and engine analysis with detected themes.
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Cycle panels |
+| `?` | Toggle help |
+| `f` | Flip board |
+| `p` | Pause updates |
+| `q` | Quit |
+
+See [packages/debug-gui/README.md](packages/debug-gui/README.md) for full documentation.
 
 ### Configuration
 

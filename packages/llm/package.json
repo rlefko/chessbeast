@@ -22,6 +22,7 @@
   "dependencies": {
     "@chessbeast/core": "workspace:*",
     "@chessbeast/database": "workspace:*",
+    "@chessbeast/debug-gui": "workspace:*",
     "@chessbeast/grpc-client": "workspace:*",
     "@chessbeast/pgn": "workspace:*",
     "openai": "^6.9.1",

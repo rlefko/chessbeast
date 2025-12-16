@@ -2,6 +2,7 @@
  * OpenAI client wrapper with retry logic and error handling
  */
 
+import { debugGuiEmitter } from '@chessbeast/debug-gui';
 import OpenAILib from 'openai';
 
 import type { LLMConfig } from '../config/llm-config.js';
@@ -153,6 +154,16 @@ export class OpenAIClient {
   }
 
   private async doChat(request: LLMRequest): Promise<LLMResponse> {
+    // Generate unique call ID for Debug GUI tracking
+    const callId = `llm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const callStartTime = Date.now();
+
+    // Emit stream start event (even for non-streaming, for Debug GUI visibility)
+    debugGuiEmitter.llmStreamStart({
+      streamId: callId,
+      model: this.config.model,
+    });
+
     try {
       // Convert messages to OpenAI format, handling tool messages
       const messages = request.messages.map((m) => {
@@ -277,10 +288,35 @@ export class OpenAIClient {
                 .arguments,
             },
           }));
+
+        // Emit tool calls to Debug GUI
+        for (const tc of result.toolCalls) {
+          debugGuiEmitter.toolCallStart({
+            callId: tc.id,
+            toolName: tc.function.name,
+            arguments: JSON.parse(tc.function.arguments || '{}'),
+          });
+        }
       }
+
+      // Emit stream end event for Debug GUI
+      debugGuiEmitter.llmStreamEnd({
+        streamId: callId,
+        finalContent: result.content,
+        tokensUsed: usage.totalTokens,
+        durationMs: Date.now() - callStartTime,
+      });
 
       return result;
     } catch (error) {
+      // Emit error to Debug GUI
+      debugGuiEmitter.llmStreamEnd({
+        streamId: callId,
+        finalContent: '',
+        tokensUsed: 0,
+        durationMs: Date.now() - callStartTime,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw this.mapError(error);
     }
   }
@@ -296,6 +332,16 @@ export class OpenAIClient {
     options.stream = true;
     // Request usage in final streaming chunk
     options.stream_options = { include_usage: true };
+
+    // Generate unique stream ID for Debug GUI tracking
+    const streamId = `llm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const streamStartTime = Date.now();
+
+    // Emit stream start event for Debug GUI
+    debugGuiEmitter.llmStreamStart({
+      streamId,
+      model: this.config.model,
+    });
 
     // Create stream - TypeScript SDK returns AsyncIterable when stream: true
     const stream = await this.client.chat.completions.create({
@@ -321,12 +367,26 @@ export class OpenAIClient {
       if (delta?.reasoning_content) {
         thinkingContent += delta.reasoning_content;
         onChunk({ type: 'thinking', text: delta.reasoning_content, done: false });
+
+        // Emit to Debug GUI
+        debugGuiEmitter.llmStreamChunk({
+          streamId,
+          chunkType: 'thinking',
+          content: delta.reasoning_content,
+        });
       }
 
       // Handle regular content
       if (delta?.content) {
         content += delta.content;
         onChunk({ type: 'content', text: delta.content, done: false });
+
+        // Emit to Debug GUI
+        debugGuiEmitter.llmStreamChunk({
+          streamId,
+          chunkType: 'content',
+          content: delta.content,
+        });
       }
 
       // Handle tool calls in streaming
@@ -345,6 +405,13 @@ export class OpenAIClient {
               text: tc.function.name,
               done: false,
               toolCall: { id: existing.id, function: { name: tc.function.name, arguments: '' } },
+            });
+
+            // Emit tool call start to Debug GUI
+            debugGuiEmitter.toolCallStart({
+              callId: existing.id,
+              toolName: tc.function.name,
+              arguments: {},
             });
           }
           if (tc.function?.arguments) {
@@ -377,6 +444,14 @@ export class OpenAIClient {
 
     // Track token usage
     this.tokenTracker.spend(usage.totalTokens);
+
+    // Emit stream end event for Debug GUI
+    debugGuiEmitter.llmStreamEnd({
+      streamId,
+      finalContent: content,
+      tokensUsed: usage.totalTokens,
+      durationMs: Date.now() - streamStartTime,
+    });
 
     // Build response with optional thinkingContent (avoid undefined for exactOptionalPropertyTypes)
     const response: LLMResponse = {
