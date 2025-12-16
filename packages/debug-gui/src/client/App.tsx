@@ -5,21 +5,22 @@
  */
 
 import { Box, useApp, useStdout } from 'ink';
+
 import { ChessBoardPanel } from './components/ChessBoardPanel.js';
-import { LLMStreamPanel } from './components/LLMStreamPanel.js';
-import { ToolCallsPanel } from './components/ToolCallsPanel.js';
 import { EnginePanel } from './components/EnginePanel.js';
-import { StatusBar } from './components/StatusBar.js';
 import { HelpOverlay } from './components/HelpOverlay.js';
-import { useWebSocket } from './hooks/useWebSocket.js';
+import { LLMStreamPanel } from './components/LLMStreamPanel.js';
+import { StatusBar } from './components/StatusBar.js';
+import { ToolCallsPanel } from './components/ToolCallsPanel.js';
 import { useKeyboard } from './hooks/useKeyboard.js';
+import { useWebSocket } from './hooks/useWebSocket.js';
 import { useDebugStore } from './state/store.js';
 
 export interface AppProps {
   url: string;
 }
 
-export function App({ url }: AppProps) {
+export function App({ url }: AppProps): JSX.Element {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const { ui } = useDebugStore();

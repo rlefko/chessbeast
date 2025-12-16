@@ -6,7 +6,9 @@
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
+
 import type { DebugGuiEvent } from '../shared/events.js';
+
 import { debugGuiEmitter } from './event-emitter.js';
 
 export interface DebugGuiServerOptions {
@@ -67,7 +69,7 @@ export class DebugGuiServer {
         });
 
         // Listen to debug events and broadcast
-        this.eventHandler = (event: DebugGuiEvent) => {
+        this.eventHandler = (event: DebugGuiEvent): void => {
           this.broadcast(event);
         };
         debugGuiEmitter.on('debug-event', this.eventHandler);

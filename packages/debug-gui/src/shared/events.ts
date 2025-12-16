@@ -24,10 +24,12 @@ export interface PositionUpdateEvent extends DebugEvent {
   moveNotation: string;
   moveNumber: number;
   isWhiteMove: boolean;
-  evaluation?: {
-    cp?: number | undefined;
-    mate?: number | undefined;
-  } | undefined;
+  evaluation?:
+    | {
+        cp?: number | undefined;
+        mate?: number | undefined;
+      }
+    | undefined;
   bestMove?: string | undefined;
   classification?: string | undefined;
   cpLoss?: number | undefined;

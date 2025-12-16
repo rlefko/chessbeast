@@ -17,6 +17,7 @@ import {
   type GameAnalysis,
   type VariationDAG,
 } from '@chessbeast/core';
+import { debugGuiEmitter } from '@chessbeast/debug-gui';
 import {
   OpenAIClient,
   createLLMConfig,
@@ -40,7 +41,6 @@ import type { Services } from './services.js';
 import { createUltraFastCoachConfig } from './ultra-fast-coach.js';
 
 // Debug GUI event emitter (no-op if not enabled)
-import { debugGuiEmitter } from '@chessbeast/debug-gui';
 
 /**
  * Result from Ultra-Fast Coach annotation runner
@@ -220,10 +220,12 @@ export async function runUltraFastCoachFull(
       moveNotation,
       moveNumber: move.moveNumber,
       isWhiteMove: move.isWhiteMove,
-      evaluation: move.evalBefore ? {
-        cp: move.evalBefore.cp,
-        mate: move.evalBefore.mate,
-      } : undefined,
+      evaluation: move.evalBefore
+        ? {
+            cp: move.evalBefore.cp,
+            mate: move.evalBefore.mate,
+          }
+        : undefined,
       bestMove: move.bestMove,
       classification: move.classification,
       cpLoss: move.cpLoss,

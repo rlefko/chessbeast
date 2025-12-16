@@ -4,8 +4,8 @@
  * A bordered panel with a title, used for each section of the debug GUI.
  */
 
-import type { ReactNode } from 'react';
 import { Box, Text } from 'ink';
+import type { ReactNode } from 'react';
 
 export interface PanelProps {
   title: string;
@@ -15,7 +15,13 @@ export interface PanelProps {
   height?: string | number | undefined;
 }
 
-export function Panel({ title, focused = false, children, width, height }: PanelProps) {
+export function Panel({
+  title,
+  focused = false,
+  children,
+  width,
+  height,
+}: PanelProps): JSX.Element {
   const borderColor = focused ? 'cyan' : 'gray';
   const titleColor = focused ? 'cyanBright' : 'white';
 

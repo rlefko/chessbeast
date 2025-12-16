@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
+
 import type {
   DebugGuiEvent,
   PositionUpdateEvent,
@@ -142,7 +143,8 @@ export class DebugGuiEventEmitter extends EventEmitter {
     this.emitEvent({
       type: 'llm:stream_end',
       finalComment: data.finalContent,
-      tokensUsed: data.tokensUsed !== undefined ? { prompt: 0, completion: data.tokensUsed } : undefined,
+      tokensUsed:
+        data.tokensUsed !== undefined ? { prompt: 0, completion: data.tokensUsed } : undefined,
       durationMs: data.durationMs,
     } as LLMStreamEndEvent);
   }
@@ -246,9 +248,7 @@ export class DebugGuiEventEmitter extends EventEmitter {
   // Session Events
   // =========================================================================
 
-  sessionStart(
-    gameMetadata: SessionStartEvent['gameMetadata'],
-  ): void {
+  sessionStart(gameMetadata: SessionStartEvent['gameMetadata']): void {
     this.emitEvent({
       type: 'session:start',
       gameMetadata,

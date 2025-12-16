@@ -2,9 +2,9 @@
  * OpenAI client wrapper with retry logic and error handling
  */
 
+import { debugGuiEmitter } from '@chessbeast/debug-gui';
 import OpenAILib from 'openai';
 
-import { debugGuiEmitter } from '@chessbeast/debug-gui';
 
 import type { LLMConfig } from '../config/llm-config.js';
 import { LLMError, LLMErrorCode, RateLimitError, TimeoutError, APIError } from '../errors.js';

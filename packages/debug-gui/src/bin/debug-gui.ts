@@ -9,8 +9,9 @@
  *   chessbeast-debug-gui ws://localhost:9222
  */
 
-import React from 'react';
 import { render } from 'ink';
+import { createElement } from 'react';
+
 import { App } from '../client/App.js';
 import { DEFAULT_DEBUG_GUI_PORT } from '../server/websocket-server.js';
 
@@ -27,7 +28,7 @@ if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
 console.error(`Connecting to ${url}...`);
 
 // Render the Ink app
-const { waitUntilExit } = render(React.createElement(App, { url }));
+const { waitUntilExit } = render(createElement(App, { url }));
 
 waitUntilExit().then(() => {
   process.exit(0);

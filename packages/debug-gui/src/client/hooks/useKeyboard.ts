@@ -5,13 +5,14 @@
  */
 
 import { useInput } from 'ink';
+
 import { useDebugStore } from '../state/store.js';
 
 export interface UseKeyboardOptions {
   onQuit?: () => void;
 }
 
-export function useKeyboard({ onQuit }: UseKeyboardOptions = {}) {
+export function useKeyboard({ onQuit }: UseKeyboardOptions = {}): void {
   const {
     ui,
     focusNextPanel,
@@ -79,7 +80,7 @@ export function useKeyboard({ onQuit }: UseKeyboardOptions = {}) {
     }
   });
 
-  function handleBoardInput(input: string, _key: unknown) {
+  function handleBoardInput(input: string, _key: unknown): void {
     // Flip board
     if (input === 'f') {
       flipBoard();
@@ -87,7 +88,7 @@ export function useKeyboard({ onQuit }: UseKeyboardOptions = {}) {
     }
   }
 
-  function handleLLMInput(input: string, key: { upArrow?: boolean; downArrow?: boolean }) {
+  function handleLLMInput(input: string, key: { upArrow?: boolean; downArrow?: boolean }): void {
     // Scroll
     if (input === 'j' || key.downArrow) {
       scrollLLM(3);
@@ -109,7 +110,10 @@ export function useKeyboard({ onQuit }: UseKeyboardOptions = {}) {
     }
   }
 
-  function handleToolsInput(_input: string, key: { upArrow?: boolean; downArrow?: boolean; return?: boolean }) {
+  function handleToolsInput(
+    _input: string,
+    key: { upArrow?: boolean; downArrow?: boolean; return?: boolean },
+  ): void {
     // Get the last few tool calls for selection
     const recentCalls = toolCalls.slice(-10);
 
@@ -123,7 +127,7 @@ export function useKeyboard({ onQuit }: UseKeyboardOptions = {}) {
     }
   }
 
-  function handleEngineInput(input: string, _key: unknown) {
+  function handleEngineInput(input: string, _key: unknown): void {
     // Highlight PV lines 1-3
     if (input === '1') {
       highlightPVLine(0);

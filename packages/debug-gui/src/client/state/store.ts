@@ -5,6 +5,7 @@
  */
 
 import { create } from 'zustand';
+
 import type { DebugGuiEvent } from '../../shared/events.js';
 
 // =============================================================================
@@ -107,21 +108,25 @@ export interface PhaseState {
 
 export interface SessionState {
   active: boolean;
-  gameMetadata?: {
-    white: string;
-    black: string;
-    totalMoves: number;
-    event?: string | undefined;
-    date?: string | undefined;
-    result?: string | undefined;
-  } | undefined;
-  stats?: {
-    gamesAnalyzed: number;
-    criticalMoments: number;
-    annotationsGenerated: number;
-    totalTimeMs: number;
-    totalCost?: number | undefined;
-  } | undefined;
+  gameMetadata?:
+    | {
+        white: string;
+        black: string;
+        totalMoves: number;
+        event?: string | undefined;
+        date?: string | undefined;
+        result?: string | undefined;
+      }
+    | undefined;
+  stats?:
+    | {
+        gamesAnalyzed: number;
+        criticalMoments: number;
+        annotationsGenerated: number;
+        totalTimeMs: number;
+        totalCost?: number | undefined;
+      }
+    | undefined;
 }
 
 export interface ConnectionState {
@@ -248,7 +253,7 @@ export const useDebugStore = create<DebugState>((set, get) => ({
   ui: initialUIState,
 
   // Process incoming WebSocket events
-  processEvent: (event: DebugGuiEvent) => {
+  processEvent: (event: DebugGuiEvent): void => {
     const state = get();
     if (state.ui.paused) return;
 
@@ -494,22 +499,22 @@ export const useDebugStore = create<DebugState>((set, get) => ({
   },
 
   // Connection actions
-  setConnectionStatus: (status, error) =>
+  setConnectionStatus: (status, error): void =>
     set((state) => ({
       connection: { ...state.connection, status, error },
     })),
 
-  setConnectionUrl: (url) =>
+  setConnectionUrl: (url): void =>
     set((state) => ({
       connection: { ...state.connection, url },
     })),
 
-  setSessionId: (sessionId) =>
+  setSessionId: (sessionId): void =>
     set((state) => ({
       connection: { ...state.connection, sessionId },
     })),
 
-  incrementReconnectAttempts: () =>
+  incrementReconnectAttempts: (): void =>
     set((state) => ({
       connection: {
         ...state.connection,
@@ -517,42 +522,42 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       },
     })),
 
-  resetReconnectAttempts: () =>
+  resetReconnectAttempts: (): void =>
     set((state) => ({
       connection: { ...state.connection, reconnectAttempts: 0 },
     })),
 
   // UI actions
-  focusPanel: (panel) =>
+  focusPanel: (panel): void =>
     set((state) => ({
       ui: { ...state.ui, focusedPanel: panel },
     })),
 
-  focusNextPanel: () =>
+  focusNextPanel: (): void =>
     set((state) => {
       const currentIndex = PANEL_ORDER.indexOf(state.ui.focusedPanel);
       const nextIndex = (currentIndex + 1) % PANEL_ORDER.length;
       return { ui: { ...state.ui, focusedPanel: PANEL_ORDER[nextIndex]! } };
     }),
 
-  focusPrevPanel: () =>
+  focusPrevPanel: (): void =>
     set((state) => {
       const currentIndex = PANEL_ORDER.indexOf(state.ui.focusedPanel);
       const prevIndex = (currentIndex - 1 + PANEL_ORDER.length) % PANEL_ORDER.length;
       return { ui: { ...state.ui, focusedPanel: PANEL_ORDER[prevIndex]! } };
     }),
 
-  toggleHelp: () =>
+  toggleHelp: (): void =>
     set((state) => ({
       ui: { ...state.ui, showHelp: !state.ui.showHelp },
     })),
 
-  togglePause: () =>
+  togglePause: (): void =>
     set((state) => ({
       ui: { ...state.ui, paused: !state.ui.paused },
     })),
 
-  flipBoard: () =>
+  flipBoard: (): void =>
     set((state) => ({
       chess: {
         ...state.chess,
@@ -560,14 +565,14 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       },
     })),
 
-  toggleToolExpand: (id) =>
+  toggleToolExpand: (id): void =>
     set((state) => ({
       toolCalls: state.toolCalls.map((call) =>
         call.id === id ? { ...call, expanded: !call.expanded } : call,
       ),
     })),
 
-  scrollLLM: (delta) =>
+  scrollLLM: (delta): void =>
     set((state) => ({
       llm: {
         ...state.llm,
@@ -575,12 +580,12 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       },
     })),
 
-  highlightPVLine: (line) =>
+  highlightPVLine: (line): void =>
     set((state) => ({
       engine: { ...state.engine, highlightedLine: line },
     })),
 
-  reset: () =>
+  reset: (): void =>
     set({
       chess: initialChessState,
       moveHistory: [],

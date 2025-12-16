@@ -6,18 +6,14 @@
 
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
+
 import { useDebugStore } from '../state/store.js';
 
-export function StatusBar() {
+export function StatusBar(): JSX.Element {
   const { connection, session, phase, ui } = useDebugStore();
 
   return (
-    <Box
-      borderStyle="single"
-      borderColor="gray"
-      paddingX={1}
-      justifyContent="space-between"
-    >
+    <Box borderStyle="single" borderColor="gray" paddingX={1} justifyContent="space-between">
       {/* Left side: Connection status */}
       <Box>
         <ConnectionStatus status={connection.status} error={connection.error} />
@@ -44,9 +40,7 @@ export function StatusBar() {
             PAUSED{' '}
           </Text>
         )}
-        <Text dimColor>
-          Tab: panels | ?: help | f: flip | q: quit
-        </Text>
+        <Text dimColor>Tab: panels | ?: help | f: flip | q: quit</Text>
       </Box>
     </Box>
   );
@@ -57,7 +51,7 @@ interface ConnectionStatusProps {
   error?: string | undefined;
 }
 
-function ConnectionStatus({ status, error }: ConnectionStatusProps) {
+function ConnectionStatus({ status, error }: ConnectionStatusProps): JSX.Element {
   switch (status) {
     case 'connecting':
       return (

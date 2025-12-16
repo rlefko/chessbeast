@@ -6,6 +6,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 
+import {
+  createDebugGuiServer,
+  DEFAULT_DEBUG_GUI_PORT,
+  type DebugGuiServer,
+} from '@chessbeast/debug-gui';
+
 import { parseCliOptions, VERSION } from '../cli.js';
 import { loadConfig, formatConfig } from '../config/loader.js';
 import { InputError, OutputError, handleError, resolveAbsolutePath } from '../errors/index.js';
@@ -17,11 +23,6 @@ import {
 } from '../orchestrator/services.js';
 import { formatConfigDisplay } from '../progress/formatters.js';
 import { ProgressReporter } from '../progress/reporter.js';
-import {
-  createDebugGuiServer,
-  DEFAULT_DEBUG_GUI_PORT,
-  type DebugGuiServer,
-} from '@chessbeast/debug-gui';
 
 /**
  * Read PGN input from file or stdin
@@ -124,7 +125,9 @@ export async function analyzeCommand(rawOptions: Record<string, unknown>): Promi
           },
         });
         reporter.printMessage(`[Debug GUI] Server listening on ws://localhost:${port}`);
-        reporter.printMessage(`[Debug GUI] Connect with: chessbeast-debug-gui ws://localhost:${port}`);
+        reporter.printMessage(
+          `[Debug GUI] Connect with: chessbeast-debug-gui ws://localhost:${port}`,
+        );
         reporter.printMessage('');
       } catch (err) {
         reporter.printWarning(

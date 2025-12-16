@@ -5,9 +5,11 @@
  */
 
 import { Box, Text } from 'ink';
-import { Panel } from './Panel.js';
-import { formatEval, getEvalColor } from './EvalBar.js';
+
 import { useDebugStore } from '../state/store.js';
+
+import { formatEval, getEvalColor } from './EvalBar.js';
+import { Panel } from './Panel.js';
 
 export interface EnginePanelProps {
   focused?: boolean | undefined;
@@ -15,7 +17,7 @@ export interface EnginePanelProps {
   height?: string | number | undefined;
 }
 
-export function EnginePanel({ focused = false, width, height }: EnginePanelProps) {
+export function EnginePanel({ focused = false, width, height }: EnginePanelProps): JSX.Element {
   const { engine, exploration, themes, criticalMoments } = useDebugStore();
 
   return (
@@ -53,13 +55,9 @@ export function EnginePanel({ focused = false, width, height }: EnginePanelProps
             {engine.multipv.slice(1, 4).map((line, idx) => (
               <Box key={idx} marginLeft={1}>
                 <Text color="gray">{idx + 2}. </Text>
-                <Text color={getEvalColor(line.evaluation)}>
-                  {formatEval(line.evaluation)}
-                </Text>
+                <Text color={getEvalColor(line.evaluation)}>{formatEval(line.evaluation)}</Text>
                 <Text> {line.move}</Text>
-                {line.pv.length > 1 && (
-                  <Text dimColor> {line.pv.slice(1, 4).join(' ')}</Text>
-                )}
+                {line.pv.length > 1 && <Text dimColor> {line.pv.slice(1, 4).join(' ')}</Text>}
               </Box>
             ))}
           </Box>
@@ -130,7 +128,7 @@ interface ProgressBarProps {
   width?: number;
 }
 
-function ProgressBar({ current, total, width = 20 }: ProgressBarProps) {
+function ProgressBar({ current, total, width = 20 }: ProgressBarProps): JSX.Element {
   const percentage = total > 0 ? current / total : 0;
   const filled = Math.round(percentage * width);
   const empty = width - filled;

@@ -5,8 +5,9 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useDebugStore } from '../state/store.js';
+
 import { parseDebugEvent } from '../../shared/events.js';
+import { useDebugStore } from '../state/store.js';
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_BASE_DELAY = 1000;
@@ -17,7 +18,15 @@ export interface UseWebSocketOptions {
   autoConnect?: boolean;
 }
 
-export function useWebSocket({ url, autoConnect = true }: UseWebSocketOptions) {
+export function useWebSocket({ url, autoConnect = true }: UseWebSocketOptions): {
+  connect: () => void;
+  disconnect: () => void;
+  isConnected: boolean;
+  isConnecting: boolean;
+  status: 'connecting' | 'connected' | 'disconnected' | 'error';
+  error: string | undefined;
+  reconnectAttempts: number;
+} {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -43,12 +52,12 @@ export function useWebSocket({ url, autoConnect = true }: UseWebSocketOptions) {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
-      ws.onopen = () => {
+      ws.onopen = (): void => {
         setConnectionStatus('connected');
         resetReconnectAttempts();
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = (event): void => {
         const data = event.data;
         if (typeof data === 'string') {
           // Handle welcome message
@@ -68,13 +77,13 @@ export function useWebSocket({ url, autoConnect = true }: UseWebSocketOptions) {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (): void => {
         wsRef.current = null;
         setConnectionStatus('disconnected');
         scheduleReconnect();
       };
 
-      ws.onerror = () => {
+      ws.onerror = (): void => {
         setConnectionStatus('error', 'Connection failed');
       };
     } catch (error) {
@@ -131,7 +140,7 @@ export function useWebSocket({ url, autoConnect = true }: UseWebSocketOptions) {
       connect();
     }
 
-    return () => {
+    return (): void => {
       disconnect();
     };
   }, [autoConnect, connect, disconnect]);

@@ -4,11 +4,13 @@
  * Displays the current position with ASCII board, evaluation, and position info.
  */
 
-import { Box, Text } from 'ink';
 import { renderBoard } from '@chessbeast/pgn';
-import { Panel } from './Panel.js';
-import { EvalBar, formatEval, getEvalColor } from './EvalBar.js';
+import { Box, Text } from 'ink';
+
 import { useDebugStore } from '../state/store.js';
+
+import { EvalBar, formatEval, getEvalColor } from './EvalBar.js';
+import { Panel } from './Panel.js';
 
 export interface ChessBoardPanelProps {
   focused?: boolean | undefined;
@@ -16,7 +18,11 @@ export interface ChessBoardPanelProps {
   height?: string | number | undefined;
 }
 
-export function ChessBoardPanel({ focused = false, width, height }: ChessBoardPanelProps) {
+export function ChessBoardPanel({
+  focused = false,
+  width,
+  height,
+}: ChessBoardPanelProps): JSX.Element {
   const { chess } = useDebugStore();
 
   // Render the ASCII board
@@ -52,9 +58,7 @@ export function ChessBoardPanel({ focused = false, width, height }: ChessBoardPa
           <Box>
             <Text dimColor>Move: </Text>
             <Text>
-              {chess.moveNumber > 0
-                ? `${chess.moveNumber}${chess.isWhiteMove ? '.' : '...'}`
-                : '-'}
+              {chess.moveNumber > 0 ? `${chess.moveNumber}${chess.isWhiteMove ? '.' : '...'}` : '-'}
             </Text>
             <Text dimColor> | Side: </Text>
             <Text>{chess.isWhiteMove ? 'White' : 'Black'}</Text>

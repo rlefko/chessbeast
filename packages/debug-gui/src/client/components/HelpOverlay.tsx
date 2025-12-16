@@ -4,22 +4,16 @@
  * Modal showing all keyboard shortcuts.
  */
 
-import type { ReactNode } from 'react';
 import { Box, Text } from 'ink';
+import type { ReactNode } from 'react';
 
 export interface HelpOverlayProps {
   onClose?: (() => void) | undefined;
 }
 
-export function HelpOverlay({ onClose: _onClose }: HelpOverlayProps) {
+export function HelpOverlay({ onClose: _onClose }: HelpOverlayProps): JSX.Element {
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="double"
-      borderColor="cyan"
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="double" borderColor="cyan" paddingX={2} paddingY={1}>
       <Box justifyContent="center" marginBottom={1}>
         <Text bold color="cyanBright">
           Debug GUI Keyboard Shortcuts
@@ -66,7 +60,7 @@ interface SectionProps {
   children: ReactNode;
 }
 
-function Section({ title, children }: SectionProps) {
+function Section({ title, children }: SectionProps): JSX.Element {
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold color="cyan">
@@ -84,7 +78,7 @@ interface ShortcutProps {
   description: string;
 }
 
-function Shortcut({ keys, description }: ShortcutProps) {
+function Shortcut({ keys, description }: ShortcutProps): JSX.Element {
   return (
     <Box>
       <Box width={15}>

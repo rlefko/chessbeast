@@ -13,7 +13,7 @@ export interface EvalBarProps {
 
 const BAR_WIDTH = 20;
 
-export function EvalBar({ evaluation, width = BAR_WIDTH }: EvalBarProps) {
+export function EvalBar({ evaluation, width = BAR_WIDTH }: EvalBarProps): JSX.Element {
   const { cp, mate } = evaluation ?? {};
 
   // Calculate position (0-1, where 0.5 is equal)
@@ -67,7 +67,10 @@ export function EvalBar({ evaluation, width = BAR_WIDTH }: EvalBarProps) {
 /**
  * Format evaluation for display
  */
-export function formatEval(evaluation?: { cp?: number | undefined; mate?: number | undefined }): string {
+export function formatEval(evaluation?: {
+  cp?: number | undefined;
+  mate?: number | undefined;
+}): string {
   if (!evaluation) return '?';
 
   const { cp, mate } = evaluation;
@@ -87,7 +90,10 @@ export function formatEval(evaluation?: { cp?: number | undefined; mate?: number
 /**
  * Get color for evaluation
  */
-export function getEvalColor(evaluation?: { cp?: number | undefined; mate?: number | undefined }): string {
+export function getEvalColor(evaluation?: {
+  cp?: number | undefined;
+  mate?: number | undefined;
+}): string {
   if (!evaluation) return 'gray';
 
   const { cp, mate } = evaluation;

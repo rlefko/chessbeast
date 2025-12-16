@@ -4,11 +4,13 @@
  * Displays tool call history with arguments and results.
  */
 
-import type { ReactNode } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import { Panel } from './Panel.js';
+import type { ReactNode } from 'react';
+
 import { useDebugStore, type ToolCall } from '../state/store.js';
+
+import { Panel } from './Panel.js';
 
 export interface ToolCallsPanelProps {
   focused?: boolean | undefined;
@@ -22,7 +24,7 @@ export function ToolCallsPanel({
   width,
   height,
   maxCalls = 8,
-}: ToolCallsPanelProps) {
+}: ToolCallsPanelProps): JSX.Element {
   const { toolCalls } = useDebugStore();
 
   // Show most recent calls
@@ -45,7 +47,7 @@ interface ToolCallItemProps {
   call: ToolCall;
 }
 
-function ToolCallItem({ call }: ToolCallItemProps) {
+function ToolCallItem({ call }: ToolCallItemProps): JSX.Element {
   const statusColor = getStatusColor(call.status);
   const statusIcon = getStatusIcon(call.status);
 
@@ -54,13 +56,14 @@ function ToolCallItem({ call }: ToolCallItemProps) {
       {/* Header line */}
       <Box>
         <Text color={statusColor}>{statusIcon}</Text>
-        <Text color="gray"> [{call.iteration}/{call.maxIterations}] </Text>
+        <Text color="gray">
+          {' '}
+          [{call.iteration}/{call.maxIterations}]{' '}
+        </Text>
         <Text bold color={call.status === 'running' ? 'yellow' : 'white'}>
           {call.toolName}
         </Text>
-        {call.durationMs !== undefined && (
-          <Text dimColor> ({call.durationMs}ms)</Text>
-        )}
+        {call.durationMs !== undefined && <Text dimColor> ({call.durationMs}ms)</Text>}
       </Box>
 
       {/* Arguments (abbreviated) */}
@@ -142,10 +145,11 @@ function formatToolArgs(toolName: string, args: Record<string, unknown>): string
     case 'FIND_REFERENCE_GAMES':
       return `limit ${args.limit ?? 5}`;
 
-    default:
+    default: {
       // Generic JSON formatting (abbreviated)
       const json = JSON.stringify(args);
       return json.length > 50 ? json.slice(0, 47) + '...' : json;
+    }
   }
 }
 
@@ -162,11 +166,12 @@ function formatToolResult(toolName: string, result: unknown): string {
     case 'EVALUATE_POSITION':
       if (r.evaluation) {
         const ev = r.evaluation as { cp?: number; mate?: number };
-        const evalStr = ev.mate !== undefined
-          ? `M${ev.mate}`
-          : ev.cp !== undefined
-            ? `${ev.cp >= 0 ? '+' : ''}${(ev.cp / 100).toFixed(2)}`
-            : '?';
+        const evalStr =
+          ev.mate !== undefined
+            ? `M${ev.mate}`
+            : ev.cp !== undefined
+              ? `${ev.cp >= 0 ? '+' : ''}${(ev.cp / 100).toFixed(2)}`
+              : '?';
         const pv = r.pv as string[] | undefined;
         const pvStr = pv ? pv.slice(0, 3).join(' ') : '';
         return `${evalStr} ${pvStr}`;
@@ -201,8 +206,9 @@ function formatToolResult(toolName: string, result: unknown): string {
       }
       return r.found === false ? 'Not found' : JSON.stringify(result).slice(0, 50);
 
-    default:
+    default: {
       const json = JSON.stringify(result);
       return json.length > 60 ? json.slice(0, 57) + '...' : json;
+    }
   }
 }

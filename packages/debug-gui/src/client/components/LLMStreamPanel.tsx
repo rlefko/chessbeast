@@ -6,8 +6,10 @@
 
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import { Panel } from './Panel.js';
+
 import { useDebugStore } from '../state/store.js';
+
+import { Panel } from './Panel.js';
 
 export interface LLMStreamPanelProps {
   focused?: boolean | undefined;
@@ -15,7 +17,11 @@ export interface LLMStreamPanelProps {
   height?: string | number | undefined;
 }
 
-export function LLMStreamPanel({ focused = false, width, height }: LLMStreamPanelProps) {
+export function LLMStreamPanel({
+  focused = false,
+  width,
+  height,
+}: LLMStreamPanelProps): JSX.Element {
   const { llm } = useDebugStore();
 
   return (
@@ -34,9 +40,7 @@ export function LLMStreamPanel({ focused = false, width, height }: LLMStreamPane
                   <Spinner type="dots" />
                 </Text>
               )}
-              {llm.model && (
-                <Text dimColor> [{llm.model}]</Text>
-              )}
+              {llm.model && <Text dimColor> [{llm.model}]</Text>}
             </Box>
           ) : (
             <Text dimColor>Waiting for LLM stream...</Text>
@@ -73,9 +77,7 @@ export function LLMStreamPanel({ focused = false, width, height }: LLMStreamPane
             <Box>
               <Text color="green" wrap="wrap">
                 {llm.content}
-                {llm.isStreaming && !llm.isThinking && (
-                  <Text color="green">_</Text>
-                )}
+                {llm.isStreaming && !llm.isThinking && <Text color="green">_</Text>}
               </Text>
             </Box>
           </Box>
