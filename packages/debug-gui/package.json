@@ -24,6 +24,7 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "start": "node dist/bin/debug-gui.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
