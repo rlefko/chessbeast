@@ -32,20 +32,6 @@ export {
   getAttractiveBadThresholds,
 } from './types.js';
 
-// Candidate classifier
-export {
-  classifyCandidates,
-  getDefaultConfig,
-  isCheck,
-  isCapture,
-  getPieceType,
-  isAttractiveBad,
-  getPrimarySource,
-  generateSourceReason,
-  type EngineCandidate,
-  type MaiaPrediction,
-} from './candidate-classifier.js';
-
 // Engine-driven explorer (Ultra-Fast Coach architecture)
 export {
   EngineDrivenExplorer,

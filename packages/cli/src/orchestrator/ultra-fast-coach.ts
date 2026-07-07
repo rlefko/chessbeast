@@ -5,12 +5,7 @@
  * and provides a runner for staged analysis with theme detection and narration.
  */
 
-import type {
-  StagedPipelineConfig,
-  TierConfig,
-  AnalysisTier,
-  CriticalityScore,
-} from '@chessbeast/core';
+import type { TierConfig, AnalysisTier } from '@chessbeast/core';
 import type {
   DensityLevel,
   AudienceLevel,
@@ -32,9 +27,6 @@ import type {
  * Maps CLI options to component configurations
  */
 export interface UltraFastCoachConfig {
-  /** Staged pipeline configuration */
-  pipeline: Partial<StagedPipelineConfig>;
-
   /** Tier override (if specified via speed) */
   defaultTier: AnalysisTier;
 
@@ -72,25 +64,6 @@ export function speedToTier(speed: AnalysisSpeed): AnalysisTier {
       return 'standard';
     case 'deep':
       return 'full';
-  }
-}
-
-/**
- * Map analysis speed to tier thresholds
- */
-export function speedToTierThresholds(speed: AnalysisSpeed): {
-  standardPromotion: number;
-  fullPromotion: number;
-} {
-  switch (speed) {
-    case 'fast':
-      // Higher thresholds = fewer promotions = faster
-      return { standardPromotion: 60, fullPromotion: 85 };
-    case 'normal':
-      return { standardPromotion: 40, fullPromotion: 70 };
-    case 'deep':
-      // Lower thresholds = more promotions = deeper
-      return { standardPromotion: 25, fullPromotion: 55 };
   }
 }
 
@@ -166,17 +139,10 @@ export function audienceToLineMemoryConfig(
 export function createUltraFastCoachConfig(
   cliConfig: UltraFastCoachConfigSchema,
 ): UltraFastCoachConfig {
-  const tierThresholds = speedToTierThresholds(cliConfig.speed);
   const variationLimits = variationDepthToLimits(cliConfig.variations);
   const lineMemoryConfig = audienceToLineMemoryConfig(cliConfig.audience);
 
   return {
-    pipeline: {
-      tierThresholds,
-      maxCriticalRatio:
-        cliConfig.speed === 'fast' ? 0.15 : cliConfig.speed === 'deep' ? 0.35 : 0.25,
-    },
-
     defaultTier: speedToTier(cliConfig.speed),
 
     themes: {
@@ -199,49 +165,6 @@ export function createUltraFastCoachConfig(
 
     lineMemory: lineMemoryConfig,
   };
-}
-
-/**
- * Filter themes based on verbosity setting
- */
-export function shouldIncludeTheme(
-  verbosity: ThemeVerbosity,
-  severity: 'critical' | 'significant' | 'moderate' | 'minor',
-): boolean {
-  switch (verbosity) {
-    case 'none':
-      return false;
-    case 'important':
-      return severity === 'critical' || severity === 'significant';
-    case 'all':
-      return true;
-  }
-}
-
-/**
- * Determine if a position should be commented based on criticality and density
- */
-export function shouldCommentPosition(
-  criticalityScore: CriticalityScore,
-  density: DensityLevel,
-  plyInWindow: number,
-  lastCommentPly: number,
-): boolean {
-  const minPlyGap = density === 'sparse' ? 4 : density === 'normal' ? 2 : 1;
-  const minScore = density === 'sparse' ? 50 : density === 'normal' ? 30 : 15;
-
-  // Always comment critical positions
-  if (criticalityScore.score >= 70) {
-    return true;
-  }
-
-  // Check density constraints
-  if (plyInWindow - lastCommentPly < minPlyGap) {
-    return false;
-  }
-
-  // Check score threshold
-  return criticalityScore.score >= minScore;
 }
 
 /**
@@ -272,46 +195,4 @@ export function getUltraFastTierConfig(
   };
 
   return baseConfigs;
-}
-
-/**
- * Ultra-Fast Coach progress information
- */
-export interface UltraFastCoachProgress {
-  /** Current phase */
-  phase: 'analyzing' | 'themes' | 'narrating' | 'rendering';
-  /** Current stage within phase */
-  stage?: string;
-  /** Progress percentage (0-100) */
-  progress: number;
-  /** Current position being processed */
-  currentPly?: number;
-  /** Total positions */
-  totalPlies?: number;
-  /** Current tier being used */
-  tier?: AnalysisTier;
-}
-
-/**
- * Ultra-Fast Coach result
- */
-export interface UltraFastCoachResult {
-  /** Number of positions analyzed */
-  positionsAnalyzed: number;
-  /** Number of themes detected */
-  themesDetected: number;
-  /** Number of comments generated */
-  commentsGenerated: number;
-  /** Cache statistics */
-  cacheStats: {
-    hits: number;
-    misses: number;
-    hitRate: number;
-  };
-  /** Tier distribution */
-  tierDistribution: Record<AnalysisTier, number>;
-  /** Total analysis time (ms) */
-  totalTimeMs: number;
-  /** Token usage */
-  tokensUsed: number;
 }

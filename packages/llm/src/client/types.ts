@@ -3,7 +3,55 @@
  */
 
 import type { ReasoningEffort } from '../config/llm-config.js';
-import type { OpenAITool, ToolCall } from '../tools/types.js';
+
+/**
+ * JSON Schema type for OpenAI function parameters
+ */
+export interface JSONSchema {
+  type: 'object' | 'string' | 'number' | 'boolean' | 'array';
+  description?: string;
+  properties?: Record<string, JSONSchemaProperty>;
+  required?: string[];
+  items?: JSONSchemaProperty;
+  enum?: (string | number)[];
+}
+
+export interface JSONSchemaProperty {
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  description?: string;
+  default?: unknown;
+  enum?: (string | number)[];
+  items?: JSONSchemaProperty;
+}
+
+/**
+ * OpenAI function definition format
+ */
+export interface OpenAIFunction {
+  name: string;
+  description: string;
+  parameters: JSONSchema;
+}
+
+/**
+ * OpenAI tool definition (wrapper around function)
+ */
+export interface OpenAITool {
+  type: 'function';
+  function: OpenAIFunction;
+}
+
+/**
+ * Tool call from LLM response
+ */
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string; // JSON string
+  };
+}
 
 /**
  * Message role in conversation

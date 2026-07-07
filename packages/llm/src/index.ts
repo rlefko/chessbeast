@@ -449,52 +449,14 @@ export {
   type DeepAnalysis,
 } from './prompts/rich-context.js';
 
-// Tools
+// Model pricing
 export {
-  ToolExecutor,
-  AGENTIC_TOOLS,
-  TOOL_NAMES,
-  type ToolName,
-  type AgenticServices,
-  type AgenticOptions,
-  type ToolCall,
-  type ToolResult,
-  type ToolExecutionStats,
-  type OpenAITool,
-} from './tools/index.js';
-
-// Cost tracking
-export {
-  CostTracker,
-  formatCost,
-  formatTokens,
-  formatCostStats,
   getModelPricing,
   calculateCost,
   MODEL_PRICING,
   DEFAULT_PRICING,
   type ModelPricing,
-  type CostBreakdown,
-  type CostStats,
-  type FormatOptions,
 } from './cost/index.js';
-
-// Position Cards
-export {
-  formatPositionCard,
-  formatPositionCardConcise,
-  normalizeToWhitePerspective,
-  filterMaiaCandidates,
-  mergeCandidates,
-  PositionCardBuilder,
-  type PositionCard,
-  type ShallowPositionCard,
-  type CandidateMove,
-  type ClassicalFeatures,
-  type CardTier,
-  type CardBuilderServices,
-  type CardBuilderConfig,
-} from './cards/index.js';
 
 // Memory - Line context tracking and redundancy prevention
 export {
@@ -524,22 +486,6 @@ export {
   cloneLineMemory,
   serializeLineMemory,
   deserializeLineMemory,
-  // Rolling Summary
-  SUMMARY_PRIORITIES,
-  createEvalSwingSummary,
-  createThemeEmergenceSummary,
-  createThemeResolutionSummary,
-  createStructuralChangeSummary,
-  createPlanShiftSummary,
-  createGeneralSummary,
-  shouldAddEvalSwingSummary,
-  shouldAddThemeSummary,
-  processThemeDeltasForSummary,
-  compressSummary,
-  formatSummary,
-  getSummaryByType,
-  getLatestSummary,
-  clearSummaryBefore,
   // Idea Tracker
   type IdeaScope,
   type TrackedIdea,
@@ -608,93 +554,6 @@ export {
   createNarrator,
   narrateIntents,
 } from './narration/index.js';
-
-// Agent Cards - Compact LLM input representation
-export {
-  // Types
-  type AgentCard,
-  type CandidateSummary,
-  type CompactEval,
-  type DidacticInput,
-  type DidacticResult,
-  type LineContextSnapshot,
-  type NarratorRoleInput,
-  type NarratorRoleResult,
-  type OutputConstraints,
-  type ParentDelta,
-  type ThemeDeltaSummary,
-  type TiebreakerInput,
-  type TiebreakerResult,
-  type WDL,
-  DEFAULT_OUTPUT_CONSTRAINTS,
-  // Builder
-  type AgentCardBuilderConfig,
-  type AgentCardInput,
-  AgentCardBuilder,
-  createAgentCardBuilder,
-  createLineContextSnapshot,
-  DEFAULT_BUILDER_CONFIG,
-  summarizeCandidate,
-  summarizeThemeDelta,
-  // Schemas
-  type JSONSchema,
-  type ValidationError as SchemaValidationError,
-  type ValidationResult as SchemaValidationResult,
-  AGENT_CARD_SCHEMA,
-  CANDIDATE_SUMMARY_SCHEMA,
-  COMPACT_EVAL_SCHEMA,
-  DIDACTIC_INPUT_SCHEMA,
-  LINE_CONTEXT_SNAPSHOT_SCHEMA,
-  NARRATOR_INPUT_SCHEMA,
-  OUTPUT_CONSTRAINTS_SCHEMA,
-  PARENT_DELTA_SCHEMA,
-  THEME_DELTA_SUMMARY_SCHEMA,
-  TIEBREAKER_INPUT_SCHEMA,
-  validateAgainstSchema,
-  validateAgentCard,
-  validateDidacticInput,
-  validateNarratorInput,
-  validateTiebreakerInput,
-  WDL_SCHEMA,
-} from './agent-cards/index.js';
-
-// LLM Roles - Narrow roles for chess annotation
-export {
-  // Role types
-  type AudienceLevel as RoleAudienceLevel,
-  type CommentStyle,
-  type LLMRole,
-  type RoleConfig,
-  type RoleError,
-  type RoleResultBase,
-  AUDIENCE_DESCRIPTIONS,
-  DIDACTIC_ROLE_CONFIG,
-  getRoleConfig,
-  isRoleError,
-  NARRATOR_ROLE_CONFIG,
-  ROLE_CONFIGS,
-  STYLE_DESCRIPTIONS,
-  TIEBREAKER_ROLE_CONFIG,
-  // Narrator role
-  type NarratorRoleConfig,
-  createNarratorRole,
-  DEFAULT_NARRATOR_ROLE_CONFIG,
-  NarratorRole,
-  // Tiebreaker role
-  type TiebreakerRoleConfig,
-  createTiebreakerRole,
-  DEFAULT_TIEBREAKER_ROLE_CONFIG,
-  needsTiebreaker,
-  TiebreakerRole,
-  // Didactic role
-  type DidacticRoleConfig,
-  COMPLEX_CHESS_TERMS,
-  createDidacticRole,
-  DEFAULT_DIDACTIC_ROLE_CONFIG,
-  DidacticRole,
-  getComplexTermsForAudience,
-  needsReframing,
-} from './roles/index.js';
 
 // Theme Detection
 export {

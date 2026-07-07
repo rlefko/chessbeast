@@ -36,25 +36,6 @@ export {
   deserializeLineMemory,
 } from './line-memory.js';
 
-// Rolling Summary
-export {
-  SUMMARY_PRIORITIES,
-  createEvalSwingSummary,
-  createThemeEmergenceSummary,
-  createThemeResolutionSummary,
-  createStructuralChangeSummary,
-  createPlanShiftSummary,
-  createGeneralSummary,
-  shouldAddEvalSwingSummary,
-  shouldAddThemeSummary,
-  processThemeDeltasForSummary,
-  compressSummary,
-  formatSummary,
-  getSummaryByType,
-  getLatestSummary,
-  clearSummaryBefore,
-} from './rolling-summary.js';
-
 // Idea Tracker
 export {
   type IdeaScope,
