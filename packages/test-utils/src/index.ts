@@ -31,11 +31,10 @@ export {
 } from './mocks/mock-maia.js';
 
 export {
-  createMockAnnotator,
-  type MockAnnotator,
-  type MockLlmConfig,
-  type AnnotationResult,
-} from './mocks/mock-llm.js';
+  createMockLlmClient,
+  type MockLlmClient,
+  type MockLlmClientConfig,
+} from './mocks/mock-llm-client.js';
 
 export {
   createMockServices,

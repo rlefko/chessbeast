@@ -42,7 +42,7 @@ import {
 } from '../themes/lifecycle.js';
 import type { ThemeInstance, ThemeDelta, ThemeSummary } from '../themes/types.js';
 
-import type { EngineService, ExploredLine, LinePurpose, LineSource } from './variation-explorer.js';
+import type { EngineService, ExploredLine, LinePurpose, LineSource } from './types.js';
 
 /**
  * Check if a move string is in UCI format (e.g., "e2e4", "e7e8q")

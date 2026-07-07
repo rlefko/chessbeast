@@ -23,10 +23,12 @@ import {
   createLLMConfig,
   createEngineDrivenExplorer,
   createPostWritePipeline,
+  generateGameSummary,
   type EngineDrivenExplorerProgress,
   type PostWritePipelineProgress,
   type ThemeVerbosity,
   type AudienceLevel,
+  type AnnotationPerspective,
   type DensityLevel,
   type CommentIntent,
   type ThemeInstance,
@@ -297,6 +299,7 @@ export async function runUltraFastCoachFull(
   const pipeline = createPostWritePipeline(client, {
     narrator: {
       audience,
+      perspective: config.output.perspective as AnnotationPerspective,
       maxWordsPerComment: 50,
       includeVariations: coachConfig.variations.depth !== 'low',
       showEvaluations: false,
@@ -340,6 +343,16 @@ export async function runUltraFastCoachFull(
     0,
     `${pipelineResult.stats.commentsGenerated} comments`,
   );
+
+  // Phase 3: game summary (one LLM call, deterministic template fallback)
+  if (config.output.includeSummary) {
+    analysis.summary = await generateGameSummary(
+      client,
+      analysis,
+      { audience, targetRating },
+      (warning: string) => warnings.push(warning),
+    );
+  }
 
   // Transform the shared DAG (which now contains mainline + explored variations) to moves
   // Navigate to root first to ensure we start from the beginning

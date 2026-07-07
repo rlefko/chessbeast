@@ -8,12 +8,6 @@
 export type AnalysisProfile = 'quick' | 'standard' | 'deep';
 
 /**
- * Output verbosity levels (deprecated - no longer affects comment style)
- * Kept for backwards compatibility
- */
-export type OutputVerbosity = 'summary' | 'normal' | 'rich';
-
-/**
  * Annotation perspective (whose point of view)
  */
 export type AnnotationPerspective = 'white' | 'black' | 'neutral';
@@ -156,8 +150,6 @@ export interface DatabasesConfigSchema {
  * Output configuration
  */
 export interface OutputConfigSchema {
-  /** Annotation verbosity level */
-  verbosity: OutputVerbosity;
   /** Include variations in output PGN */
   includeVariations: boolean;
   /** Include NAG symbols */
@@ -171,12 +163,10 @@ export interface OutputConfigSchema {
 /**
  * Ultra-Fast Coach configuration
  *
- * Settings for the new architecture with staged analysis,
- * theme detection, and post-write comment synthesis.
+ * Settings for the annotation pipeline: staged analysis, theme detection,
+ * and post-write comment synthesis.
  */
 export interface UltraFastCoachConfigSchema {
-  /** Enable Ultra-Fast Coach annotation mode */
-  enabled: boolean;
   /** Analysis speed tier */
   speed: AnalysisSpeed;
   /** Theme output verbosity */
@@ -221,8 +211,6 @@ export interface CliOptions {
   config?: string;
   /** Analysis profile */
   profile?: AnalysisProfile;
-  /** Output verbosity */
-  verbosity?: OutputVerbosity;
   /** Target audience ELO rating */
   targetElo?: number;
   /** Skip Maia analysis */
@@ -257,8 +245,6 @@ export interface CliOptions {
   commentDensity?: CommentDensity;
   /** Target audience level (beginner/club/expert) */
   audience?: AudienceLevel;
-  /** Enable Ultra-Fast Coach annotation mode */
-  ultraFastCoach?: boolean;
   /** Enable Debug GUI WebSocket server (port number or true for default) */
   debugGui?: number | boolean;
 }

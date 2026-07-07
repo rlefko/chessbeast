@@ -10,7 +10,11 @@ import {
   type MockEngine,
   type EvaluateResponse,
 } from './mock-engine.js';
-import { createMockAnnotator, type MockLlmConfig, type MockAnnotator } from './mock-llm.js';
+import {
+  createMockLlmClient,
+  type MockLlmClientConfig,
+  type MockLlmClient,
+} from './mock-llm-client.js';
 import {
   createMockMaia,
   type MockMaiaConfig,
@@ -24,7 +28,7 @@ import {
 export interface MockServicesConfig {
   engine?: MockEngineConfig;
   maia?: MockMaiaConfig;
-  llm?: MockLlmConfig;
+  llm?: MockLlmClientConfig;
   /** Skip Maia service entirely */
   skipMaia?: boolean;
   /** Skip LLM service entirely */
@@ -204,7 +208,7 @@ export interface MockServices {
   maia: MockMaia | null;
   ecoClient: ReturnType<typeof createMockEcoClient> | null;
   lichessClient: ReturnType<typeof createMockLichessClient> | null;
-  annotator: MockAnnotator | null;
+  llmClient: MockLlmClient | null;
 }
 
 /**
@@ -223,7 +227,7 @@ export function createMockServices(config: MockServicesConfig = {}): any {
     maia: skipMaia ? null : createMockMaia(maia),
     ecoClient: skipDatabases ? null : createMockEcoClient(),
     lichessClient: skipDatabases ? null : createMockLichessClient(),
-    annotator: skipLlm ? null : createMockAnnotator(llm),
+    llmClient: skipLlm ? null : createMockLlmClient(llm),
   };
 
   return services;
@@ -276,4 +280,4 @@ export function createDeterministicMocks(): any {
   });
 }
 
-export type { MockEngine, MockMaia, MockAnnotator };
+export type { MockEngine, MockMaia, MockLlmClient };

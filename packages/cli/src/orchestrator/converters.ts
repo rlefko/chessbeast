@@ -4,7 +4,6 @@
  */
 
 import type { ParsedGameInput } from '@chessbeast/core';
-import type { DeepAnalysis } from '@chessbeast/llm';
 import type { ParsedGame, MoveInfo } from '@chessbeast/pgn';
 
 /**
@@ -33,29 +32,5 @@ export function toAnalysisInput(game: ParsedGame): ParsedGameInput {
       moveNumber: move.moveNumber,
       isWhiteMove: move.isWhiteMove,
     })),
-  };
-}
-
-/**
- * Convert engine evaluation to DeepAnalysis format
- */
-export function toDeepAnalysis(
-  evalData: { cp?: number; mate?: number; depth: number; pv: string[] },
-  bestMove: string,
-): DeepAnalysis {
-  // Convert to centipawns - handle mate scores
-  let evaluation: number;
-  if (evalData.mate !== undefined && evalData.mate !== 0) {
-    // Mate score: use large value with sign
-    evaluation = evalData.mate > 0 ? 100000 - evalData.mate * 100 : -100000 - evalData.mate * 100;
-  } else {
-    evaluation = evalData.cp ?? 0;
-  }
-
-  return {
-    evaluation,
-    bestMove,
-    principalVariation: evalData.pv,
-    depth: evalData.depth,
   };
 }

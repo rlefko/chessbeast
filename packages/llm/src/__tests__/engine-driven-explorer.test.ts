@@ -31,7 +31,7 @@ import {
   type EngineDrivenExplorerConfig,
   type EngineDrivenExplorerProgress,
 } from '../explorer/engine-driven-explorer.js';
-import type { EngineEvaluation, EngineService } from '../explorer/variation-explorer.js';
+import type { EngineEvaluation, EngineService } from '../explorer/types.js';
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 

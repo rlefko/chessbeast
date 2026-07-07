@@ -291,7 +291,6 @@ function createServices(engine: MockStockfish, llm: MockLlmClient): Services {
     maia: null,
     ecoClient: null,
     lichessClient: null,
-    annotator: null,
     cache: createArtifactCache(DEFAULT_CACHE_CONFIG),
     llmClient: llm as unknown as OpenAIClient,
   };
@@ -317,7 +316,6 @@ function buildConfig(
   if (overrides.commentDensity !== undefined) {
     config.ultraFastCoach.commentDensity = overrides.commentDensity;
   }
-  config.ultraFastCoach.enabled = true;
   return config;
 }
 

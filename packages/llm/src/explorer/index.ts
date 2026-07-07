@@ -1,35 +1,17 @@
 /**
- * Variation Explorer module
+ * Exploration module
  *
- * Provides variation exploration for chess analysis.
+ * Engine-driven variation exploration for the Ultra-Fast Coach pipeline.
  */
 
-// Original variation explorer (used by Annotator)
+// Shared exploration types
 export {
-  VariationExplorer,
-  createVariationExplorer,
-  type ExploredLine,
-  type ExplorationSession,
-  type ExplorationConfig,
-  type LinePurpose,
-  type LineSource,
+  type EngineEvaluation,
   type EngineService,
   type MaiaService,
-  type EngineEvaluation,
-} from './variation-explorer.js';
-
-// Candidate classification types
-export {
-  type CandidateSource,
-  type ClassifiedCandidate,
-  type CandidateClassificationConfig,
-  type CommentType,
-  type CommentLimits,
-  CANDIDATE_SOURCE_PRIORITY,
-  ATTRACTIVE_BAD_THRESHOLDS,
-  COMMENT_LIMITS,
-  PIECE_VALUES,
-  getAttractiveBadThresholds,
+  type ExploredLine,
+  type LinePurpose,
+  type LineSource,
 } from './types.js';
 
 // Engine-driven explorer (Ultra-Fast Coach architecture)

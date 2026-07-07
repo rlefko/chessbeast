@@ -7,7 +7,6 @@ import { Command } from 'commander';
 import type {
   CliOptions,
   AnalysisProfile,
-  OutputVerbosity,
   AnnotationPerspective,
   ReasoningEffort,
   AnalysisSpeed,
@@ -26,14 +25,6 @@ const PROFILE_HELP = `Analysis profile:
     quick    - Fast analysis (depth 12/16, ~15% critical moments)
     standard - Balanced analysis (depth 14/22, ~25% critical) [default]
     deep     - Thorough analysis (depth 18/28, ~35% critical)`;
-
-/**
- * Verbosity descriptions for help text
- */
-const VERBOSITY_HELP = `Output verbosity:
-    summary - Brief move comments, no variations
-    normal  - Standard annotations with key lines [default]
-    rich    - Detailed explanations with alternatives`;
 
 /**
  * Perspective descriptions for help text
@@ -95,9 +86,9 @@ const AUDIENCE_HELP = `Target audience skill level:
 /**
  * Ultra-Fast Coach mode descriptions for help text
  */
-const ULTRA_FAST_COACH_HELP = `Enable Ultra-Fast Coach annotation mode.
-    Uses engine-driven exploration with post-write LLM annotation
-    for faster, more efficient analysis.`;
+const ULTRA_FAST_COACH_HELP = `(deprecated) Ultra-Fast Coach is now the default
+    annotation mode; this flag has no effect and will be removed
+    in a future release.`;
 
 const DEBUG_GUI_HELP = `Start Debug GUI WebSocket server for real-time debugging.
     Launches a WebSocket server that streams analysis events.
@@ -123,7 +114,6 @@ export function createProgram(): Command {
     .option('-o, --output <file>', 'Output file (default: stdout)')
     .option('-c, --config <file>', 'Path to config file')
     .option('-p, --profile <profile>', PROFILE_HELP, 'standard')
-    .option('-v, --verbosity <level>', VERBOSITY_HELP, 'normal')
     .option('--perspective <side>', PERSPECTIVE_HELP, 'neutral')
     .option('--target-elo <rating>', 'Target audience rating for annotations', parseInt)
     .option('--model <model>', 'OpenAI model to use (e.g., gpt-5-codex, gpt-5-mini, gpt-5-nano)')
@@ -165,8 +155,6 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['output'] !== undefined) result.output = options['output'] as string;
   if (options['config'] !== undefined) result.config = options['config'] as string;
   if (options['profile'] !== undefined) result.profile = options['profile'] as AnalysisProfile;
-  if (options['verbosity'] !== undefined)
-    result.verbosity = options['verbosity'] as OutputVerbosity;
   if (options['perspective'] !== undefined)
     result.perspective = options['perspective'] as AnnotationPerspective;
   if (options['targetElo'] !== undefined) result.targetElo = options['targetElo'] as number;
@@ -189,8 +177,6 @@ export function parseCliOptions(options: Record<string, unknown>): CliOptions {
   if (options['commentDensity'] !== undefined)
     result.commentDensity = options['commentDensity'] as CommentDensity;
   if (options['audience'] !== undefined) result.audience = options['audience'] as AudienceLevel;
-  if (options['ultraFastCoach'] !== undefined)
-    result.ultraFastCoach = options['ultraFastCoach'] as boolean;
   if (options['debugGui'] !== undefined) {
     const val = options['debugGui'];
     if (typeof val === 'string') {

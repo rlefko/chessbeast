@@ -5,7 +5,6 @@
 // Schema types
 export type {
   AnalysisProfile,
-  OutputVerbosity,
   AnalysisConfigSchema,
   RatingsConfigSchema,
   LLMConfigSchema,
@@ -36,7 +35,6 @@ export {
   configSchema,
   partialConfigSchema,
   analysisProfileSchema,
-  outputVerbositySchema,
   ConfigValidationError,
   validateConfig,
   validatePartialConfig,

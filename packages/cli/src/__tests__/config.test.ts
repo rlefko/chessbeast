@@ -40,7 +40,6 @@ describe('Config Defaults', () => {
     });
 
     it('should have valid default output config', () => {
-      expect(DEFAULT_CONFIG.output.verbosity).toBe('normal');
       expect(DEFAULT_CONFIG.output.includeVariations).toBe(true);
       expect(DEFAULT_CONFIG.output.includeNags).toBe(true);
       expect(DEFAULT_CONFIG.output.includeSummary).toBe(true);
@@ -138,10 +137,10 @@ describe('Config Validation', () => {
       expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     });
 
-    it('should reject config with invalid verbosity', () => {
+    it('should reject config with invalid perspective', () => {
       const config = {
         ...DEFAULT_CONFIG,
-        output: { ...DEFAULT_CONFIG.output, verbosity: 'verbose' },
+        output: { ...DEFAULT_CONFIG.output, perspective: 'sideways' },
       };
       expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     });

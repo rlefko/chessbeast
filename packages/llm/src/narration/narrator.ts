@@ -25,6 +25,12 @@ import { RedundancyFilter, createRedundancyFilter } from './redundancy.js';
 export type AudienceLevel = 'beginner' | 'club' | 'expert';
 
 /**
+ * Annotation perspective: whose point of view the language takes.
+ * Controls we/they framing only, never evaluation content.
+ */
+export type AnnotationPerspective = 'neutral' | 'white' | 'black';
+
+/**
  * Narrator configuration
  */
 export interface NarratorConfig {
@@ -49,6 +55,9 @@ export interface NarratorConfig {
   /** Whether to show evaluation numbers */
   showEvaluations: boolean;
 
+  /** Whose point of view the language takes (we/they framing only) */
+  perspective: AnnotationPerspective;
+
   /** Temperature for LLM generation */
   temperature: number;
 
@@ -65,6 +74,7 @@ export const DEFAULT_NARRATOR_CONFIG: NarratorConfig = {
   maxWordsPerComment: 50,
   includeVariations: true,
   showEvaluations: false,
+  perspective: 'neutral',
   temperature: 0.7,
   concurrency: 5,
 };
@@ -333,6 +343,14 @@ export class Narrator {
       expert: 'an experienced tournament player',
     };
 
+    const perspectiveGuidelines: Record<AnnotationPerspective, string> = {
+      neutral: '- Write in objective third person, referring to the sides as White and Black',
+      white:
+        '- Write from White\'s point of view: White is "we/our" and Black is "they/their". Keep evaluations objective',
+      black:
+        '- Write from Black\'s point of view: Black is "we/our" and White is "they/their". Keep evaluations objective',
+    };
+
     return `You are a chess commentator writing annotations for ${audienceDescriptions[this.config.audience]}.
 
 Guidelines:
@@ -342,6 +360,7 @@ Guidelines:
 - Don't repeat information already obvious from the move
 - Write in active voice
 - Avoid meta-commentary ("this is interesting", "one might consider")
+${perspectiveGuidelines[this.config.perspective]}
 ${this.config.showEvaluations ? '- Include evaluation numbers when relevant' : '- Omit evaluation numbers, focus on concepts'}
 ${this.config.includeVariations ? '- Reference key variations when they illustrate the point' : '- Avoid detailed variations, focus on concepts'}
 

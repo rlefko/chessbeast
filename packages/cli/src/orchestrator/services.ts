@@ -12,13 +12,7 @@ import {
 } from '@chessbeast/core';
 import { EcoClient, LichessEliteClient } from '@chessbeast/database';
 import { StockfishClient, MaiaClient, Stockfish16Client } from '@chessbeast/grpc-client';
-import {
-  Annotator,
-  type AnnotatorServices,
-  type EngineService,
-  type MaiaService,
-  type OpenAIClient,
-} from '@chessbeast/llm';
+import { OpenAIClient, createLLMConfig, type LLMConfigInput } from '@chessbeast/llm';
 
 import type { ChessBeastConfig } from '../config/schema.js';
 import { ServiceError, createServiceError, resolveAbsolutePath } from '../errors/index.js';
@@ -33,10 +27,9 @@ export interface Services {
   maia: MaiaClient | null;
   ecoClient: EcoClient | null;
   lichessClient: LichessEliteClient | null;
-  annotator: Annotator | null;
+  /** Shared LLM client (null when LLM annotation is skipped); tests inject a mock here */
+  llmClient: OpenAIClient | null;
   cache: ArtifactCache;
-  /** Optional pre-built LLM client; when set, the annotation runner uses it instead of constructing one */
-  llmClient?: OpenAIClient;
 }
 
 /**
@@ -260,8 +253,8 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
     );
   }
 
-  // Initialize LLM annotator (optional if skipLlm)
-  let annotator: Annotator | null = null;
+  // Initialize the shared LLM client (optional if skipLlm)
+  let llmClient: OpenAIClient | null = null;
   if (!config.analysis.skipLlm) {
     if (!config.llm.apiKey) {
       throw new ServiceError(
@@ -270,27 +263,19 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
         'Set the OPENAI_API_KEY environment variable or use --skip-llm',
       );
     }
-    // Build annotator config, adding token budget if specified
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const annotatorConfig: any = {
+    const llmConfigInput: LLMConfigInput = {
       apiKey: config.llm.apiKey,
       model: config.llm.model,
       temperature: config.llm.temperature,
       timeout: config.llm.timeout,
     };
-    if (config.llm.tokenBudget) {
-      annotatorConfig.budget = { maxTokensPerGame: config.llm.tokenBudget };
+    if (config.llm.reasoningEffort !== undefined) {
+      llmConfigInput.reasoningEffort = config.llm.reasoningEffort;
     }
-
-    // Create service adapters for variation exploration
-    const annotatorServices: AnnotatorServices = {
-      engine: createEngineAdapter(stockfish),
-    };
-    if (maia) {
-      annotatorServices.maia = createMaiaAdapter(maia);
+    if (config.llm.tokenBudget !== undefined) {
+      llmConfigInput.budget = { maxTokensPerGame: config.llm.tokenBudget };
     }
-
-    annotator = new Annotator(annotatorConfig, annotatorServices);
+    llmClient = new OpenAIClient(createLLMConfig(llmConfigInput));
   }
 
   // Initialize artifact cache based on analysis speed
@@ -304,7 +289,7 @@ export async function initializeServices(config: ChessBeastConfig): Promise<Serv
     maia,
     ecoClient,
     lichessClient,
-    annotator,
+    llmClient,
     cache,
   };
 }
@@ -316,96 +301,4 @@ export function closeServices(_services: Services): void {
   // gRPC clients don't have explicit close methods
   // Database clients will be garbage collected
   // Nothing to do here for now
-}
-
-/**
- * Convert EvaluateResponse to EngineEvaluation
- */
-function toEngineEvaluation(response: {
-  cp: number;
-  mate: number;
-  depth: number;
-  bestLine: string[];
-}): { cp?: number; mate?: number; depth: number; pv: string[] } {
-  // Create base result
-  const result: { cp?: number; mate?: number; depth: number; pv: string[] } = {
-    depth: response.depth,
-    pv: response.bestLine,
-  };
-
-  // Only add cp/mate if non-zero
-  if (response.cp !== 0) {
-    result.cp = response.cp;
-  }
-  if (response.mate !== 0) {
-    result.mate = response.mate;
-  }
-
-  return result;
-}
-
-/**
- * Create an EngineService adapter from StockfishClient
- *
- * Adapts the StockfishClient to the EngineService interface expected by VariationExplorer.
- */
-function createEngineAdapter(stockfish: StockfishClient): EngineService {
-  return {
-    async evaluate(
-      fen: string,
-      depth: number,
-    ): Promise<{ cp?: number; mate?: number; depth: number; pv: string[] }> {
-      const response = await stockfish.evaluate(fen, { depth });
-      return toEngineEvaluation(response);
-    },
-
-    async evaluateMultiPv(
-      fen: string,
-      options: { depth?: number; timeLimitMs?: number; numLines?: number },
-    ): Promise<Array<{ cp?: number; mate?: number; depth: number; pv: string[] }>> {
-      const evalOptions: { depth?: number; timeLimitMs?: number; multipv?: number } = {
-        multipv: options.numLines ?? 3,
-      };
-      if (options.depth !== undefined) {
-        evalOptions.depth = options.depth;
-      }
-      if (options.timeLimitMs !== undefined) {
-        evalOptions.timeLimitMs = options.timeLimitMs;
-      }
-
-      const response = await stockfish.evaluate(fen, evalOptions);
-
-      // The main response is the first line
-      const results = [toEngineEvaluation(response)];
-
-      // Add alternatives if available
-      if (response.alternatives) {
-        for (const alt of response.alternatives) {
-          results.push(toEngineEvaluation(alt));
-        }
-      }
-
-      return results;
-    },
-  };
-}
-
-/**
- * Create a MaiaService adapter from MaiaClient
- *
- * Adapts the MaiaClient to the MaiaService interface expected by VariationExplorer.
- */
-function createMaiaAdapter(maia: MaiaClient): MaiaService {
-  return {
-    async predictMoves(
-      fen: string,
-      rating: number,
-    ): Promise<Array<{ san: string; probability: number }>> {
-      const response = await maia.predict(fen, rating);
-      return response.predictions.map((p) => ({
-        san: p.move,
-        probability: p.probability,
-      }));
-    },
-  };
 }

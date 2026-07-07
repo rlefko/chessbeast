@@ -30,11 +30,6 @@ const ratingSchema = z.number().int().min(100).max(4000);
 export const analysisProfileSchema = z.enum(['quick', 'standard', 'deep']);
 
 /**
- * Output verbosity schema
- */
-export const outputVerbositySchema = z.enum(['summary', 'normal', 'rich']);
-
-/**
  * Service endpoint schema
  */
 export const serviceEndpointSchema = z.object({
@@ -116,10 +111,10 @@ export const databasesConfigSchema = z.object({
  * Output configuration schema
  */
 export const outputConfigSchema = z.object({
-  verbosity: outputVerbositySchema,
   includeVariations: z.boolean(),
   includeNags: z.boolean(),
   includeSummary: z.boolean(),
+  perspective: z.enum(['neutral', 'white', 'black']),
 });
 
 /**

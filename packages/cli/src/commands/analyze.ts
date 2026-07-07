@@ -93,6 +93,11 @@ function writeOutput(output: string, outputPath: string | undefined): void {
  * Main analyze command handler
  */
 export async function analyzeCommand(rawOptions: Record<string, unknown>): Promise<void> {
+  if (rawOptions['ultraFastCoach'] !== undefined) {
+    console.error(
+      'Warning: --ultra-fast-coach is deprecated; it is now the default annotation mode and the flag has no effect',
+    );
+  }
   const options = parseCliOptions(rawOptions);
   const reporterOptions: { color: boolean; verbose?: boolean; debug?: boolean } = {
     color: !options.noColor,
