@@ -134,9 +134,13 @@ export async function runUltraFastCoachFull(
   if (config.llm.reasoningEffort !== undefined) {
     llmConfigInput.reasoningEffort = config.llm.reasoningEffort;
   }
+  if (config.llm.tokenBudget !== undefined) {
+    llmConfigInput.budget = { maxTokensPerGame: config.llm.tokenBudget };
+  }
   const llmConfig = createLLMConfig(llmConfigInput);
 
-  const client = new OpenAIClient(llmConfig);
+  // Use the injected client when present (tests inject a mock here)
+  const client = services.llmClient ?? new OpenAIClient(llmConfig);
 
   // Get Ultra-Fast Coach config
   const coachConfig = createUltraFastCoachConfig(config.ultraFastCoach);

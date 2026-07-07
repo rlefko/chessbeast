@@ -143,9 +143,24 @@ export const DEFAULT_LLM_CONFIG: Omit<LLMConfig, 'apiKey'> = {
 };
 
 /**
+ * Input for createLLMConfig: any subset of LLMConfig, with partial sub-configs
+ * merged over their defaults.
+ */
+export type LLMConfigInput = Omit<
+  Partial<LLMConfig>,
+  'budget' | 'retry' | 'circuitBreaker' | 'cache'
+> & {
+  apiKey: string;
+  budget?: Partial<TokenBudget>;
+  retry?: Partial<RetryConfig>;
+  circuitBreaker?: Partial<CircuitBreakerConfig>;
+  cache?: Partial<CacheConfig>;
+};
+
+/**
  * Create a full LLM config with defaults for unspecified values
  */
-export function createLLMConfig(partial: Partial<LLMConfig> & { apiKey: string }): LLMConfig {
+export function createLLMConfig(partial: LLMConfigInput): LLMConfig {
   return {
     ...DEFAULT_LLM_CONFIG,
     ...partial,

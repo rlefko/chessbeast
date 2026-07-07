@@ -17,6 +17,7 @@ import {
   type AnnotatorServices,
   type EngineService,
   type MaiaService,
+  type OpenAIClient,
 } from '@chessbeast/llm';
 
 import type { ChessBeastConfig } from '../config/schema.js';
@@ -34,6 +35,8 @@ export interface Services {
   lichessClient: LichessEliteClient | null;
   annotator: Annotator | null;
   cache: ArtifactCache;
+  /** Optional pre-built LLM client; when set, the annotation runner uses it instead of constructing one */
+  llmClient?: OpenAIClient;
 }
 
 /**
