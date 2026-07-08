@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -44,6 +44,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.12",
     "@types/ws": "^8.5.13",
+    "@vitest/coverage-v8": "^2.1.0",
     "vitest": "^2.1.0"
   }
 }

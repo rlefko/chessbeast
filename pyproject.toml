@@ -68,3 +68,11 @@ known-first-party = ["common", "stockfish_service", "stockfish16_service", "maia
 asyncio_mode = "auto"
 testpaths = ["services"]
 addopts = "-v --tb=short --import-mode=importlib"
+
+[tool.coverage.run]
+source = ["services"]
+omit = ["**/generated/*", "**/tests/*", "**/conftest.py"]
+
+[tool.coverage.report]
+fail_under = 78
+show_missing = false

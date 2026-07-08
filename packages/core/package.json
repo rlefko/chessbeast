@@ -20,15 +20,16 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@chessbeast/pgn": "workspace:*",
+    "@chessbeast/database": "workspace:*",
     "@chessbeast/grpc-client": "workspace:*",
-    "@chessbeast/database": "workspace:*"
+    "@chessbeast/pgn": "workspace:*"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.0",
     "vitest": "^2.1.0"
   }
 }
