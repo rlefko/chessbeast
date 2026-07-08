@@ -209,8 +209,8 @@ export const DEFAULT_RATING = 1500;
 export const CRITICAL_MOMENT_THRESHOLDS = {
   /** Maximum percentage of moves to mark as critical */
   maxCriticalRatio: 0.25,
-  /** Minimum interestingness score to be included (0 = any NAG) */
-  minInterestingnessScore: 1,
+  /** Minimum criticality score to be included (0 = any NAG) */
+  minCriticalityScore: 1,
 };
 
 /**

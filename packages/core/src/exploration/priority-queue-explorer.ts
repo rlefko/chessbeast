@@ -6,7 +6,7 @@
  * the artifact cache for efficient transposition handling.
  */
 
-import { ChessPosition } from '@chessbeast/pgn';
+import { ChessPosition, isUciMove } from '@chessbeast/pgn';
 
 import { recommendMultipv } from '../classifier/adaptive-multipv.js';
 import { calculateCriticality } from '../classifier/criticality-scorer.js';
@@ -41,14 +41,6 @@ import {
 } from './stopping-conditions.js';
 
 /**
- * Check if a move string is in UCI format (e.g., "e2e4", "e7e8q")
- * UCI moves are 4-5 characters: source square + target square + optional promotion
- */
-function isUciFormat(move: string): boolean {
-  return /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/i.test(move);
-}
-
-/**
  * Configuration for the priority queue explorer
  */
 export interface ExplorerConfig {
@@ -75,6 +67,13 @@ export interface ExplorerConfig {
 
   /** Stopping configuration overrides */
   stoppingConfig?: Partial<StoppingConfig>;
+
+  /**
+   * Callback invoked when a recoverable problem occurs during exploration
+   * (e.g., an engine evaluation failure). Failures never abort exploration,
+   * but consumers can surface them as warnings.
+   */
+  onWarning?: (warning: string) => void;
 }
 
 /**
@@ -126,7 +125,7 @@ export interface CandidateMove {
 /**
  * Default explorer configuration
  */
-const DEFAULT_EXPLORER_CONFIG: Required<Omit<ExplorerConfig, 'cache' | 'dag'>> = {
+const DEFAULT_EXPLORER_CONFIG: Required<Omit<ExplorerConfig, 'cache' | 'dag' | 'onWarning'>> = {
   maxNodes: 500,
   maxDepth: 40,
   minPriority: 10,
@@ -145,12 +144,18 @@ export class PriorityQueueExplorer {
   private readonly engine: EngineService;
   private readonly cache?: ArtifactCache;
   private readonly dag?: VariationDAG;
-  private readonly config: Required<Omit<ExplorerConfig, 'cache' | 'dag'>>;
+  private readonly config: Required<Omit<ExplorerConfig, 'cache' | 'dag' | 'onWarning'>>;
   private readonly stoppingConfig: StoppingConfig;
+  private readonly onWarning?: (warning: string) => void;
 
   private queue: PriorityQueue<ExplorationNode>;
   private state: ExplorationState;
+  /** Explored nodes keyed by position key (used for transposition detection) */
   private exploredNodes: Map<string, ExplorationNode>;
+  /** Explored nodes keyed by node id (used for parent-chain reconstruction) */
+  private exploredNodesById: Map<string, ExplorationNode>;
+  /** Number of queued nodes skipped because their position was already explored */
+  private nodesSkipped: number = 0;
   private isPaused: boolean = false;
   private isStopped: boolean = false;
 
@@ -165,6 +170,9 @@ export class PriorityQueueExplorer {
     }
     if (config.dag !== undefined) {
       this.dag = config.dag;
+    }
+    if (config.onWarning !== undefined) {
+      this.onWarning = config.onWarning;
     }
     this.config = {
       ...DEFAULT_EXPLORER_CONFIG,
@@ -184,6 +192,7 @@ export class PriorityQueueExplorer {
     this.queue = new PriorityQueue<ExplorationNode>(compareByPriority);
     this.state = createInitialState();
     this.exploredNodes = new Map();
+    this.exploredNodesById = new Map();
   }
 
   /**
@@ -209,6 +218,7 @@ export class PriorityQueueExplorer {
     );
     markExplored(rootNode);
     this.exploredNodes.set(rootNode.positionKey, rootNode);
+    this.exploredNodesById.set(rootNode.nodeId, rootNode);
 
     // Add initial candidates to queue
     for (const candidate of candidates) {
@@ -254,6 +264,7 @@ export class PriorityQueueExplorer {
 
       // Skip if already explored (transposition)
       if (this.exploredNodes.has(node.positionKey)) {
+        this.nodesSkipped++;
         continue;
       }
 
@@ -318,6 +329,7 @@ export class PriorityQueueExplorer {
     // Mark as explored
     markExplored(node);
     this.exploredNodes.set(node.positionKey, node);
+    this.exploredNodesById.set(node.nodeId, node);
 
     // Update max depth
     if (node.explorationDepth > this.state.maxDepthReached) {
@@ -378,7 +390,7 @@ export class PriorityQueueExplorer {
       const moveSan = pvSan[i]!;
 
       // Validate moveSan is proper SAN (not UCI format) - catch upstream bugs
-      if (isUciFormat(moveSan)) {
+      if (isUciMove(moveSan)) {
         console.error(
           `[PQE] BUG: pvSan[${i}] "${moveSan}" is UCI format - upstream should provide SAN`,
         );
@@ -445,7 +457,12 @@ export class PriorityQueueExplorer {
     try {
       const evals = await this.engine.evaluateMultiPv(node.fen, options);
       return evals[0];
-    } catch {
+    } catch (e) {
+      // Evaluation failures are isolated (exploration continues), but they
+      // must surface to consumers instead of being silently swallowed
+      this.onWarning?.(
+        `Engine evaluation failed for position ${node.fen}: ${e instanceof Error ? e.message : String(e)}`,
+      );
       return undefined;
     }
   }
@@ -524,7 +541,7 @@ export class PriorityQueueExplorer {
 
     return {
       nodesExplored: this.state.nodesExplored,
-      nodesSkipped: exploredNodes.length - this.state.nodesExplored,
+      nodesSkipped: this.nodesSkipped,
       maxDepthReached: this.state.maxDepthReached,
       stoppingReason: reason,
       timeMs: Date.now() - startTime,
@@ -551,7 +568,11 @@ export class PriorityQueueExplorer {
 
       while (current && current.parentMove) {
         variation.unshift(current.parentMove);
-        current = current.parentNodeId ? this.exploredNodes.get(current.parentNodeId) : undefined;
+        // Parents must be looked up by node id: exploredNodes is keyed by
+        // position key, which would always miss and truncate variations
+        current = current.parentNodeId
+          ? this.exploredNodesById.get(current.parentNodeId)
+          : undefined;
       }
 
       if (variation.length > 0) {
@@ -606,6 +627,8 @@ export class PriorityQueueExplorer {
     this.queue.clear();
     this.state = createInitialState();
     this.exploredNodes.clear();
+    this.exploredNodesById.clear();
+    this.nodesSkipped = 0;
     this.isPaused = false;
     this.isStopped = false;
   }

@@ -302,32 +302,29 @@ describe('transformDagToMoves', () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it('detects uppercase-promotion UCI ("e7e8Q") as UCI; lowercase converts but uppercase currently leaks through', () => {
+    it('converts promotion UCI leaked into edge.san to SAN regardless of promotion-piece case', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const promoFen = '8/4P1k1/8/8/8/8/8/4K3 w - - 0 1';
 
-      // Uppercase promotion char: detected as UCI (warn fires)...
+      // Uppercase promotion char: detected as UCI (warn fires) and converted,
+      // since uciToSan normalizes the promotion piece to lowercase for chess.js
       const upper = new TestDag(promoFen, 12);
       upper.addLine('root', ['e8=Q'], { idPrefix: 'main', overrides: { 0: { san: 'e7e8Q' } } });
       const upperMoves = transformDagToMoves(upper);
 
       expect(warnSpy).toHaveBeenCalledTimes(1);
-      // documents current behavior; arguably a bug: isUciFormat accepts an
-      // uppercase promotion piece, but ChessPosition.uciToSan forwards the
-      // promotion char case-sensitively and chess.js rejects "Q", so the
-      // conversion fails and the raw UCI string is kept in the output.
-      expect(errorSpy).toHaveBeenCalledTimes(1);
-      expect(upperMoves[0]!.san).toBe('e7e8Q');
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(upperMoves[0]!.san).toBe('e8=Q');
 
-      // ...whereas lowercase promotion UCI converts cleanly to SAN.
+      // Lowercase promotion UCI converts identically.
       const lower = new TestDag(promoFen, 12);
       lower.addLine('root', ['e8=Q'], { idPrefix: 'main', overrides: { 0: { san: 'e7e8q' } } });
       const lowerMoves = transformDagToMoves(lower);
 
       expect(lowerMoves[0]!.san).toBe('e8=Q');
       expect(warnSpy).toHaveBeenCalledTimes(2);
-      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -386,6 +383,30 @@ describe('transformDagToMoves', () => {
       const moves = transformDagToMoves(dag);
 
       expect(moves[1]!.variations).toBeUndefined();
+    });
+
+    it('keeps a bare variation branching right after a pipeline-annotated move (engine demonstration line)', () => {
+      const dag = mainlineDag(['e4', 'e5', 'Nf3']);
+      // Bare engine line branching at the node reached by 1.e4 (an
+      // alternative to 1...e5) - kept only when 1.e4 itself is annotated
+      dag.addLine('main-0', ['c5'], { firstEdgePrincipal: false, idPrefix: 'bare' });
+
+      // Pipeline comment on ply 1 (the position after 1.e4) marks e4 as a
+      // critical move; its follow-up alternatives are demonstration lines
+      const comments = new Map<number, string>([[1, 'A critical decision']]);
+      const withComment = transformDagToMoves(dag, { comments });
+      expect(withComment[0]!.commentAfter).toBe('A critical decision');
+      expect(withComment[1]!.variations).toBeDefined();
+      expect(withComment[1]!.variations![0]![0]!.san).toBe('c5');
+
+      // A pipeline NAG on the entering move also keeps the branch
+      const nags = new Map<number, string[]>([[1, ['$2']]]);
+      const withNag = transformDagToMoves(dag, { nags });
+      expect(withNag[1]!.variations).toBeDefined();
+
+      // Without any annotation on 1.e4 the bare line stays dropped
+      const bare = transformDagToMoves(dag);
+      expect(bare[1]!.variations).toBeUndefined();
     });
 
     it('keeps variations whose first move carries a comment or NAGs, preserving branch order', () => {

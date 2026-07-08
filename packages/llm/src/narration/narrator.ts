@@ -184,13 +184,26 @@ export class Narrator {
     );
 
     // Combine intents to process
-    const intentsToProcess = [
+    const combinedIntents = [
       ...redundancyResult.includedIntents,
       ...redundancyResult.briefReferenceIntents,
     ];
 
-    // Sort by ply for chronological processing
-    intentsToProcess.sort((a, b) => a.plyIndex - b.plyIndex);
+    // Sort by ply for chronological processing. The sort is stable, so
+    // intents sharing a ply stay in priority order (mandatory first).
+    combinedIntents.sort((a, b) => a.plyIndex - b.plyIndex);
+
+    // Deduplicate same-ply intents: comments are keyed by ply, so only one
+    // comment can survive per ply. Keep the first (highest-priority) intent
+    // instead of letting a later, lower-priority narration overwrite it.
+    const seenPlies = new Set<number>();
+    const intentsToProcess = combinedIntents.filter((intent) => {
+      if (seenPlies.has(intent.plyIndex)) {
+        return false;
+      }
+      seenPlies.add(intent.plyIndex);
+      return true;
+    });
 
     // Generate comments in parallel with concurrency limit
     const limit = pLimit(this.config.concurrency);

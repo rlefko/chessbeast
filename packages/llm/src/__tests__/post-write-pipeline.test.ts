@@ -254,7 +254,7 @@ describe('PostWritePipeline', () => {
 
       expect(result.stats.totalIntents).toBe(6);
       expect(result.stats.intentsAfterDensity).toBe(6);
-      expect(result.stats.intentsAfterRedundancy).toBe(3);
+      expect(result.stats.intentsAfterCap).toBe(3);
       // Both mandatory intents survive; the single optional slot goes to the
       // highest-priority optional intent (ply 12, priority 0.9).
       expect(sortedKeys(result.comments)).toEqual([4, 12, 44]);
@@ -271,7 +271,7 @@ describe('PostWritePipeline', () => {
 
       const result = await runOffline(intents, 200, { maxCommentsPerGame: 2 });
 
-      expect(result.stats.intentsAfterRedundancy).toBe(4);
+      expect(result.stats.intentsAfterCap).toBe(4);
       expect(sortedKeys(result.comments)).toEqual([4, 12, 20, 28]);
     });
   });
@@ -286,7 +286,7 @@ describe('PostWritePipeline', () => {
       expect(result.stats).toEqual({
         totalIntents: 0,
         intentsAfterDensity: 0,
-        intentsAfterRedundancy: 0,
+        intentsAfterCap: 0,
         commentsGenerated: 0,
         tokensUsed: 0,
         averageCommentLength: 0,
@@ -399,27 +399,25 @@ describe('PostWritePipeline', () => {
       // narrator, so only the first mention survives.
       expect(sortedKeys(result.comments)).toEqual([10]);
       expect(result.stats.commentsGenerated).toBe(1);
-      // documents current behavior; arguably a bug: stats.intentsAfterRedundancy
-      // reflects the maxCommentsPerGame cap applied in the pipeline, NOT the
-      // redundancy filter (which runs inside the narrator), so it stays at 3
-      // even though only 1 comment was ultimately generated.
-      expect(result.stats.intentsAfterRedundancy).toBe(3);
+      // stats.intentsAfterCap reflects the maxCommentsPerGame cap applied in
+      // the pipeline (no cap here), NOT the redundancy filter that runs inside
+      // the narrator, so it stays at 3 even though only 1 comment was generated.
+      expect(result.stats.intentsAfterCap).toBe(3);
     });
 
     // pins the PR-#99/#101 class of annotation-placement/quality regressions:
     // which intent wins a density conflict must be deterministic.
-    it('resolves density conflicts between adjacent optional intents by input order, not priority', async () => {
-      // documents current behavior; arguably a bug: the pipeline passes intents
-      // to DensityFilter.filter in INPUT order even though the filter's contract
-      // says they "should be sorted by priority". An earlier low-priority intent
-      // therefore crowds out a later, higher-priority adjacent one.
+    it('resolves density conflicts between adjacent optional intents by priority, not input order', async () => {
+      // The pipeline sorts intents by priority before density filtering (the
+      // filter's contract expects priority-sorted input), so a later,
+      // higher-priority intent wins over an earlier low-priority adjacent one.
       const lowPriorityFirst = makeIntent({ plyIndex: 10, mandatory: false, priority: 0.3 });
       const highPrioritySecond = makeIntent({ plyIndex: 11, mandatory: false, priority: 0.65 });
 
       const result = await runOffline([lowPriorityFirst, highPrioritySecond], 60);
 
       expect(result.stats.intentsAfterDensity).toBe(1);
-      expect(sortedKeys(result.comments)).toEqual([10]);
+      expect(sortedKeys(result.comments)).toEqual([11]);
     });
   });
 });

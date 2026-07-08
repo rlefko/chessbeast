@@ -28,8 +28,6 @@ import {
   type PostWritePipelineProgress,
   type ThemeVerbosity,
   type AudienceLevel,
-  type AnnotationPerspective,
-  type DensityLevel,
   type CommentIntent,
   type ThemeInstance,
 } from '@chessbeast/llm';
@@ -144,23 +142,18 @@ export async function runUltraFastCoachFull(
   // Use the injected client when present (tests inject a mock here)
   const client = services.llmClient ?? new OpenAIClient(llmConfig);
 
-  // Get Ultra-Fast Coach config
+  // Get Ultra-Fast Coach config (the single layer deriving internal configs)
   const coachConfig = createUltraFastCoachConfig(config.ultraFastCoach);
 
-  // Create artifact cache with tier-based sizing
-  const cache = createArtifactCache({
-    maxEngineEvals: coachConfig.defaultTier === 'full' ? 5000 : 2000,
-    maxThemes: coachConfig.defaultTier === 'full' ? 3000 : 1000,
-    maxCandidates: coachConfig.defaultTier === 'full' ? 2000 : 500,
-    ttlMs: 3600000, // 1 hour
-  });
+  // Create artifact cache with tier-based sizing from the coach config
+  const cache = createArtifactCache(coachConfig.artifactCache);
 
   // Create engine adapter for the explorer
   const engineAdapter = createEngineAdapter(services.stockfish);
 
   // Determine theme verbosity and audience from config
   const themeVerbosity: ThemeVerbosity = coachConfig.themes.verbosity;
-  const audience = (coachConfig.narration.audience ?? 'club') as AudienceLevel;
+  const audience: AudienceLevel = coachConfig.narration.audience ?? 'club';
   const targetRating = config.ratings.targetAudienceRating ?? config.ratings.defaultRating;
 
   // Create the SHARED DAG upfront with mainline moves
@@ -182,12 +175,16 @@ export async function runUltraFastCoachFull(
   const explorer = createEngineDrivenExplorer(engineAdapter, cache, {
     maxNodes: coachConfig.variations.maxNodes,
     maxDepth: coachConfig.variations.maxDepth,
-    budgetMs: coachConfig.defaultTier === 'full' ? 120000 : 60000,
+    budgetMs: coachConfig.variations.budgetMs,
     detectThemes: coachConfig.themes.enabled,
     themeVerbosity,
     audience,
     targetRating,
     sharedDag, // Pass the shared DAG so explored variations are integrated
+    // Surface engine-evaluation failures (isolated inside exploration) as warnings
+    onWarning: (warning: string) => {
+      warnings.push(warning);
+    },
   });
 
   // Emit session start event
@@ -298,15 +295,15 @@ export async function runUltraFastCoachFull(
 
   const pipeline = createPostWritePipeline(client, {
     narrator: {
-      audience,
-      perspective: config.output.perspective as AnnotationPerspective,
-      maxWordsPerComment: 50,
-      includeVariations: coachConfig.variations.depth !== 'low',
+      // Narration settings (audience, word cap, variation inclusion) come
+      // from the coach config; only run-specific overrides are applied here
+      ...coachConfig.narration,
+      perspective: config.output.perspective,
       showEvaluations: false,
     },
-    density: coachConfig.density as DensityLevel,
+    density: coachConfig.density,
     lineMemory: coachConfig.lineMemory,
-    maxCommentsPerGame: 30,
+    maxCommentsPerGame: coachConfig.maxCommentsPerGame,
     useLlm: true,
   });
 

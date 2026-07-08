@@ -16,7 +16,6 @@ export type {
   LLMConfigInput,
   TokenBudget,
   RetryConfig,
-  CacheConfig,
   ReasoningEffort,
 } from './config/llm-config.js';
 export { createLLMConfig, loadConfigFromEnv, DEFAULT_LLM_CONFIG } from './config/llm-config.js';

@@ -22,7 +22,6 @@ export {
   speedToTier,
   variationDepthToLimits,
   commentDensityToLevel,
-  audienceToLLMAudience,
   audienceToLineMemoryConfig,
   getUltraFastTierConfig,
 } from './ultra-fast-coach.js';

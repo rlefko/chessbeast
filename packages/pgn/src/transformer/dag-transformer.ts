@@ -8,15 +8,8 @@
  * variations and builds a DAG, then comments are attached post-write.
  */
 
-import { ChessPosition } from '../chess/position.js';
+import { ChessPosition, isUciMove } from '../chess/position.js';
 import type { MoveInfo } from '../index.js';
-
-/**
- * Check if a string is in UCI format (e.g., "e2e4", "e7e8q")
- */
-function isUciFormat(move: string): boolean {
-  return /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/i.test(move);
-}
 
 /**
  * Minimal VariationNode interface (compatible with @chessbeast/core)
@@ -146,7 +139,7 @@ function edgeToMoveInfo(
   // Validate SAN - ensure it's not UCI format
   // After performance fix PR, upstream should always provide proper SAN - this check catches bugs
   let san = edge.san;
-  if (san && isUciFormat(san)) {
+  if (san && isUciMove(san)) {
     // DEPRECATED: This conversion should not be needed after upstream fixes
     // Log warning to catch any remaining DAG corruption
     console.warn(
@@ -213,6 +206,12 @@ function attachVariations(
   const root = dag.getRoot();
   let currentNode = root;
 
+  // Whether the mainline move ENTERING the current node carries a pipeline
+  // annotation. Variations branching right after an annotated (critical)
+  // move are the engine's demonstration lines for that move, so they are
+  // kept even when their own first move is bare.
+  let entryMoveAnnotated = false;
+
   for (const move of moves) {
     // Find the edge that matches this move
     const principalEdge = currentNode.principalChildEdge
@@ -244,6 +243,7 @@ function attachVariations(
     // A variation is meaningful if it has explanatory content or NAGs indicating quality
     const meaningfulVariations = variations.filter((variation) => {
       if (variation.length === 0) return false;
+      if (entryMoveAnnotated) return true;
       const firstMove = variation[0]!;
       // Keep if has comment, NAGs (indicating move quality), or nested variations
       return (
@@ -260,6 +260,9 @@ function attachVariations(
     // Move to next node
     const nextNode = dag.getNode(principalEdge.toNode);
     if (!nextNode) break;
+    entryMoveAnnotated =
+      opts.comments?.get(nextNode.ply) !== undefined ||
+      (opts.nags?.get(nextNode.ply)?.length ?? 0) > 0;
     currentNode = nextNode;
   }
 }

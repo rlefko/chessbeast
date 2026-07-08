@@ -439,14 +439,13 @@ describe('Ultra-Fast Coach runner integration', () => {
     expect(analysis.moves[0]!.comment).toBeUndefined();
     expect(analysis.moves[1]!.comment).toBeUndefined();
 
-    // All comments cluster around the injected moments (within one ply -
-    // exploration intents may narrate the position entering the moment)
+    // Every comment lands exactly on a critical-moment ply: all intents share
+    // the after-move ply convention, so no comment drifts to a neighbor move
     const commentedPlies = analysis.moves
       .filter((m) => m.comment !== undefined)
       .map((m) => m.plyIndex);
     for (const ply of commentedPlies) {
-      const nearMoment = CRITICAL_PLIES.some((critical) => Math.abs(critical - ply) <= 1);
-      expect(nearMoment).toBe(true);
+      expect(CRITICAL_PLIES).toContain(ply);
     }
   });
 
@@ -506,10 +505,11 @@ describe('Ultra-Fast Coach runner integration', () => {
     // The failing moment still gets its mandatory played-move comment
     expect(commentedIndexes).toContain(MISTAKE_PLY);
 
-    // Documents current behavior; arguably a bug: engine evaluation failures
-    // inside exploration are swallowed (console.warn only) and never surface
-    // in result.warnings, so callers cannot tell the engine misbehaved.
-    expect(result.warnings.some((w) => w.includes('Exploration failed'))).toBe(false);
+    // Engine evaluation failures inside exploration are isolated (the run
+    // completes) but must surface as warnings so callers can tell the
+    // engine misbehaved
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings.some((w) => w.includes('Engine evaluation failed'))).toBe(true);
   });
 
   // pins PR #97: explored variations were discovered but never applied to

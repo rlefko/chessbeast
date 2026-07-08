@@ -262,30 +262,28 @@ describe('EngineDrivenExplorer', () => {
       );
     });
 
-    // documents current behavior; arguably a bug: the first PV move of the top
-    // engine line is captured as "best move" before any legality validation, so
-    // a garbage move string flows straight into the intent's bestAlternative.
-    it('an unvalidated garbage engine best move flows into the played-move intent bestAlternative (documents current behavior)', async () => {
+    it('rejects a garbage engine best move so it never reaches the played-move intent bestAlternative', async () => {
       const engine = new MockEngineService();
       engine.setEvals(START_FEN, [{ cp: 15, depth: 18, pv: ['zzz9'] }]);
       const explorer = makeExplorer(engine, { detectThemes: false });
 
       const result = await explorer.explore(START_FEN, 'e4', 'blunder');
 
-      expect(result.intents[0]!.content.bestAlternative).toBe('zzz9');
+      expect(result.intents[0]!.content.bestAlternative).toBeUndefined();
+      expect(result.intents[0]!.content.themeExplanation).not.toContain('zzz9');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Ignoring illegal engine best move "zzz9"'),
+      );
     });
 
-    // documents current behavior: the root node is put into the explored set
-    // without being counted as explored, so it is reported as one "cache hit"
-    // (nodesSkipped) even when the cache never returned anything.
-    it('result counters reflect a single explored node plus the root reported as a cache hit (documents current behavior)', async () => {
+    it('result counters reflect a single explored node and zero cache hits when the cache never hit', async () => {
       const engine = new MockEngineService();
       const explorer = makeExplorer(engine, { detectThemes: false });
 
       const result = await explorer.explore(START_FEN, 'e4', 'mistake');
 
       expect(result.nodesExplored).toBe(1);
-      expect(result.cacheHits).toBe(1);
+      expect(result.cacheHits).toBe(0);
       expect(result.maxDepthReached).toBe(1);
     });
   });
@@ -326,13 +324,12 @@ describe('EngineDrivenExplorer', () => {
       expect(variationMoves).toHaveLength(5);
       expect(variationMoves).toContainEqual(['d4']);
       expect(variationMoves).toContainEqual(['Nf3']);
-      expect(variationMoves).toContainEqual(['e5']);
-      expect(variationMoves).toContainEqual(['Nc6']);
-      // documents current behavior; arguably a bug: PriorityQueueExplorer keys
-      // its exploredNodes map by positionKey but extractVariations looks parents
-      // up by parentNodeId, so the parent-chain walk always misses and every
-      // legacy variation is truncated to a single move (['e4', 'e5'] never appears).
-      expect(variationMoves).not.toContainEqual(['e4', 'e5']);
+      // Multi-move variations: extractVariations reconstructs the parent chain
+      // by node id, so PV children extend from the played move instead of
+      // being truncated to single-move lines
+      expect(variationMoves).toContainEqual(['e4', 'e5']);
+      expect(variationMoves).toContainEqual(['e4', 'Nf3']);
+      expect(variationMoves).toContainEqual(['e4', 'Nc6']);
     });
 
     it('never stores a UCI-shaped string in edge.san and always stores real UCI in edge.uci', async () => {
@@ -410,24 +407,27 @@ describe('EngineDrivenExplorer', () => {
   });
 
   // pins PR #95: comments landed on the wrong ply because exploration depth
-  // was used instead of the game ply
+  // was used instead of the game ply. All intents share the after-move
+  // convention: plyIndex is the RESULTING position's ply (gamePly + 1),
+  // matching the dag-transformer's comments.get(toNode.ply) lookup.
   describe('gamePly propagation (PR #95)', () => {
     const FEN_MOVE_13_WHITE = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 13';
     const FEN_MOVE_6_WHITE = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 6';
 
-    it('node intents attach to the provided gamePly, not the exploration depth', async () => {
+    it('node intents attach to the ply after the provided gamePly, not the exploration depth', async () => {
       const engine = new MockEngineService();
       const explorer = makeExplorer(engine, { detectThemes: false });
 
       const result = await explorer.explore(FEN_MOVE_13_WHITE, 'e4', undefined, undefined, 24);
 
       expect(result.intents).toHaveLength(1);
-      expect(result.intents[0]!.plyIndex).toBe(24);
+      expect(result.intents[0]!.plyIndex).toBe(25);
+      // The move descriptors still describe the move itself at gamePly 24
       expect(result.intents[0]!.content.moveNumber).toBe(13);
       expect(result.intents[0]!.content.isWhiteMove).toBe(true);
     });
 
-    it('the played-move intent attaches to the ply after the move (gamePly + 1) while node intents stay on gamePly', async () => {
+    it('the played-move intent and node intents all attach to the ply after the move (gamePly + 1)', async () => {
       const engine = new MockEngineService();
       const explorer = makeExplorer(engine, { detectThemes: false });
 
@@ -437,11 +437,11 @@ describe('EngineDrivenExplorer', () => {
       // Primary played-move intent is first and lives on the position AFTER the move
       expect(result.intents[0]!.type).toBe('blunder_explanation');
       expect(result.intents[0]!.plyIndex).toBe(25);
-      // Every intent derives from the game ply 24, never the exploration depth (1)
+      // Every intent uses the after-move convention (25), never the
+      // exploration depth (1) or the before-move ply (24)
       for (const ply of plies) {
-        expect([24, 25]).toContain(ply);
+        expect(ply).toBe(25);
       }
-      expect(plies).not.toContain(1);
     });
 
     it('two explorations at different gamePly values do not collide on the same ply indices', async () => {
@@ -465,14 +465,14 @@ describe('EngineDrivenExplorer', () => {
       const engine = new MockEngineService();
       const explorer = makeExplorer(engine, { detectThemes: false });
 
-      // Move 13, white to move -> 0-based ply (13 - 1) * 2 = 24
+      // Move 13, white to move -> 0-based move ply (13 - 1) * 2 = 24, intent on 25
       const whiteResult = await explorer.explore(FEN_MOVE_13_WHITE, 'e4');
-      expect(whiteResult.intents[0]!.plyIndex).toBe(24);
+      expect(whiteResult.intents[0]!.plyIndex).toBe(25);
 
-      // Move 13, black to move -> 0-based ply (13 - 1) * 2 + 1 = 25
+      // Move 13, black to move -> 0-based move ply (13 - 1) * 2 + 1 = 25, intent on 26
       const blackFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 13';
       const blackResult = await explorer.explore(blackFen, 'e5');
-      expect(blackResult.intents[0]!.plyIndex).toBe(25);
+      expect(blackResult.intents[0]!.plyIndex).toBe(26);
     });
   });
 
@@ -593,11 +593,7 @@ describe('EngineDrivenExplorer', () => {
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Callback error'));
     });
 
-    // documents current behavior; arguably a bug: only the per-node progress
-    // callbacks are guarded (inside PriorityQueueExplorer); the initial
-    // onProgress call made directly by explore() is unguarded, so a callback
-    // that throws immediately rejects the whole exploration.
-    it('an onProgress callback that throws on the very first call rejects explore() (documents current behavior)', async () => {
+    it('an onProgress callback that throws on the very first call does not reject explore()', async () => {
       const engine = new MockEngineService();
       const explorer = makeExplorer(engine, { detectThemes: false });
 
@@ -605,9 +601,13 @@ describe('EngineDrivenExplorer', () => {
         throw new Error('progress exploded');
       };
 
-      await expect(explorer.explore(START_FEN, 'e4', 'mistake', alwaysThrows)).rejects.toThrow(
-        'progress exploded',
-      );
+      const result = await explorer.explore(START_FEN, 'e4', 'mistake', alwaysThrows);
+
+      expect(result.nodesExplored).toBe(1);
+      expect(result.intents.length).toBeGreaterThanOrEqual(1);
+      // The initial call is guarded by the explorer itself, matching the
+      // per-node guard inside PriorityQueueExplorer
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Progress callback error'));
     });
   });
 
@@ -625,7 +625,8 @@ describe('EngineDrivenExplorer', () => {
 
       expect(result.intents).toHaveLength(2);
       for (const intent of result.intents) {
-        expect(intent.plyIndex).toBe(24);
+        // After-move convention: intents land on gamePly + 1
+        expect(intent.plyIndex).toBe(25);
       }
       expect(result.themes.size).toBe(0);
       expect(result.themeSummaries.size).toBe(0);

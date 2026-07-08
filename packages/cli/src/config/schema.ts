@@ -2,6 +2,14 @@
  * Configuration schema types for ChessBeast CLI
  */
 
+import type { AudienceLevel } from '@chessbeast/llm';
+
+/**
+ * Target audience level for annotations - the canonical definition lives in
+ * @chessbeast/llm (narrator); re-exported here for CLI config consumers.
+ */
+export type { AudienceLevel };
+
 /**
  * Analysis profile presets
  */
@@ -36,11 +44,6 @@ export type VariationDepth = 'low' | 'medium' | 'high';
  * Comment density control
  */
 export type CommentDensity = 'sparse' | 'normal' | 'verbose';
-
-/**
- * Target audience level for annotations
- */
-export type AudienceLevel = 'beginner' | 'club' | 'expert';
 
 /**
  * Analysis configuration

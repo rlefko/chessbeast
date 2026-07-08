@@ -28,6 +28,7 @@ import {
   DensityFilter,
   createDensityFilter,
   DENSITY_CONFIGS,
+  sortIntentsByPriority,
 } from '../narration/index.js';
 import type { ThemeInstance, ThemeSummary } from '../themes/types.js';
 
@@ -124,7 +125,8 @@ export interface PostWritePipelineResult {
   stats: {
     totalIntents: number;
     intentsAfterDensity: number;
-    intentsAfterRedundancy: number;
+    /** Intent count after the maxCommentsPerGame cap (redundancy runs inside the narrator) */
+    intentsAfterCap: number;
     commentsGenerated: number;
     tokensUsed: number;
     averageCommentLength: number;
@@ -188,7 +190,12 @@ export class PostWritePipeline {
       commentsGenerated: 0,
     });
 
-    const densityResult = this.densityFilter.filter(input.intents, input.totalPlies);
+    // The density filter's contract expects priority-sorted intents (higher
+    // priority wins adjacent-ply conflicts), so sort before filtering
+    const densityResult = this.densityFilter.filter(
+      sortIntentsByPriority(input.intents),
+      input.totalPlies,
+    );
 
     // Apply max comments limit if needed
     let filteredIntents = densityResult.includedIntents;
@@ -293,7 +300,7 @@ export class PostWritePipeline {
       stats: {
         totalIntents: input.intents.length,
         intentsAfterDensity: densityResult.includedIntents.length,
-        intentsAfterRedundancy: filteredIntents.length,
+        intentsAfterCap: filteredIntents.length,
         commentsGenerated: narrationResult.stats.commentsGenerated,
         tokensUsed: narrationResult.stats.totalTokensUsed,
         averageCommentLength: narrationResult.stats.averageCommentLength,

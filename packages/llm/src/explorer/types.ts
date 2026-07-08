@@ -5,29 +5,17 @@
  * orchestrator adapters, plus the explored-line shape used for variations.
  */
 
-/**
- * Engine evaluation interface (matches @chessbeast/core EngineEvaluation)
- */
-export interface EngineEvaluation {
-  cp?: number;
-  mate?: number;
-  depth: number;
-  pv: string[];
-}
+import type { EngineEvaluation, EngineService } from '@chessbeast/core';
 
 /**
- * Engine service interface (matches @chessbeast/core EngineService)
+ * Engine evaluation and service interfaces are the canonical @chessbeast/core
+ * types - re-exported here so explorer consumers have a single definition.
  */
-export interface EngineService {
-  evaluate(fen: string, depth: number): Promise<EngineEvaluation>;
-  evaluateMultiPv(
-    fen: string,
-    options: { depth?: number; timeLimitMs?: number; numLines?: number },
-  ): Promise<EngineEvaluation[]>;
-}
+export type { EngineEvaluation, EngineService };
 
 /**
- * Maia service interface (matches @chessbeast/core MaiaService)
+ * Maia service interface (the subset of @chessbeast/core MaiaService used by
+ * the explorer - core's interface additionally requires estimateRating)
  */
 export interface MaiaService {
   predictMoves(fen: string, rating: number): Promise<Array<{ san: string; probability: number }>>;
