@@ -17,7 +17,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["services/stockfish", "services/maia", "services/stockfish16"]
+members = ["services/common", "services/stockfish", "services/maia", "services/stockfish16"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -57,7 +57,7 @@ select = [
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["stockfish_service", "maia_service", "conftest"]
+known-first-party = ["common", "stockfish_service", "stockfish16_service", "maia_service", "conftest"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ARG"]  # Allow unused arguments in test fixtures

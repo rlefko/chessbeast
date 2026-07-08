@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
-import { ChessPosition, STARTING_FEN, InvalidFenError, IllegalMoveError } from '../index.js';
+import {
+  ChessPosition,
+  STARTING_FEN,
+  InvalidFenError,
+  IllegalMoveError,
+  isUciMove,
+} from '../index.js';
 
 describe('ChessPosition', () => {
   describe('constructor and factory methods', () => {
@@ -321,5 +327,158 @@ describe('ChessPosition', () => {
       const pieces = pos.getAllPieces();
       expect(pieces).toHaveLength(2); // Just two kings
     });
+  });
+
+  describe('uciToSan / sanToUci / moveWithUci roundtrips', () => {
+    const BOTH_CASTLE_FEN = 'r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1';
+
+    it('roundtrips kingside castling (e1g1 <-> O-O) for both colors', () => {
+      const white = ChessPosition.fromFen(BOTH_CASTLE_FEN);
+      expect(white.uciToSan('e1g1')).toBe('O-O');
+      expect(white.sanToUci('O-O')).toBe('e1g1');
+
+      const black = ChessPosition.fromFen('r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R b KQkq - 0 1');
+      expect(black.uciToSan('e8g8')).toBe('O-O');
+      expect(black.sanToUci('O-O')).toBe('e8g8');
+    });
+
+    it('roundtrips queenside castling (e1c1 <-> O-O-O) for both colors', () => {
+      const white = ChessPosition.fromFen(BOTH_CASTLE_FEN);
+      expect(white.uciToSan('e1c1')).toBe('O-O-O');
+      expect(white.sanToUci('O-O-O')).toBe('e1c1');
+
+      const black = ChessPosition.fromFen('r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R b KQkq - 0 1');
+      expect(black.uciToSan('e8c8')).toBe('O-O-O');
+      expect(black.sanToUci('O-O-O')).toBe('e8c8');
+    });
+
+    it('roundtrips queen promotion and normalizes UPPERCASE promotion UCI (e7e8Q)', () => {
+      const fen = '8/4P3/8/8/8/8/8/K6k w - - 0 1';
+      const pos = ChessPosition.fromFen(fen);
+      expect(pos.uciToSan('e7e8q')).toBe('e8=Q');
+      // Uppercase promotion suffix is normalized to lowercase before chess.js
+      expect(pos.uciToSan('e7e8Q')).toBe('e8=Q');
+      // SAN -> UCI always emits the lowercase promotion piece
+      expect(pos.sanToUci('e8=Q')).toBe('e7e8q');
+    });
+
+    it('roundtrips underpromotions', () => {
+      const fen = '8/P7/8/8/8/8/8/K6k w - - 0 1';
+      const pos = ChessPosition.fromFen(fen);
+      expect(pos.uciToSan('a7a8n')).toBe('a8=N');
+      expect(pos.sanToUci('a8=N')).toBe('a7a8n');
+      expect(pos.uciToSan('a7a8r')).toBe('a8=R');
+      expect(pos.sanToUci('a8=R')).toBe('a7a8r');
+      // Bishop on a8 checks the h1 king along the long diagonal
+      expect(pos.uciToSan('a7a8b')).toBe('a8=B+');
+      expect(pos.sanToUci('a8=B+')).toBe('a7a8b');
+    });
+
+    it('roundtrips en passant captures', () => {
+      const fen = 'rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3';
+      const pos = ChessPosition.fromFen(fen);
+      expect(pos.uciToSan('e5f6')).toBe('exf6');
+      expect(pos.sanToUci('exf6')).toBe('e5f6');
+    });
+
+    it('roundtrips file disambiguation (Nbd2) and rank disambiguation (R1e2)', () => {
+      // Knights on b1 and f3 can both reach d2
+      const knights = ChessPosition.fromFen(
+        'rnbqkb1r/ppp1pppp/5n2/3p4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3',
+      );
+      expect(knights.uciToSan('b1d2')).toBe('Nbd2');
+      expect(knights.sanToUci('Nbd2')).toBe('b1d2');
+      expect(knights.uciToSan('f3d2')).toBe('Nfd2');
+      expect(knights.sanToUci('Nfd2')).toBe('f3d2');
+
+      // Rooks on e1 and e5 can both reach e2 (rank disambiguation)
+      const rooks = ChessPosition.fromFen('k7/8/8/4R3/8/8/8/4R2K w - - 0 1');
+      expect(rooks.uciToSan('e1e2')).toBe('R1e2');
+      expect(rooks.sanToUci('R1e2')).toBe('e1e2');
+      expect(rooks.uciToSan('e5e2')).toBe('R5e2');
+      expect(rooks.sanToUci('R5e2')).toBe('e5e2');
+    });
+
+    it('includes check and mate suffixes in SAN produced from UCI', () => {
+      const checkPos = ChessPosition.fromFen('k7/8/8/8/8/8/8/3Q3K w - - 0 1');
+      expect(checkPos.uciToSan('d1d8')).toBe('Qd8+');
+      expect(checkPos.sanToUci('Qd8+')).toBe('d1d8');
+
+      // Fool's mate: Qh4 is checkmate
+      const matePos = ChessPosition.fromFen(
+        'rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2',
+      );
+      expect(matePos.uciToSan('d8h4')).toBe('Qh4#');
+      expect(matePos.sanToUci('Qh4#')).toBe('d8h4');
+    });
+
+    it('leaves the position unchanged after uciToSan and sanToUci conversions', () => {
+      const pos = ChessPosition.startingPosition();
+      pos.uciToSan('e2e4');
+      expect(pos.fen()).toBe(STARTING_FEN);
+      pos.sanToUci('Nf3');
+      expect(pos.fen()).toBe(STARTING_FEN);
+    });
+
+    it('moveWithUci returns SAN + UCI together and advances the position', () => {
+      const castle = ChessPosition.fromFen(BOTH_CASTLE_FEN);
+      const castleResult = castle.moveWithUci('O-O');
+      expect(castleResult.san).toBe('O-O');
+      expect(castleResult.uci).toBe('e1g1');
+      expect(castleResult.fenBefore).toBe(BOTH_CASTLE_FEN);
+      expect(castleResult.fenAfter).toContain('R4RK1');
+      expect(castle.fen()).toBe(castleResult.fenAfter);
+
+      const promo = ChessPosition.fromFen('8/4P3/8/8/8/8/8/K6k w - - 0 1');
+      const promoResult = promo.moveWithUci('e8=Q');
+      expect(promoResult.san).toBe('e8=Q');
+      expect(promoResult.uci).toBe('e7e8q');
+    });
+
+    it('throws IllegalMoveError for illegal input instead of echoing it back', () => {
+      const pos = ChessPosition.startingPosition();
+
+      // Well-formed but illegal UCI
+      expect(() => pos.uciToSan('e2e5')).toThrow(IllegalMoveError);
+      // Castling UCI when castling is not available
+      expect(() => pos.uciToSan('e1g1')).toThrow(IllegalMoveError);
+      // Malformed UCI garbage
+      expect(() => pos.uciToSan('xyz')).toThrow(IllegalMoveError);
+      // Illegal / malformed SAN
+      expect(() => pos.sanToUci('Nf6')).toThrow(IllegalMoveError);
+      expect(() => pos.sanToUci('not-a-move')).toThrow(IllegalMoveError);
+      expect(() => pos.moveWithUci('e5')).toThrow(IllegalMoveError);
+
+      // Position is untouched after the failures
+      expect(pos.fen()).toBe(STARTING_FEN);
+    });
+  });
+});
+
+describe('isUciMove', () => {
+  it('accepts plain moves and both lowercase and UPPERCASE promotion suffixes', () => {
+    expect(isUciMove('e2e4')).toBe(true);
+    expect(isUciMove('g1f3')).toBe(true);
+    expect(isUciMove('e1g1')).toBe(true); // castling in UCI is a king move
+    expect(isUciMove('e7e8q')).toBe(true);
+    expect(isUciMove('e7e8Q')).toBe(true);
+    expect(isUciMove('a2a1n')).toBe(true);
+    expect(isUciMove('a2a1N')).toBe(true);
+    expect(isUciMove('h7h8r')).toBe(true);
+    expect(isUciMove('h7h8B')).toBe(true);
+  });
+
+  it('rejects SAN lookalikes and malformed strings', () => {
+    expect(isUciMove('e4')).toBe(false);
+    expect(isUciMove('Nf3')).toBe(false);
+    expect(isUciMove('exd5')).toBe(false);
+    expect(isUciMove('O-O')).toBe(false);
+    expect(isUciMove('e8=Q')).toBe(false);
+    expect(isUciMove('')).toBe(false);
+    expect(isUciMove('e2e9')).toBe(false); // rank out of range
+    expect(isUciMove('i2i4')).toBe(false); // file out of range
+    expect(isUciMove('e7e8k')).toBe(false); // king is not a promotion piece
+    expect(isUciMove('e2e4 ')).toBe(false); // trailing whitespace
+    expect(isUciMove('e2e4e5')).toBe(false); // too long
   });
 });

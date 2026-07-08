@@ -8,6 +8,7 @@ Uses mocked subprocess to avoid requiring an actual SF16 binary.
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from stockfish16_service.config import Stockfish16Config
 from stockfish16_service.engine import (
     ClassicalEvalResult,
