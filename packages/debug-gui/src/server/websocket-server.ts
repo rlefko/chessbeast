@@ -138,9 +138,14 @@ export class DebugGuiServer {
   }
 
   /**
-   * Get the server port
+   * Get the server port (the actual bound port once listening, so that
+   * port 0 — "any free port" — resolves to the real one)
    */
   get port(): number {
+    const address = this.wss?.address();
+    if (address && typeof address === 'object') {
+      return address.port;
+    }
     return this.options.port;
   }
 }

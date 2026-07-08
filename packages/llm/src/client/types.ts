@@ -5,71 +5,20 @@
 import type { ReasoningEffort } from '../config/llm-config.js';
 
 /**
- * JSON Schema type for OpenAI function parameters
- */
-export interface JSONSchema {
-  type: 'object' | 'string' | 'number' | 'boolean' | 'array';
-  description?: string;
-  properties?: Record<string, JSONSchemaProperty>;
-  required?: string[];
-  items?: JSONSchemaProperty;
-  enum?: (string | number)[];
-}
-
-export interface JSONSchemaProperty {
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  description?: string;
-  default?: unknown;
-  enum?: (string | number)[];
-  items?: JSONSchemaProperty;
-}
-
-/**
- * OpenAI function definition format
- */
-export interface OpenAIFunction {
-  name: string;
-  description: string;
-  parameters: JSONSchema;
-}
-
-/**
- * OpenAI tool definition (wrapper around function)
- */
-export interface OpenAITool {
-  type: 'function';
-  function: OpenAIFunction;
-}
-
-/**
- * Tool call from LLM response
- */
-export interface ToolCall {
-  id: string;
-  type: 'function';
-  function: {
-    name: string;
-    arguments: string; // JSON string
-  };
-}
-
-/**
  * Message role in conversation
  */
-export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
+export type MessageRole = 'system' | 'user' | 'assistant';
 
 /**
  * Streaming chunk from LLM
  */
 export interface StreamChunk {
   /** Type of content: 'thinking' for reasoning, 'content' for response */
-  type: 'thinking' | 'content' | 'tool_call';
+  type: 'thinking' | 'content';
   /** Text content of this chunk */
   text: string;
   /** Whether this is the final chunk */
   done: boolean;
-  /** Tool call info (when type is 'tool_call') */
-  toolCall?: Partial<ToolCall>;
 }
 
 /**
@@ -78,20 +27,18 @@ export interface StreamChunk {
 export interface ChatMessage {
   role: MessageRole;
   content: string;
-  /** Tool calls made by assistant (when role is 'assistant') */
-  toolCalls?: ToolCall[];
-  /** Tool call ID this message responds to (when role is 'tool') */
-  toolCallId?: string;
 }
 
 /**
- * Tool choice for function calling
+ * Optional metadata describing what a request is narrating.
+ * Used for observability (Debug GUI stream headers); never sent to the API.
  */
-export type ToolChoice =
-  | 'auto' // Let model decide
-  | 'none' // Disable tools
-  | 'required' // Force tool use
-  | { type: 'function'; function: { name: string } }; // Force specific tool
+export interface LLMRequestMetadata {
+  /** Move notation being narrated (e.g., "12... Nxe4") */
+  moveNotation?: string;
+  /** Comment intent type driving this request (e.g., "blunder_explanation") */
+  intentType?: string;
+}
 
 /**
  * Request to the LLM
@@ -109,10 +56,8 @@ export interface LLMRequest {
   reasoningEffort?: ReasoningEffort;
   /** Streaming callback for real-time response chunks */
   onChunk?: (chunk: StreamChunk) => void;
-  /** Tools available for function calling */
-  tools?: OpenAITool[];
-  /** Tool choice strategy */
-  toolChoice?: ToolChoice;
+  /** Observability metadata (not sent to the API) */
+  metadata?: LLMRequestMetadata;
 }
 
 /**
@@ -122,13 +67,11 @@ export interface LLMResponse {
   /** Generated content */
   content: string;
   /** Finish reason */
-  finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls';
+  finishReason: 'stop' | 'length' | 'content_filter';
   /** Token usage */
   usage: TokenUsage;
   /** Reasoning/thinking content from reasoning models (if any) */
   thinkingContent?: string;
-  /** Tool calls requested by the model */
-  toolCalls?: ToolCall[];
 }
 
 /**

@@ -6,6 +6,7 @@ import { debugGuiEmitter } from '@chessbeast/debug-gui';
 import OpenAILib from 'openai';
 
 import type { LLMConfig } from '../config/llm-config.js';
+import { getModelPricing, calculateCost } from '../cost/pricing.js';
 import { LLMError, LLMErrorCode, RateLimitError, TimeoutError, APIError } from '../errors.js';
 
 import { CircuitBreaker } from './circuit-breaker.js';
@@ -153,46 +154,57 @@ export class OpenAIClient {
     return this.circuitBreaker.getState();
   }
 
+  /**
+   * Compute the dollar cost of a request from its token usage
+   */
+  private computeCost(usage: TokenUsage): number {
+    const pricing = getModelPricing(this.config.model);
+    return calculateCost(
+      pricing,
+      usage.promptTokens,
+      usage.completionTokens,
+      usage.thinkingTokens ?? 0,
+    ).totalCost;
+  }
+
+  /**
+   * Build the Debug GUI token-usage payload from a TokenUsage record
+   */
+  private buildTokensUsedPayload(usage: TokenUsage): {
+    prompt: number;
+    completion: number;
+    reasoning?: number;
+  } {
+    return {
+      prompt: usage.promptTokens,
+      completion: usage.completionTokens,
+      ...(usage.thinkingTokens !== undefined ? { reasoning: usage.thinkingTokens } : {}),
+    };
+  }
+
   private async doChat(request: LLMRequest): Promise<LLMResponse> {
-    // Generate unique call ID for Debug GUI tracking
-    const callId = `llm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const callStartTime = Date.now();
+    // Generate unique stream ID for Debug GUI tracking
+    const streamId = `llm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const startTime = Date.now();
 
     // Emit stream start event (even for non-streaming, for Debug GUI visibility)
     debugGuiEmitter.llmStreamStart({
-      streamId: callId,
+      streamId,
       model: this.config.model,
+      ...(request.metadata?.moveNotation !== undefined
+        ? { moveNotation: request.metadata.moveNotation }
+        : {}),
+      ...(request.metadata?.intentType !== undefined
+        ? { intentType: request.metadata.intentType }
+        : {}),
     });
 
     try {
-      // Convert messages to OpenAI format, handling tool messages
-      const messages = request.messages.map((m) => {
-        if (m.role === 'tool') {
-          return {
-            role: 'tool' as const,
-            content: m.content,
-            tool_call_id: m.toolCallId!,
-          };
-        }
-        if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
-          return {
-            role: 'assistant' as const,
-            content: m.content || null,
-            tool_calls: m.toolCalls.map((tc) => ({
-              id: tc.id,
-              type: 'function' as const,
-              function: {
-                name: tc.function.name,
-                arguments: tc.function.arguments,
-              },
-            })),
-          };
-        }
-        return {
-          role: m.role as 'system' | 'user' | 'assistant',
-          content: m.content,
-        };
-      });
+      // Convert messages to OpenAI format
+      const messages = request.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
       // Build request options
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -226,18 +238,9 @@ export class OpenAIClient {
         options.response_format = { type: 'json_object' };
       }
 
-      // Add tools if provided
-      if (request.tools && request.tools.length > 0) {
-        options.tools = request.tools;
-        // Set tool choice
-        if (request.toolChoice) {
-          options.tool_choice = request.toolChoice;
-        }
-      }
-
       // Use streaming if callback provided and streaming is enabled
       if (request.onChunk && this.config.streaming) {
-        return this.doChatStreaming(options, request.onChunk);
+        return await this.doChatStreaming(options, request.onChunk, streamId, startTime);
       }
 
       // Non-streaming path
@@ -275,46 +278,22 @@ export class OpenAIClient {
         result.thinkingContent = thinkingContent;
       }
 
-      // Extract tool calls if present (filter for function type only)
-      if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
-        result.toolCalls = choice.message.tool_calls
-          .filter((tc) => tc.type === 'function')
-          .map((tc) => ({
-            id: tc.id,
-            type: 'function' as const,
-            function: {
-              name: (tc as { function: { name: string; arguments: string } }).function.name,
-              arguments: (tc as { function: { name: string; arguments: string } }).function
-                .arguments,
-            },
-          }));
-
-        // Emit tool calls to Debug GUI
-        for (const tc of result.toolCalls) {
-          debugGuiEmitter.toolCallStart({
-            callId: tc.id,
-            toolName: tc.function.name,
-            arguments: JSON.parse(tc.function.arguments || '{}'),
-          });
-        }
-      }
-
-      // Emit stream end event for Debug GUI
+      // Emit stream end event for Debug GUI (real usage object + computed cost)
       debugGuiEmitter.llmStreamEnd({
-        streamId: callId,
+        streamId,
         finalContent: result.content,
-        tokensUsed: usage.totalTokens,
-        durationMs: Date.now() - callStartTime,
+        tokensUsed: this.buildTokensUsedPayload(usage),
+        cost: this.computeCost(usage),
+        durationMs: Date.now() - startTime,
       });
 
       return result;
     } catch (error) {
       // Emit error to Debug GUI
       debugGuiEmitter.llmStreamEnd({
-        streamId: callId,
+        streamId,
         finalContent: '',
-        tokensUsed: 0,
-        durationMs: Date.now() - callStartTime,
+        durationMs: Date.now() - startTime,
         error: error instanceof Error ? error.message : String(error),
       });
       throw this.mapError(error);
@@ -322,26 +301,22 @@ export class OpenAIClient {
   }
 
   /**
-   * Streaming chat completion with real-time chunk callbacks
+   * Streaming chat completion with real-time chunk callbacks.
+   *
+   * The caller (doChat) has already emitted llm:stream_start and handles
+   * llm:stream_end on error, so this method only emits chunk events and the
+   * successful stream end.
    */
   private async doChatStreaming(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     options: any,
     onChunk: (chunk: StreamChunk) => void,
+    streamId: string,
+    startTime: number,
   ): Promise<LLMResponse> {
     options.stream = true;
     // Request usage in final streaming chunk
     options.stream_options = { include_usage: true };
-
-    // Generate unique stream ID for Debug GUI tracking
-    const streamId = `llm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const streamStartTime = Date.now();
-
-    // Emit stream start event for Debug GUI
-    debugGuiEmitter.llmStreamStart({
-      streamId,
-      model: this.config.model,
-    });
 
     // Create stream - TypeScript SDK returns AsyncIterable when stream: true
     const stream = await this.client.chat.completions.create({
@@ -352,10 +327,7 @@ export class OpenAIClient {
     let content = '';
     let thinkingContent = '';
     let usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-    let finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls' = 'stop';
-
-    // Accumulate tool calls from streaming
-    const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>();
+    let finishReason: 'stop' | 'length' | 'content_filter' = 'stop';
 
     // Stream is an async iterable
     for await (const chunk of stream) {
@@ -389,39 +361,6 @@ export class OpenAIClient {
         });
       }
 
-      // Handle tool calls in streaming
-      if (delta?.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          const index = tc.index ?? 0;
-          const existing = toolCallsMap.get(index) ?? { id: '', name: '', arguments: '' };
-
-          if (tc.id) {
-            existing.id = tc.id;
-          }
-          if (tc.function?.name) {
-            existing.name = tc.function.name;
-            onChunk({
-              type: 'tool_call',
-              text: tc.function.name,
-              done: false,
-              toolCall: { id: existing.id, function: { name: tc.function.name, arguments: '' } },
-            });
-
-            // Emit tool call start to Debug GUI
-            debugGuiEmitter.toolCallStart({
-              callId: existing.id,
-              toolName: tc.function.name,
-              arguments: {},
-            });
-          }
-          if (tc.function?.arguments) {
-            existing.arguments += tc.function.arguments;
-          }
-
-          toolCallsMap.set(index, existing);
-        }
-      }
-
       // Capture finish reason
       if (choice?.finish_reason) {
         finishReason = this.mapFinishReason(choice.finish_reason);
@@ -445,12 +384,13 @@ export class OpenAIClient {
     // Track token usage
     this.tokenTracker.spend(usage.totalTokens);
 
-    // Emit stream end event for Debug GUI
+    // Emit stream end event for Debug GUI (real usage object + computed cost)
     debugGuiEmitter.llmStreamEnd({
       streamId,
       finalContent: content,
-      tokensUsed: usage.totalTokens,
-      durationMs: Date.now() - streamStartTime,
+      tokensUsed: this.buildTokensUsedPayload(usage),
+      cost: this.computeCost(usage),
+      durationMs: Date.now() - startTime,
     });
 
     // Build response with optional thinkingContent (avoid undefined for exactOptionalPropertyTypes)
@@ -461,18 +401,6 @@ export class OpenAIClient {
     };
     if (thinkingContent) {
       response.thinkingContent = thinkingContent;
-    }
-
-    // Add tool calls if any were received
-    if (toolCallsMap.size > 0) {
-      response.toolCalls = Array.from(toolCallsMap.values()).map((tc) => ({
-        id: tc.id,
-        type: 'function' as const,
-        function: {
-          name: tc.name,
-          arguments: tc.arguments,
-        },
-      }));
     }
 
     return response;
@@ -574,18 +502,12 @@ export class OpenAIClient {
     return 5000;
   }
 
-  private mapFinishReason(
-    reason: string | null,
-  ): 'stop' | 'length' | 'content_filter' | 'tool_calls' {
+  private mapFinishReason(reason: string | null): 'stop' | 'length' | 'content_filter' {
     switch (reason) {
-      case 'stop':
-        return 'stop';
       case 'length':
         return 'length';
       case 'content_filter':
         return 'content_filter';
-      case 'tool_calls':
-        return 'tool_calls';
       default:
         return 'stop';
     }

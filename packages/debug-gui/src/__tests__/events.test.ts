@@ -114,4 +114,71 @@ describe('parseDebugEvent', () => {
     expect(result).not.toBeNull();
     expect(result?.type).toBe('llm:stream_chunk');
   });
+
+  it('parses annotation:intent events with the full descriptor', () => {
+    const event: DebugGuiEvent = {
+      type: 'annotation:intent',
+      timestamp: Date.now(),
+      sessionId: 'test-session',
+      plyIndex: 17,
+      moveNotation: '9. Nd5',
+      intentType: 'tactical_shot',
+      priority: 3.5,
+      mandatory: false,
+    };
+
+    const result = parseDebugEvent(JSON.stringify(event));
+    expect(result).not.toBeNull();
+    expect(result?.type).toBe('annotation:intent');
+    if (result?.type === 'annotation:intent') {
+      expect(result.plyIndex).toBe(17);
+      expect(result.moveNotation).toBe('9. Nd5');
+      expect(result.priority).toBeCloseTo(3.5, 6);
+    }
+  });
+
+  it('parses annotation:comment events including filter outcomes', () => {
+    const event: DebugGuiEvent = {
+      type: 'annotation:comment',
+      timestamp: Date.now(),
+      sessionId: 'test-session',
+      plyIndex: 22,
+      moveNotation: '11... exd5',
+      comment: 'Opening the e-file at the right moment.',
+      nags: ['$1'],
+      filtered: undefined,
+    };
+
+    const result = parseDebugEvent(JSON.stringify(event));
+    expect(result).not.toBeNull();
+    expect(result?.type).toBe('annotation:comment');
+    if (result?.type === 'annotation:comment') {
+      expect(result.comment).toBe('Opening the e-file at the right moment.');
+      expect(result.nags).toEqual(['$1']);
+    }
+  });
+
+  it('parses llm:stream_end events with structured tokens and cost', () => {
+    const event: DebugGuiEvent = {
+      type: 'llm:stream_end',
+      timestamp: Date.now(),
+      sessionId: 'test-session',
+      tokensUsed: { prompt: 100, completion: 25, reasoning: 8 },
+      cost: 0.0021,
+      durationMs: 640,
+    };
+
+    const result = parseDebugEvent(JSON.stringify(event));
+    expect(result).not.toBeNull();
+    if (result?.type === 'llm:stream_end') {
+      expect(result.tokensUsed).toEqual({ prompt: 100, completion: 25, reasoning: 8 });
+      expect(result.cost).toBeCloseTo(0.0021, 8);
+    }
+  });
+
+  it('returns null for malformed JSON payloads', () => {
+    expect(parseDebugEvent('{"type": "annotation:intent", "plyIndex": ')).toBeNull();
+    expect(parseDebugEvent('')).toBeNull();
+    expect(parseDebugEvent('[1, 2, 3')).toBeNull();
+  });
 });

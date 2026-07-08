@@ -327,6 +327,10 @@ export class Narrator {
           { role: 'user', content: prompt },
         ],
         temperature: this.config.temperature,
+        metadata: {
+          moveNotation: `${intent.content.moveNumber}${intent.content.isWhiteMove ? '.' : '...'} ${intent.content.move}`,
+          intentType: intent.type,
+        },
       });
 
       const comment = this.cleanComment(response.content);

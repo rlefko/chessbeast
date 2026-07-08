@@ -123,6 +123,7 @@ export async function runUltraFastCoachFull(
   reporter: ProgressReporter,
 ): Promise<UltraFastCoachRunnerResult> {
   const warnings: string[] = [];
+  const runStartTime = Date.now();
 
   // Build LLM config (conditionally add reasoningEffort)
   const llmConfigInput: Parameters<typeof createLLMConfig>[0] = {
@@ -200,6 +201,7 @@ export async function runUltraFastCoachFull(
   // Phase 1: Engine-driven exploration (using deep_analysis phase)
   reporter.startPhase('deep_analysis');
   debugGuiEmitter.phaseStart('deep_analysis', 'Engine Exploration');
+  const explorationPhaseStart = Date.now();
 
   let totalNodesExplored = 0;
   const allIntents: CommentIntent[] = [];
@@ -280,6 +282,18 @@ export async function runUltraFastCoachFull(
           allThemes.set(key, themes);
         }
       }
+
+      // Emit detected themes to the Debug GUI
+      for (const [positionKey, themes] of explorationResult.themes) {
+        for (const theme of themes) {
+          debugGuiEmitter.themeDetected({
+            themeName: theme.type,
+            lifecycle: theme.status === 'transformed' ? 'escalated' : theme.status,
+            fen: positionKey,
+            description: theme.explanation,
+          });
+        }
+      }
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       warnings.push(`Exploration failed for ${moveNotation}: ${errMsg}`);
@@ -287,11 +301,32 @@ export async function runUltraFastCoachFull(
   }
 
   reporter.completePhase('deep_analysis', `${totalNodesExplored} nodes explored`);
-  debugGuiEmitter.phaseComplete('deep_analysis', 0, `${totalNodesExplored} nodes explored`);
+  debugGuiEmitter.phaseComplete(
+    'deep_analysis',
+    Date.now() - explorationPhaseStart,
+    `${totalNodesExplored} nodes explored`,
+  );
+
+  // Publish the intent queue to the Debug GUI annotation panel.
+  // Intents use the after-move ply convention (comments attach to the
+  // RESULTING position's ply), so the move described is moves[plyIndex - 1].
+  for (const intent of allIntents) {
+    const intentMove = analysis.moves[intent.plyIndex - 1];
+    debugGuiEmitter.annotationIntent({
+      plyIndex: intent.plyIndex,
+      moveNotation: intentMove
+        ? `${intentMove.moveNumber}${intentMove.isWhiteMove ? '.' : '...'} ${intentMove.san}`
+        : `ply ${intent.plyIndex}`,
+      intentType: intent.type,
+      priority: intent.priority,
+      mandatory: intent.mandatory,
+    });
+  }
 
   // Phase 2: Post-write annotation (using llm_annotation phase)
   reporter.startPhase('llm_annotation');
   debugGuiEmitter.phaseStart('llm_annotation', 'LLM Annotation', allIntents.length);
+  const annotationPhaseStart = Date.now();
 
   const pipeline = createPostWritePipeline(client, {
     narrator: {
@@ -328,6 +363,21 @@ export async function runUltraFastCoachFull(
           progress.currentComment,
         );
       }
+
+      // Per-ply outcome: emit an annotation:comment event (generated or filtered)
+      if (progress.plyIndex !== undefined) {
+        const progressMove = analysis.moves[progress.plyIndex - 1];
+        debugGuiEmitter.annotationComment({
+          plyIndex: progress.plyIndex,
+          moveNotation:
+            progress.moveNotation ??
+            (progressMove
+              ? `${progressMove.moveNumber}${progressMove.isWhiteMove ? '.' : '...'} ${progressMove.san}`
+              : undefined),
+          comment: progress.currentComment ?? '',
+          filtered: progress.filtered,
+        });
+      }
     },
     (warning: string) => {
       warnings.push(warning);
@@ -337,7 +387,7 @@ export async function runUltraFastCoachFull(
   reporter.completePhase('llm_annotation', `${pipelineResult.stats.commentsGenerated} comments`);
   debugGuiEmitter.phaseComplete(
     'llm_annotation',
-    0,
+    Date.now() - annotationPhaseStart,
     `${pipelineResult.stats.commentsGenerated} comments`,
   );
 
@@ -364,7 +414,8 @@ export async function runUltraFastCoachFull(
     gamesAnalyzed: 1,
     criticalMoments: criticalMoments.length,
     annotationsGenerated: pipelineResult.stats.commentsGenerated,
-    totalTimeMs: 0, // TODO: track actual time
+    totalTimeMs: Date.now() - runStartTime,
+    nodesExplored: totalNodesExplored,
   });
 
   return {
