@@ -321,15 +321,12 @@ describe('EngineDrivenExplorer', () => {
       // 3 candidates (e4 played, d4, Nf3) + 3 PV children under the e4 node
       expect(result.nodesExplored).toBe(6);
       const variationMoves = result.variations.map((line) => line.moves);
-      expect(variationMoves).toHaveLength(5);
+      expect(variationMoves).toHaveLength(3);
       expect(variationMoves).toContainEqual(['d4']);
       expect(variationMoves).toContainEqual(['Nf3']);
-      // Multi-move variations: extractVariations reconstructs the parent chain
-      // by node id, so PV children extend from the played move instead of
-      // being truncated to single-move lines
-      expect(variationMoves).toContainEqual(['e4', 'e5']);
-      expect(variationMoves).toContainEqual(['e4', 'Nf3']);
-      expect(variationMoves).toContainEqual(['e4', 'Nc6']);
+      // PV children chain to their true parents, so the engine's full line
+      // reconstructs from the played move without skipping intermediate moves
+      expect(variationMoves).toContainEqual(['e4', 'e5', 'Nf3', 'Nc6']);
     });
 
     it('never stores a UCI-shaped string in edge.san and always stores real UCI in edge.uci', async () => {

@@ -406,12 +406,10 @@ describe('PriorityQueueExplorer', () => {
 
       const result = await explorer.explore(STARTING_FEN, [candidateFromStart('e4')]);
 
-      // Multi-move lines survive the parent-chain reconstruction
-      expect(result.variations).toContainEqual(['e4', 'e5']);
-      // documents current behavior: every PV child points at the PV origin node as
-      // its parent, so the deeper PV move reconstructs as a two-move line as well
-      expect(result.variations).toContainEqual(['e4', 'Nf3']);
-      expect(result.variations).toHaveLength(2);
+      // PV children chain to their true parents, so the full line reconstructs
+      // without skipping intermediate moves
+      expect(result.variations).toContainEqual(['e4', 'e5', 'Nf3']);
+      expect(result.variations).toHaveLength(1);
     });
 
     it('notifies onVariationComplete for each extracted variation', async () => {

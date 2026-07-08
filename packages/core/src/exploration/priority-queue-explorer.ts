@@ -386,6 +386,11 @@ export class PriorityQueueExplorer {
     // This is the key optimization - avoids creating a new ChessPosition per PV move
     const position = new ChessPosition(parent.fen);
 
+    // Track the previous PV node so each child chains to its true parent;
+    // chaining every child to the PV origin reconstructed lines that skipped
+    // intermediate moves (e.g. ['e4','Nf3'] instead of ['e4','e5','Nf3'])
+    let chainParent: ExplorationNode | undefined = parent;
+
     for (let i = 0; i < Math.min(pvSan.length, maxPvMoves); i++) {
       const moveSan = pvSan[i]!;
 
@@ -422,13 +427,26 @@ export class PriorityQueueExplorer {
             parent.ply + 1 + i,
             parent.explorationDepth + 1 + i,
             {
-              parentNodeId: parent.nodeId,
+              parentNodeId: chainParent.nodeId,
               parentMove: moveSan,
               parentMoveUci: moveUci,
               noveltyScore: 0.8 - i * 0.1, // Decreasing novelty for later PV moves
             },
           );
           this.queue.push(childNode);
+          // Register immediately so parent-chain reconstruction can resolve
+          // this node even before (or without) it being processed
+          this.exploredNodesById.set(childNode.nodeId, childNode);
+          chainParent = childNode;
+        } else {
+          // Position already known: continue the chain through its exploration
+          // node when we have one; otherwise stop rather than mis-parent the
+          // deeper PV moves
+          const existing = this.exploredNodes.get(generatePositionKey(result.node.fen).key);
+          if (!existing) {
+            break;
+          }
+          chainParent = existing;
         }
       } catch (e) {
         // Move processing errors are fatal for the rest of the PV - position is now invalid
