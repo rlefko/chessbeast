@@ -29,6 +29,17 @@ export interface MoveResultWithUci extends MoveResult {
 export const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 /**
+ * Check if a move string is in UCI format (e.g., "e2e4", "e7e8q", "e7e8Q")
+ *
+ * UCI moves are 4-5 characters: source square + target square + optional
+ * promotion piece. Both lowercase and uppercase promotion suffixes are
+ * accepted, since engines and adapters are inconsistent about the case.
+ */
+export function isUciMove(move: string): boolean {
+  return /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/.test(move);
+}
+
+/**
  * A chess position wrapper around chess.js
  *
  * Provides a clean interface for position manipulation,
@@ -214,7 +225,9 @@ export class ChessPosition {
       // Build move object conditionally to satisfy exactOptionalPropertyTypes
       const moveObj: { from: string; to: string; promotion?: string } = { from, to };
       if (promotionChar) {
-        moveObj.promotion = promotionChar;
+        // chess.js only accepts lowercase promotion pieces; normalize so
+        // uppercase-promotion UCI ("e7e8Q") converts instead of failing
+        moveObj.promotion = promotionChar.toLowerCase();
       }
       const result = this.chess.move(moveObj);
       if (!result) {

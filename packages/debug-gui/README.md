@@ -7,18 +7,20 @@ Terminal-based Debug GUI for visualizing Ultra-Fast Coach analysis in real-time.
 A 4-panel terminal UI that connects to a running ChessBeast analysis via WebSocket, showing:
 
 - **Chess Board**: ASCII board with evaluation bar and position info
-- **LLM Stream**: Real-time LLM output with token counting
-- **Tool Calls**: History of tool invocations with timing
-- **Engine Analysis**: MultiPV lines, exploration progress, detected themes
+- **LLM Stream**: Tail-following LLM output with per-stream and session token/cost totals
+- **Annotations**: Comment-intent queue transitioning pending -> done/filtered during narration
+- **Engine**: MultiPV lines, exploration progress, detected themes
 
 ## Quick Start
 
 **Terminal 1** - Run analysis with debug server:
+
 ```bash
 chessbeast analyze --input game.pgn --ultra-fast-coach --debug-gui
 ```
 
 **Terminal 2** - Connect the debug GUI:
+
 ```bash
 pnpm debug-gui
 ```
@@ -54,24 +56,23 @@ node packages/debug-gui/dist/bin/debug-gui.js ws://localhost:9222
 
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Cycle between panels |
+| Key         | Action                 |
+| ----------- | ---------------------- |
+| `Tab`       | Cycle between panels   |
 | `Shift+Tab` | Cycle panels (reverse) |
-| `?` | Toggle help overlay |
-| `p` | Pause/resume updates |
-| `q` | Quit |
+| `?`         | Toggle help overlay    |
+| `p`         | Pause/resume updates   |
+| `q`         | Quit                   |
 
 ### Panel-Specific
 
-| Panel | Key | Action |
-|-------|-----|--------|
-| Board | `f` | Flip board perspective |
-| LLM | `j`/`k` | Scroll down/up |
-| LLM | `g`/`G` | Scroll to top/bottom |
-| Engine | `1-3` | Highlight PV line |
-| Engine | `0` | Clear highlight |
-| Tools | `Enter` | Expand/collapse tool call |
+| Panel  | Key     | Action                                   |
+| ------ | ------- | ---------------------------------------- |
+| Board  | `f`     | Flip board perspective                   |
+| LLM    | `j`/`k` | Scroll toward newest/oldest text         |
+| LLM    | `g`/`G` | Jump to oldest text / follow live output |
+| Engine | `1-3`   | Highlight PV line                        |
+| Engine | `0`     | Clear highlight                          |
 
 ## Architecture
 
@@ -89,14 +90,14 @@ The debug server runs inside the CLI process and emits events over WebSocket. Th
 
 ## Event Types
 
-| Event | Description |
-|-------|-------------|
-| `position:update` | Current position (FEN, eval, move, classification) |
-| `llm:stream_*` | LLM streaming (start, chunk, end) |
-| `tool:call_*` | Tool invocations (start, result) |
-| `engine:*` | Engine analysis, exploration progress, themes |
-| `phase:*` | Pipeline phase events (start, progress, complete) |
-| `session:*` | Game analysis lifecycle (start, end) |
+| Event             | Description                                              |
+| ----------------- | -------------------------------------------------------- |
+| `position:update` | Current position (FEN, eval, move, classification)       |
+| `llm:stream_*`    | LLM streaming (start, chunk, end)                        |
+| `annotation:*`    | Comment intents and generated comments (intent, comment) |
+| `engine:*`        | Engine analysis, exploration progress, themes            |
+| `phase:*`         | Pipeline phase events (start, progress, complete)        |
+| `session:*`       | Game analysis lifecycle (start, end)                     |
 
 ## Development
 

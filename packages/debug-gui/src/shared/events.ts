@@ -35,17 +35,6 @@ export interface PositionUpdateEvent extends DebugEvent {
   cpLoss?: number | undefined;
 }
 
-export interface MoveHistoryEvent extends DebugEvent {
-  type: 'position:move_history';
-  moves: Array<{
-    notation: string;
-    moveNumber: number;
-    isWhite: boolean;
-    evaluation?: number;
-    classification?: string;
-  }>;
-}
-
 // =============================================================================
 // LLM Streaming Events
 // =============================================================================
@@ -53,53 +42,69 @@ export interface MoveHistoryEvent extends DebugEvent {
 export interface LLMStreamStartEvent extends DebugEvent {
   type: 'llm:stream_start';
   moveNotation: string;
-  intentType?: string;
-  model?: string;
+  intentType?: string | undefined;
+  model?: string | undefined;
 }
 
 export interface LLMStreamChunkEvent extends DebugEvent {
   type: 'llm:stream_chunk';
-  chunkType: 'thinking' | 'content' | 'tool_call';
+  chunkType: 'thinking' | 'content';
   text: string;
   done: boolean;
 }
 
 export interface LLMStreamEndEvent extends DebugEvent {
   type: 'llm:stream_end';
-  finalComment?: string;
-  tokensUsed?: {
-    prompt: number;
-    completion: number;
-    reasoning?: number;
-  };
-  cost?: number;
+  finalComment?: string | undefined;
+  tokensUsed?:
+    | {
+        prompt: number;
+        completion: number;
+        reasoning?: number | undefined;
+      }
+    | undefined;
+  cost?: number | undefined;
   durationMs: number;
+  error?: string | undefined;
 }
 
 // =============================================================================
-// Tool Call Events
+// Annotation Events
 // =============================================================================
 
-export interface ToolCallStartEvent extends DebugEvent {
-  type: 'tool:call_start';
-  toolName: string;
-  toolArgs: Record<string, unknown>;
-  iteration: number;
-  maxIterations: number;
-  context?: {
-    currentFen?: string;
-    currentLine?: string[];
-    depth?: number;
-  };
+/**
+ * A comment intent produced by the engine-driven exploration phase.
+ * These populate the annotation queue before narration begins.
+ */
+export interface AnnotationIntentEvent extends DebugEvent {
+  type: 'annotation:intent';
+  /** Ply of the position AFTER the move (comment attachment convention) */
+  plyIndex: number;
+  /** Notation of the move being annotated (e.g., "12... Nxe4") */
+  moveNotation: string;
+  /** Intent type (e.g., "blunder_explanation", "tactical_shot") */
+  intentType: string;
+  /** Priority score (higher = more important) */
+  priority: number;
+  /** Whether this intent is mandatory (e.g., blunders) */
+  mandatory: boolean;
 }
 
-export interface ToolCallResultEvent extends DebugEvent {
-  type: 'tool:call_result';
-  toolName: string;
-  success: boolean;
-  result?: unknown;
-  error?: string;
-  durationMs: number;
+/**
+ * A generated comment from the post-write narration phase.
+ */
+export interface AnnotationCommentEvent extends DebugEvent {
+  type: 'annotation:comment';
+  /** Ply of the position AFTER the move (comment attachment convention) */
+  plyIndex: number;
+  /** Notation of the move being annotated, when known */
+  moveNotation?: string | undefined;
+  /** The generated comment text */
+  comment: string;
+  /** NAGs attached to this ply, if any */
+  nags?: string[] | undefined;
+  /** Set when the intent was filtered out instead of narrated */
+  filtered?: 'density' | 'redundancy' | 'cap' | undefined;
 }
 
 // =============================================================================
@@ -111,18 +116,20 @@ export interface EngineAnalysisEvent extends DebugEvent {
   fen: string;
   depth: number;
   nodes: number;
-  nps?: number;
+  nps?: number | undefined;
   evaluation: {
-    cp?: number;
-    mate?: number;
+    cp?: number | undefined;
+    mate?: number | undefined;
   };
   pv: string[];
-  multipv?: Array<{
-    rank: number;
-    move: string;
-    evaluation: { cp?: number; mate?: number };
-    pv: string[];
-  }>;
+  multipv?:
+    | Array<{
+        rank: number;
+        move: string;
+        evaluation: { cp?: number | undefined; mate?: number | undefined };
+        pv: string[];
+      }>
+    | undefined;
 }
 
 export interface EngineCriticalMomentEvent extends DebugEvent {
@@ -139,8 +146,8 @@ export interface EngineExplorationProgressEvent extends DebugEvent {
   maxNodes: number;
   currentDepth: number;
   phase: 'exploring' | 'detecting_themes' | 'generating_intents';
-  themesDetected?: number;
-  intentsGenerated?: number;
+  themesDetected?: number | undefined;
+  intentsGenerated?: number | undefined;
 }
 
 export interface ThemeDetectedEvent extends DebugEvent {
@@ -148,7 +155,7 @@ export interface ThemeDetectedEvent extends DebugEvent {
   themeName: string;
   lifecycle: 'emerged' | 'persisting' | 'escalated' | 'resolved';
   fen: string;
-  description?: string;
+  description?: string | undefined;
 }
 
 // =============================================================================
@@ -159,7 +166,7 @@ export interface PhaseStartEvent extends DebugEvent {
   type: 'phase:start';
   phase: string;
   phaseName: string;
-  totalMoves?: number;
+  totalMoves?: number | undefined;
 }
 
 export interface PhaseProgressEvent extends DebugEvent {
@@ -167,14 +174,14 @@ export interface PhaseProgressEvent extends DebugEvent {
   phase: string;
   current: number;
   total: number;
-  detail?: string;
+  detail?: string | undefined;
 }
 
 export interface PhaseCompleteEvent extends DebugEvent {
   type: 'phase:complete';
   phase: string;
   durationMs: number;
-  detail?: string;
+  detail?: string | undefined;
 }
 
 // =============================================================================
@@ -201,6 +208,7 @@ export interface SessionEndEvent extends DebugEvent {
     annotationsGenerated: number;
     totalTimeMs: number;
     totalCost?: number | undefined;
+    nodesExplored?: number | undefined;
   };
 }
 
@@ -220,12 +228,11 @@ export interface ConnectionEvent {
 
 export type DebugGuiEvent =
   | PositionUpdateEvent
-  | MoveHistoryEvent
   | LLMStreamStartEvent
   | LLMStreamChunkEvent
   | LLMStreamEndEvent
-  | ToolCallStartEvent
-  | ToolCallResultEvent
+  | AnnotationIntentEvent
+  | AnnotationCommentEvent
   | EngineAnalysisEvent
   | EngineCriticalMomentEvent
   | EngineExplorationProgressEvent

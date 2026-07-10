@@ -1,246 +1,64 @@
 # Contributing to ChessBeast
 
-Thank you for your interest in contributing to ChessBeast! This guide will help you get started.
+Thanks for your interest in ChessBeast. This guide covers setup, style, tests, and how changes land.
 
-## Development Setup
+## Prerequisites and Setup
 
-### Prerequisites
-
-- Node.js 18+
-- Python 3.12+
-- pnpm (for TypeScript packages)
-- uv (for Python services)
-- Stockfish chess engine
-
-### Initial Setup
+You need Node.js 18+, Python 3.12, pnpm, and uv. Then run the full setup, which installs dependencies, installs the git hooks, generates the gRPC stubs, builds the SQLite databases, and builds Stockfish from source:
 
 ```bash
-# Clone the repository
 git clone https://github.com/rlefko/chessbeast.git
 cd chessbeast
-
-# Run full setup (installs deps, downloads models, sets up databases)
 make setup
-
-# Or install dependencies only
-make install
 ```
 
-### Building
-
-```bash
-# Build everything
-make build
-
-# Build TypeScript only
-make build-ts
-
-# Generate gRPC stubs from proto files
-make build-protos
-```
-
-### Running Services
-
-```bash
-# Start all services (Stockfish + Maia)
-make run
-
-# Start individual services
-make run-stockfish
-make run-maia
-
-# Using Docker
-make docker-up
-```
-
-## Project Structure
-
-```
-chessbeast/
-├── packages/           # TypeScript packages
-│   ├── cli/           # CLI entry point
-│   ├── core/          # Analysis pipeline
-│   ├── pgn/           # PGN parsing/rendering
-│   ├── grpc-client/   # gRPC clients
-│   ├── database/      # Database clients
-│   ├── llm/           # LLM integration
-│   └── test-utils/    # Test utilities
-├── services/          # Python gRPC services
-│   ├── stockfish/     # Engine wrapper
-│   ├── maia/          # Maia2 model serving
-│   └── protos/        # Protobuf definitions
-├── data/              # SQLite databases
-├── scripts/           # Setup scripts
-├── tests/             # Integration tests
-└── docs/              # Documentation
-```
+See [README.md](README.md) for a quick tour and [docs/architecture.md](docs/architecture.md) for how the packages and services fit together.
 
 ## Code Style
 
-### TypeScript
-
-We use ESLint and Prettier for TypeScript code:
+TypeScript is checked with ESLint and formatted with Prettier, and every package compiles under strict TypeScript (`strict: true`). Python is linted with ruff and type-checked with mypy in strict mode (`strict = true`). Run the checks before you commit:
 
 ```bash
-# Check linting
-make lint
-
-# Auto-fix issues
-make lint-fix
+make lint        # ESLint, Prettier, ruff, mypy
+make lint-fix    # auto-fix what can be fixed
+make typecheck   # tsc and mypy
 ```
 
-Key conventions:
-- Use TypeScript strict mode
-- Prefer `const` over `let`
-- Use explicit types for function parameters and return values
-- Use async/await over raw Promises
+## Tests
 
-### Python
-
-We use MyPy for type checking and follow PEP 8:
+Behavior changes come with tests. Run the full suite before opening a pull request:
 
 ```bash
-# Run Python linting
-cd services && uv run mypy .
+make test        # Vitest (TypeScript) and pytest (Python)
 ```
 
-Key conventions:
-- Use type hints for all functions
-- Use `async def` for async code
-- Follow PEP 8 naming conventions
+Coverage gates are enforced and will fail the build: each TypeScript package has its own Vitest v8 thresholds (see `packages/core/vitest.config.ts` and the llm, pgn, and debug-gui configs), and Python enforces `fail_under = 78` in `pyproject.toml`. Mock external dependencies (Stockfish, Maia, OpenAI) in unit tests and reuse the fixtures in `packages/test-utils/`.
 
-## Testing
+## Commit Convention
 
-### Running Tests
-
-```bash
-# Run all tests
-make test
-
-# TypeScript tests only
-make test-ts
-
-# Python tests only
-make test-py
-
-# Run specific test file
-pnpm vitest run parser
-python -m pytest services/stockfish/tests/test_engine.py -v
-```
-
-### Writing Tests
-
-- Unit tests should mock external dependencies (Stockfish, Maia, OpenAI)
-- Use the fixtures in `packages/test-utils/src/fixtures/` for test data
-- Integration tests go in the `tests/` directory
-
-Example test structure:
-
-```typescript
-import { describe, it, expect, vi } from 'vitest';
-
-describe('ComponentName', () => {
-  it('should do something specific', () => {
-    // Arrange
-    const input = createTestInput();
-
-    // Act
-    const result = componentFunction(input);
-
-    // Assert
-    expect(result).toEqual(expectedOutput);
-  });
-});
-```
-
-## Commit Messages
-
-All commits must follow this format:
-- Single sentence
-- Emoji prefix
-- No ending punctuation
-
-### Emoji Prefixes
-
-| Emoji | Meaning |
-|-------|---------|
-| ✨ | New feature |
-| 🐛 | Bug fix |
-| ♻️ | Refactor |
-| 📝 | Documentation |
-| 🧪 | Tests |
-| 🔧 | Configuration |
-| ⬆️ | Dependencies |
-| 🎨 | Style/formatting |
-| ⚡ | Performance |
-| 🔒 | Security |
-
-### Examples
+Every commit message is a single sentence with an emoji prefix and no ending punctuation, enforced by `scripts/hooks/commit-msg` (installed by `make setup`). See [CLAUDE.md](CLAUDE.md) for the full list of emoji prefixes.
 
 ```
 ✨ Add PGN parser for multi-game files
-🐛 Fix castling rights validation
-♻️ Refactor engine pool for better concurrency
-📝 Update installation instructions
-🧪 Add unit tests for move classification
 ```
 
 ## Pull Request Process
 
-1. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+All changes land via a pull request to `main`; there are no direct commits. Keep each PR focused, and update the affected docs in the same PR as any behavior change. Continuous integration mirrors the local checks and must pass:
 
-2. **Make your changes**
-   - Follow the code style guidelines
-   - Add tests for new functionality
-   - Update documentation if needed
+```bash
+pnpm run lint
+pnpm run format:check
+pnpm run typecheck
+pnpm run build
+pnpm run test
 
-3. **Run tests locally**
-   ```bash
-   make test
-   make lint
-   ```
-
-4. **Commit your changes**
-   ```bash
-   git add .
-   git commit -m "✨ Add your feature description"
-   ```
-
-5. **Push and create PR**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-   Then open a Pull Request on GitHub.
-
-### PR Guidelines
-
-- Keep PRs focused on a single feature or fix
-- Include a clear description of what the PR does
-- Reference any related issues
-- Ensure all CI checks pass
-- Request review from maintainers
-
-## Architecture Guidelines
-
-When making changes, consider:
-
-1. **Package boundaries**: Keep packages focused on their responsibility
-2. **Type safety**: Use TypeScript types and avoid `any`
-3. **Error handling**: Use proper error types and handle failures gracefully
-4. **Testing**: New features should include tests
-5. **Documentation**: Update docs for user-facing changes
-
-See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
-
-## Getting Help
-
-- Open an issue for bugs or feature requests
-- Check existing issues before creating new ones
-- For questions, open a discussion on GitHub
+uv run ruff check services/
+uv run ruff format --check services/
+uv run mypy services/
+uv run pytest --cov --cov-report=term
+```
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's MIT License.
+By contributing, you agree that your contributions are licensed under the project's GPL-3.0 license.

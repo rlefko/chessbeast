@@ -13,8 +13,52 @@ import type {
   EvaluationOptions,
 } from '@chessbeast/core';
 import type { EcoClient, LichessEliteClient } from '@chessbeast/database';
+import { debugGuiEmitter } from '@chessbeast/debug-gui';
 import type { StockfishClient, MaiaClient } from '@chessbeast/grpc-client';
 import { ChessPosition } from '@chessbeast/pgn';
+
+/** Minimum interval between engine:analysis Debug GUI emissions */
+const ENGINE_ANALYSIS_THROTTLE_MS = 100;
+
+/** Module-local timestamp of the last engine:analysis emission */
+let lastEngineAnalysisEmitAt = 0;
+
+/**
+ * Emit a throttled engine:analysis event to the Debug GUI.
+ * No-ops when the emitter is disabled or the last emission was <100ms ago.
+ */
+function emitEngineAnalysisThrottled(fen: string, evaluations: EngineEvaluation[]): void {
+  if (!debugGuiEmitter.isEnabled()) return;
+  const main = evaluations[0];
+  if (!main) return;
+
+  const now = Date.now();
+  if (now - lastEngineAnalysisEmitAt < ENGINE_ANALYSIS_THROTTLE_MS) return;
+  lastEngineAnalysisEmitAt = now;
+
+  const toEventEval = (e: EngineEvaluation): { cp?: number; mate?: number } => ({
+    ...(e.cp !== undefined ? { cp: e.cp } : {}),
+    ...(e.mate !== undefined ? { mate: e.mate } : {}),
+  });
+
+  debugGuiEmitter.engineAnalysis({
+    fen,
+    depth: main.depth,
+    nodes: 0, // Node counts are not reported by the gRPC evaluate API
+    evaluation: toEventEval(main),
+    pv: main.pv,
+    ...(evaluations.length > 1
+      ? {
+          multipv: evaluations.map((e, idx) => ({
+            rank: idx + 1,
+            move: e.pv[0] ?? '?',
+            evaluation: toEventEval(e),
+            pv: e.pv,
+          })),
+        }
+      : {}),
+  });
+}
 
 /**
  * Convert UCI principal variation to SAN notation
@@ -51,6 +95,9 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
       if (result.mate !== 0) {
         eval_.mate = result.mate;
       }
+
+      emitEngineAnalysisThrottled(fen, [eval_]);
+
       return eval_;
     },
 
@@ -117,6 +164,8 @@ export function createEngineAdapter(client: StockfishClient): EngineService {
           results.push(altEval);
         }
       }
+
+      emitEngineAnalysisThrottled(fen, results);
 
       return results;
     },

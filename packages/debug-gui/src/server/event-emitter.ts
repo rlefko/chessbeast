@@ -10,12 +10,11 @@ import { EventEmitter } from 'events';
 import type {
   DebugGuiEvent,
   PositionUpdateEvent,
-  MoveHistoryEvent,
   LLMStreamStartEvent,
   LLMStreamChunkEvent,
   LLMStreamEndEvent,
-  ToolCallStartEvent,
-  ToolCallResultEvent,
+  AnnotationIntentEvent,
+  AnnotationCommentEvent,
   EngineAnalysisEvent,
   EngineCriticalMomentEvent,
   EngineExplorationProgressEvent,
@@ -97,10 +96,6 @@ export class DebugGuiEventEmitter extends EventEmitter {
     this.emitEvent({ type: 'position:update', ...data } as PositionUpdateEvent);
   }
 
-  moveHistory(data: EventWithoutMeta<MoveHistoryEvent>): void {
-    this.emitEvent({ type: 'position:move_history', ...data } as MoveHistoryEvent);
-  }
-
   // =========================================================================
   // LLM Events
   // =========================================================================
@@ -121,7 +116,7 @@ export class DebugGuiEventEmitter extends EventEmitter {
 
   llmStreamChunk(data: {
     streamId: string;
-    chunkType: 'thinking' | 'content' | 'tool_call';
+    chunkType: 'thinking' | 'content';
     content: string;
     done?: boolean;
   }): void {
@@ -136,57 +131,31 @@ export class DebugGuiEventEmitter extends EventEmitter {
   llmStreamEnd(data: {
     streamId: string;
     finalContent?: string;
-    tokensUsed?: number;
+    tokensUsed?: { prompt: number; completion: number; reasoning?: number };
+    cost?: number;
     durationMs: number;
     error?: string;
   }): void {
     this.emitEvent({
       type: 'llm:stream_end',
       finalComment: data.finalContent,
-      tokensUsed:
-        data.tokensUsed !== undefined ? { prompt: 0, completion: data.tokensUsed } : undefined,
+      tokensUsed: data.tokensUsed,
+      cost: data.cost,
       durationMs: data.durationMs,
+      error: data.error,
     } as LLMStreamEndEvent);
   }
 
   // =========================================================================
-  // Tool Call Events
+  // Annotation Events
   // =========================================================================
 
-  toolCallStart(data: {
-    callId: string;
-    toolName: string;
-    arguments: Record<string, unknown>;
-    iteration?: number;
-    maxIterations?: number;
-    context?: { currentFen?: string; currentLine?: string[]; depth?: number };
-  }): void {
-    this.emitEvent({
-      type: 'tool:call_start',
-      toolName: data.toolName,
-      toolArgs: data.arguments,
-      iteration: data.iteration ?? 1,
-      maxIterations: data.maxIterations ?? 1,
-      context: data.context,
-    } as ToolCallStartEvent);
+  annotationIntent(data: EventWithoutMeta<AnnotationIntentEvent>): void {
+    this.emitEvent({ type: 'annotation:intent', ...data } as AnnotationIntentEvent);
   }
 
-  toolCallResult(data: {
-    callId: string;
-    toolName: string;
-    success: boolean;
-    result?: unknown;
-    error?: string;
-    durationMs: number;
-  }): void {
-    this.emitEvent({
-      type: 'tool:call_result',
-      toolName: data.toolName,
-      success: data.success,
-      result: data.result,
-      error: data.error,
-      durationMs: data.durationMs,
-    } as ToolCallResultEvent);
+  annotationComment(data: EventWithoutMeta<AnnotationCommentEvent>): void {
+    this.emitEvent({ type: 'annotation:comment', ...data } as AnnotationCommentEvent);
   }
 
   // =========================================================================

@@ -7,6 +7,8 @@
 import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
 
+import { palette } from '../theme.js';
+
 export interface PanelProps {
   title: string;
   focused: boolean;
@@ -22,8 +24,8 @@ export function Panel({
   width,
   height,
 }: PanelProps): JSX.Element {
-  const borderColor = focused ? 'cyan' : 'gray';
-  const titleColor = focused ? 'cyanBright' : 'white';
+  const borderColor = focused ? palette.panelBorderFocused : palette.panelBorder;
+  const titleColor = focused ? palette.panelTitleFocused : palette.panelTitle;
 
   return (
     <Box
@@ -33,13 +35,14 @@ export function Panel({
       width={width}
       height={height}
       paddingX={1}
+      overflow="hidden"
     >
-      <Box marginBottom={1}>
+      <Box>
         <Text color={titleColor} bold={focused}>
           {title}
         </Text>
         {focused && (
-          <Text color="gray" dimColor>
+          <Text color={palette.muted} dimColor>
             {' '}
             (focused)
           </Text>

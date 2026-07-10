@@ -28,6 +28,7 @@ import {
   DensityFilter,
   createDensityFilter,
   DENSITY_CONFIGS,
+  sortIntentsByPriority,
 } from '../narration/index.js';
 import type { ThemeInstance, ThemeSummary } from '../themes/types.js';
 
@@ -49,6 +50,14 @@ export interface PostWritePipelineConfig {
 
   /** Whether to use LLM for comment generation */
   useLlm: boolean;
+}
+
+/**
+ * Format the move notation for an intent (e.g., "12. Nf3" / "12... Nxe4")
+ */
+function formatIntentMoveNotation(intent: CommentIntent): string {
+  const { moveNumber, isWhiteMove, move } = intent.content;
+  return `${moveNumber}${isWhiteMove ? '.' : '...'} ${move}`;
 }
 
 /**
@@ -85,6 +94,15 @@ export interface PostWritePipelineProgress {
 
   /** Current comment being generated */
   currentComment?: string;
+
+  /** Ply (after-move convention) the current comment or filter decision applies to */
+  plyIndex?: number;
+
+  /** Move notation for the current ply (e.g., "12... Nxe4") */
+  moveNotation?: string;
+
+  /** Set when this progress update reports an intent filtered out instead of narrated */
+  filtered?: 'density' | 'redundancy' | 'cap';
 }
 
 /**
@@ -124,7 +142,8 @@ export interface PostWritePipelineResult {
   stats: {
     totalIntents: number;
     intentsAfterDensity: number;
-    intentsAfterRedundancy: number;
+    /** Intent count after the maxCommentsPerGame cap (redundancy runs inside the narrator) */
+    intentsAfterCap: number;
     commentsGenerated: number;
     tokensUsed: number;
     averageCommentLength: number;
@@ -188,7 +207,28 @@ export class PostWritePipeline {
       commentsGenerated: 0,
     });
 
-    const densityResult = this.densityFilter.filter(input.intents, input.totalPlies);
+    // The density filter's contract expects priority-sorted intents (higher
+    // priority wins adjacent-ply conflicts), so sort before filtering
+    const densityResult = this.densityFilter.filter(
+      sortIntentsByPriority(input.intents),
+      input.totalPlies,
+    );
+
+    // Report intents dropped by density filtering
+    const densityIncluded = new Set(densityResult.includedIntents);
+    for (const intent of input.intents) {
+      if (!densityIncluded.has(intent)) {
+        onProgress?.({
+          phase: 'filtering',
+          intentsProcessed: 0,
+          totalIntents: input.intents.length,
+          commentsGenerated: 0,
+          plyIndex: intent.plyIndex,
+          moveNotation: formatIntentMoveNotation(intent),
+          filtered: 'density',
+        });
+      }
+    }
 
     // Apply max comments limit if needed
     let filteredIntents = densityResult.includedIntents;
@@ -201,6 +241,22 @@ export class PostWritePipeline {
 
       const remainingSlots = Math.max(0, this.config.maxCommentsPerGame - mandatory.length);
       filteredIntents = [...mandatory, ...optional.slice(0, remainingSlots)];
+
+      // Report intents dropped by the per-game comment cap
+      const capIncluded = new Set(filteredIntents);
+      for (const intent of densityResult.includedIntents) {
+        if (!capIncluded.has(intent)) {
+          onProgress?.({
+            phase: 'filtering',
+            intentsProcessed: 0,
+            totalIntents: input.intents.length,
+            commentsGenerated: 0,
+            plyIndex: intent.plyIndex,
+            moveNotation: formatIntentMoveNotation(intent),
+            filtered: 'cap',
+          });
+        }
+      }
     }
 
     onProgress?.({
@@ -279,6 +335,39 @@ export class PostWritePipeline {
       }
     }
 
+    // Report per-ply narration outcomes: each surviving intent either produced
+    // a comment or was filtered inside the narrator (redundancy / empty result)
+    const reportedPlies = new Set<number>();
+    let reportedComments = 0;
+    for (const intent of filteredIntents) {
+      if (reportedPlies.has(intent.plyIndex)) continue;
+      reportedPlies.add(intent.plyIndex);
+
+      const comment = comments.get(intent.plyIndex);
+      if (comment !== undefined) {
+        reportedComments++;
+        onProgress?.({
+          phase: 'narrating',
+          intentsProcessed: reportedPlies.size,
+          totalIntents: filteredIntents.length,
+          commentsGenerated: reportedComments,
+          plyIndex: intent.plyIndex,
+          moveNotation: formatIntentMoveNotation(intent),
+          currentComment: comment,
+        });
+      } else {
+        onProgress?.({
+          phase: 'narrating',
+          intentsProcessed: reportedPlies.size,
+          totalIntents: filteredIntents.length,
+          commentsGenerated: reportedComments,
+          plyIndex: intent.plyIndex,
+          moveNotation: formatIntentMoveNotation(intent),
+          filtered: 'redundancy',
+        });
+      }
+    }
+
     // Complete
     onProgress?.({
       phase: 'complete',
@@ -293,7 +382,7 @@ export class PostWritePipeline {
       stats: {
         totalIntents: input.intents.length,
         intentsAfterDensity: densityResult.includedIntents.length,
-        intentsAfterRedundancy: filteredIntents.length,
+        intentsAfterCap: filteredIntents.length,
         commentsGenerated: narrationResult.stats.commentsGenerated,
         tokensUsed: narrationResult.stats.totalTokensUsed,
         averageCommentLength: narrationResult.stats.averageCommentLength,

@@ -1,22 +1,11 @@
-"""Pytest configuration for Maia service tests."""
+"""Pytest configuration for Maia service tests.
 
-import sys
-from pathlib import Path
+Shared fixtures (FEN positions, engine availability) live in services/conftest.py.
+"""
+
 from unittest.mock import MagicMock
 
 import pytest
-
-# Add the src directory to the Python path
-src_path = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(src_path))
-
-
-# Sample FEN positions for testing
-STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-COMPLEX_FEN = "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4"
-SICILIAN_FEN = "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2"
-CHECKMATE_FEN = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"
-INVALID_FEN = "not-a-valid-fen"
 
 
 @pytest.fixture

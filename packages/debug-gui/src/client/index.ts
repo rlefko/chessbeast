@@ -3,7 +3,15 @@
  */
 
 export { App, type AppProps } from './App.js';
-export { useDebugStore, type DebugState, type PanelId } from './state/store.js';
-export { useWebSocket, type UseWebSocketOptions } from './hooks/useWebSocket.js';
-export { useKeyboard, type UseKeyboardOptions } from './hooks/useKeyboard.js';
+export {
+  useDebugStore,
+  type DebugState,
+  type PanelId,
+  type ConnectionState,
+  type UIState,
+  type AnnotationItem,
+  type LLMState,
+} from './state/store.js';
+export * from './hooks/index.js';
 export * from './components/index.js';
+export * from './theme.js';

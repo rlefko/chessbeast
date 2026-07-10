@@ -2,7 +2,7 @@
  * Criticality Scorer
  *
  * Multi-factor scoring system for determining position criticality.
- * Extends the existing interestingness scoring with additional factors
+ * Extends the critical-moment criticality scoring with additional factors
  * for tactical volatility, theme novelty, and king safety.
  *
  * Used by the staged analysis pipeline to determine which positions

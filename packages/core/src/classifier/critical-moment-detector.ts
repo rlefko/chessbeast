@@ -42,7 +42,7 @@ export interface PlyEvaluation {
 export interface CriticalMomentOptions {
   /** Maximum ratio of moves to mark as critical (default 0.25) */
   maxCriticalRatio?: number;
-  /** Minimum interestingness score to include (default 30) */
+  /** Minimum criticality score to include (default 30) */
   minScore?: number;
   /** Include phase transitions as critical moments */
   includePhaseTransitions?: boolean;
@@ -75,12 +75,12 @@ export function estimateGamePhase(plyIndex: number, totalPlies: number): GamePha
 }
 
 /**
- * Result of interestingness calculation
+ * Result of criticality calculation
  *
  * Now aligned with NAG assignment using win probability thresholds.
  * Critical moment = Any move with auto-assigned NAG.
  */
-interface InterestingnessResult {
+interface CriticalityResult {
   score: number;
   type: CriticalMomentType;
   reason: string;
@@ -89,7 +89,7 @@ interface InterestingnessResult {
 }
 
 /**
- * Calculate interestingness score for a position using win probability
+ * Calculate criticality score for a position using win probability
  *
  * Uses win probability thresholds aligned with NAG assignment.
  * A critical moment is any move that gets automatically assigned a NAG annotation.
@@ -102,9 +102,9 @@ interface InterestingnessResult {
  * - ! (good move): 40 - lower priority (good moves less interesting for exploration)
  *
  * @param ply - Evaluation data for the ply
- * @returns Interestingness result with score, type, reason, and optional NAG
+ * @returns Criticality result with score, type, reason, and optional NAG
  */
-function calculateInterestingness(ply: PlyEvaluation): InterestingnessResult {
+function calculateCriticalityScore(ply: PlyEvaluation): CriticalityResult {
   const { evalBefore, evalAfter, classification } = ply;
 
   // Convert mate scores to extreme cp values for win probability calculation
@@ -226,7 +226,7 @@ export function detectPhaseTransitions(
  *
  * @param evaluations - Evaluation data for all plies
  * @param options - Detection options
- * @returns Array of critical moments, sorted by interestingness
+ * @returns Array of critical moments, sorted by criticality
  */
 export function detectCriticalMoments(
   evaluations: PlyEvaluation[],
@@ -249,7 +249,7 @@ export function detectCriticalMoments(
   for (let i = 0; i < evaluations.length; i++) {
     const ply = evaluations[i]!;
 
-    const { score, type, reason, nag } = calculateInterestingness(ply);
+    const { score, type, reason, nag } = calculateCriticalityScore(ply);
 
     // Only include moves that got a NAG (score > 0)
     if (nag && score >= minScore) {
@@ -272,7 +272,7 @@ export function detectCriticalMoments(
         moments.push({
           plyIndex: ply.plyIndex,
           type: 'phase_transition',
-          score: 40, // Moderate interestingness
+          score: 40, // Moderate criticality
           reason: `Game entered ${transition.phase}`,
         });
       }

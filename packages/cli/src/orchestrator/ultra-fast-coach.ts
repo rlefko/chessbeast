@@ -5,36 +5,66 @@
  * and provides a runner for staged analysis with theme detection and narration.
  */
 
-import type {
-  StagedPipelineConfig,
-  TierConfig,
-  AnalysisTier,
-  CriticalityScore,
-} from '@chessbeast/core';
-import type {
-  DensityLevel,
-  AudienceLevel,
-  NarratorConfig,
-  LineMemoryConfig,
-} from '@chessbeast/llm';
+import type { TierConfig, AnalysisTier, ArtifactCacheConfig } from '@chessbeast/core';
+import type { DensityLevel, NarratorConfig, LineMemoryConfig } from '@chessbeast/llm';
 
 import type {
   AnalysisSpeed,
   ThemeVerbosity,
   VariationDepth,
   CommentDensity,
-  AudienceLevel as ConfigAudienceLevel,
+  AudienceLevel,
   UltraFastCoachConfigSchema,
 } from '../config/schema.js';
+
+/**
+ * Maximum words per generated comment
+ */
+const MAX_WORDS_PER_COMMENT = 50;
+
+/**
+ * Maximum comments per annotated game
+ */
+const MAX_COMMENTS_PER_GAME = 30;
+
+/**
+ * Exploration time budget (ms) for the full tier
+ */
+const EXPLORATION_BUDGET_MS_FULL = 120000;
+
+/**
+ * Exploration time budget (ms) for the shallow/standard tiers
+ */
+const EXPLORATION_BUDGET_MS_DEFAULT = 60000;
+
+/**
+ * Artifact cache time-to-live (1 hour)
+ */
+const ARTIFACT_CACHE_TTL_MS = 3600000;
+
+/**
+ * Artifact cache sizing for the full tier
+ */
+const ARTIFACT_CACHE_SIZING_FULL = {
+  maxEngineEvals: 5000,
+  maxThemes: 3000,
+  maxCandidates: 2000,
+} as const;
+
+/**
+ * Artifact cache sizing for the shallow/standard tiers
+ */
+const ARTIFACT_CACHE_SIZING_DEFAULT = {
+  maxEngineEvals: 2000,
+  maxThemes: 1000,
+  maxCandidates: 500,
+} as const;
 
 /**
  * Complete Ultra-Fast Coach configuration
  * Maps CLI options to component configurations
  */
 export interface UltraFastCoachConfig {
-  /** Staged pipeline configuration */
-  pipeline: Partial<StagedPipelineConfig>;
-
   /** Tier override (if specified via speed) */
   defaultTier: AnalysisTier;
 
@@ -49,6 +79,8 @@ export interface UltraFastCoachConfig {
     depth: VariationDepth;
     maxNodes: number;
     maxDepth: number;
+    /** Exploration time budget in milliseconds (derived from the tier) */
+    budgetMs: number;
   };
 
   /** Narration settings */
@@ -59,6 +91,12 @@ export interface UltraFastCoachConfig {
 
   /** Line memory configuration */
   lineMemory: Partial<LineMemoryConfig>;
+
+  /** Maximum comments per annotated game */
+  maxCommentsPerGame: number;
+
+  /** Artifact cache sizing (derived from the tier) */
+  artifactCache: Partial<ArtifactCacheConfig>;
 }
 
 /**
@@ -72,25 +110,6 @@ export function speedToTier(speed: AnalysisSpeed): AnalysisTier {
       return 'standard';
     case 'deep':
       return 'full';
-  }
-}
-
-/**
- * Map analysis speed to tier thresholds
- */
-export function speedToTierThresholds(speed: AnalysisSpeed): {
-  standardPromotion: number;
-  fullPromotion: number;
-} {
-  switch (speed) {
-    case 'fast':
-      // Higher thresholds = fewer promotions = faster
-      return { standardPromotion: 60, fullPromotion: 85 };
-    case 'normal':
-      return { standardPromotion: 40, fullPromotion: 70 };
-    case 'deep':
-      // Lower thresholds = more promotions = deeper
-      return { standardPromotion: 25, fullPromotion: 55 };
   }
 }
 
@@ -126,19 +145,9 @@ export function commentDensityToLevel(density: CommentDensity): DensityLevel {
 }
 
 /**
- * Map audience level from config to LLM audience level
- */
-export function audienceToLLMAudience(audience: ConfigAudienceLevel): AudienceLevel {
-  // These are the same, but we explicitly map for type safety
-  return audience as AudienceLevel;
-}
-
-/**
  * Map audience level to line memory configuration
  */
-export function audienceToLineMemoryConfig(
-  audience: ConfigAudienceLevel,
-): Partial<LineMemoryConfig> {
+export function audienceToLineMemoryConfig(audience: AudienceLevel): Partial<LineMemoryConfig> {
   switch (audience) {
     case 'beginner':
       // More detail for beginners
@@ -166,18 +175,13 @@ export function audienceToLineMemoryConfig(
 export function createUltraFastCoachConfig(
   cliConfig: UltraFastCoachConfigSchema,
 ): UltraFastCoachConfig {
-  const tierThresholds = speedToTierThresholds(cliConfig.speed);
+  const defaultTier = speedToTier(cliConfig.speed);
   const variationLimits = variationDepthToLimits(cliConfig.variations);
   const lineMemoryConfig = audienceToLineMemoryConfig(cliConfig.audience);
+  const isFullTier = defaultTier === 'full';
 
   return {
-    pipeline: {
-      tierThresholds,
-      maxCriticalRatio:
-        cliConfig.speed === 'fast' ? 0.15 : cliConfig.speed === 'deep' ? 0.35 : 0.25,
-    },
-
-    defaultTier: speedToTier(cliConfig.speed),
+    defaultTier,
 
     themes: {
       enabled: cliConfig.themes !== 'none',
@@ -187,61 +191,27 @@ export function createUltraFastCoachConfig(
     variations: {
       depth: cliConfig.variations,
       ...variationLimits,
+      budgetMs: isFullTier ? EXPLORATION_BUDGET_MS_FULL : EXPLORATION_BUDGET_MS_DEFAULT,
     },
 
     narration: {
-      audience: audienceToLLMAudience(cliConfig.audience),
+      audience: cliConfig.audience,
       showEvaluations: cliConfig.audience !== 'beginner',
       includeVariations: cliConfig.variations !== 'low',
+      maxWordsPerComment: MAX_WORDS_PER_COMMENT,
     },
 
     density: commentDensityToLevel(cliConfig.commentDensity),
 
     lineMemory: lineMemoryConfig,
+
+    maxCommentsPerGame: MAX_COMMENTS_PER_GAME,
+
+    artifactCache: {
+      ...(isFullTier ? ARTIFACT_CACHE_SIZING_FULL : ARTIFACT_CACHE_SIZING_DEFAULT),
+      ttlMs: ARTIFACT_CACHE_TTL_MS,
+    },
   };
-}
-
-/**
- * Filter themes based on verbosity setting
- */
-export function shouldIncludeTheme(
-  verbosity: ThemeVerbosity,
-  severity: 'critical' | 'significant' | 'moderate' | 'minor',
-): boolean {
-  switch (verbosity) {
-    case 'none':
-      return false;
-    case 'important':
-      return severity === 'critical' || severity === 'significant';
-    case 'all':
-      return true;
-  }
-}
-
-/**
- * Determine if a position should be commented based on criticality and density
- */
-export function shouldCommentPosition(
-  criticalityScore: CriticalityScore,
-  density: DensityLevel,
-  plyInWindow: number,
-  lastCommentPly: number,
-): boolean {
-  const minPlyGap = density === 'sparse' ? 4 : density === 'normal' ? 2 : 1;
-  const minScore = density === 'sparse' ? 50 : density === 'normal' ? 30 : 15;
-
-  // Always comment critical positions
-  if (criticalityScore.score >= 70) {
-    return true;
-  }
-
-  // Check density constraints
-  if (plyInWindow - lastCommentPly < minPlyGap) {
-    return false;
-  }
-
-  // Check score threshold
-  return criticalityScore.score >= minScore;
 }
 
 /**
@@ -272,46 +242,4 @@ export function getUltraFastTierConfig(
   };
 
   return baseConfigs;
-}
-
-/**
- * Ultra-Fast Coach progress information
- */
-export interface UltraFastCoachProgress {
-  /** Current phase */
-  phase: 'analyzing' | 'themes' | 'narrating' | 'rendering';
-  /** Current stage within phase */
-  stage?: string;
-  /** Progress percentage (0-100) */
-  progress: number;
-  /** Current position being processed */
-  currentPly?: number;
-  /** Total positions */
-  totalPlies?: number;
-  /** Current tier being used */
-  tier?: AnalysisTier;
-}
-
-/**
- * Ultra-Fast Coach result
- */
-export interface UltraFastCoachResult {
-  /** Number of positions analyzed */
-  positionsAnalyzed: number;
-  /** Number of themes detected */
-  themesDetected: number;
-  /** Number of comments generated */
-  commentsGenerated: number;
-  /** Cache statistics */
-  cacheStats: {
-    hits: number;
-    misses: number;
-    hitRate: number;
-  };
-  /** Tier distribution */
-  tierDistribution: Record<AnalysisTier, number>;
-  /** Total analysis time (ms) */
-  totalTimeMs: number;
-  /** Token usage */
-  tokensUsed: number;
 }

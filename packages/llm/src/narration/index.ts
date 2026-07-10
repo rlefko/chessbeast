@@ -72,6 +72,7 @@ export {
 // Narrator
 export type {
   AudienceLevel,
+  AnnotationPerspective,
   NarratorConfig,
   GeneratedNarration,
   NarrationResult,
@@ -79,3 +80,11 @@ export type {
 } from './narrator.js';
 
 export { DEFAULT_NARRATOR_CONFIG, Narrator, createNarrator, narrateIntents } from './narrator.js';
+
+// Game summary
+export type { GameSummaryConfig } from './game-summary.js';
+export {
+  DEFAULT_GAME_SUMMARY_CONFIG,
+  generateGameSummary,
+  buildTemplateSummary,
+} from './game-summary.js';

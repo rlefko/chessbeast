@@ -58,7 +58,6 @@ export function formatConfigDisplay(config: ChessBeastConfig): string {
 
   // Output
   lines.push(chalk.dim('Output:'));
-  lines.push(`  Verbosity: ${config.output.verbosity}`);
   lines.push(`  Include variations: ${config.output.includeVariations}`);
   lines.push(`  Include NAGs: ${config.output.includeNags}`);
   lines.push(`  Include summary: ${config.output.includeSummary}`);

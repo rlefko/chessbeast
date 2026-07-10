@@ -8,6 +8,7 @@ import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from stockfish16_service.config import Stockfish16Config
 from stockfish16_service.engine import ClassicalEvalResult, PhaseScore
 from stockfish16_service.pool import (

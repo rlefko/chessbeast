@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-chessbeast-common = { path = "../common" }
+chessbeast-common = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

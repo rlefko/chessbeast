@@ -102,7 +102,6 @@ export const DEFAULT_DATABASES_CONFIG = {
  * Default output configuration
  */
 export const DEFAULT_OUTPUT_CONFIG = {
-  verbosity: 'normal' as const,
   includeVariations: true,
   includeNags: true,
   includeSummary: true,
@@ -113,7 +112,6 @@ export const DEFAULT_OUTPUT_CONFIG = {
  * Default Ultra-Fast Coach configuration
  */
 export const DEFAULT_ULTRA_FAST_COACH_CONFIG = {
-  enabled: false,
   speed: 'normal' as const,
   themes: 'important' as const,
   variations: 'medium' as const,

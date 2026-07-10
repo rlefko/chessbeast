@@ -18,13 +18,14 @@ import {
   type ExplorationNode,
   type CandidateMove,
   type ExplorationResult,
+  type ExplorerConfig,
   PriorityQueueExplorer,
   createVariationDAG,
   type CriticalityScore,
   calculateCriticality,
   type MoveClassification,
 } from '@chessbeast/core';
-import { ChessPosition } from '@chessbeast/pgn';
+import { ChessPosition, isUciMove } from '@chessbeast/pgn';
 
 import type {
   CommentIntent,
@@ -42,15 +43,7 @@ import {
 } from '../themes/lifecycle.js';
 import type { ThemeInstance, ThemeDelta, ThemeSummary } from '../themes/types.js';
 
-import type { EngineService, ExploredLine, LinePurpose, LineSource } from './variation-explorer.js';
-
-/**
- * Check if a move string is in UCI format (e.g., "e2e4", "e7e8q")
- * UCI moves are 4-5 characters: source square + target square + optional promotion
- */
-function isUciFormat(move: string): boolean {
-  return /^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/i.test(move);
-}
+import type { EngineService, ExploredLine, LinePurpose, LineSource } from './types.js';
 
 /**
  * Theme verbosity levels
@@ -92,12 +85,20 @@ export interface EngineDrivenExplorerConfig {
    * This allows multiple explorations to share a single DAG with mainline.
    */
   sharedDag?: VariationDAG;
+
+  /**
+   * Callback invoked when a recoverable problem occurs during exploration
+   * (e.g., an engine evaluation failure). Failures never abort exploration,
+   * but consumers can surface them as warnings.
+   */
+  onWarning?: (warning: string) => void;
 }
 
 /**
- * Default configuration (sharedDag is intentionally omitted - it has no sensible default)
+ * Default configuration (sharedDag and onWarning are intentionally omitted -
+ * they have no sensible defaults)
  */
-const DEFAULT_CONFIG: Required<Omit<EngineDrivenExplorerConfig, 'sharedDag'>> = {
+const DEFAULT_CONFIG: Required<Omit<EngineDrivenExplorerConfig, 'sharedDag' | 'onWarning'>> = {
   maxNodes: 200,
   maxDepth: 30,
   budgetMs: 30000,
@@ -174,8 +175,9 @@ export interface EngineDrivenExplorerResult {
 export class EngineDrivenExplorer {
   private readonly engine: EngineService;
   private readonly cache: ArtifactCache;
-  private readonly config: Required<Omit<EngineDrivenExplorerConfig, 'sharedDag'>> & {
+  private readonly config: Required<Omit<EngineDrivenExplorerConfig, 'sharedDag' | 'onWarning'>> & {
     sharedDag?: VariationDAG;
+    onWarning?: (warning: string) => void;
   };
   private readonly detectorRegistry: ReturnType<typeof createFullDetectorRegistry>;
   private readonly lifecycleTracker: ThemeLifecycleTracker;
@@ -252,13 +254,17 @@ export class EngineDrivenExplorer {
     }
 
     // Create the priority queue explorer
-    const explorer = new PriorityQueueExplorer(this.engine, {
+    const pqeConfig: ExplorerConfig = {
       cache: this.cache,
       dag,
       maxNodes: this.config.maxNodes,
       maxDepth: this.config.maxDepth,
       budgetMs: this.config.budgetMs,
-    });
+    };
+    if (this.config.onWarning !== undefined) {
+      pqeConfig.onWarning = this.config.onWarning;
+    }
+    const explorer = new PriorityQueueExplorer(this.engine, pqeConfig);
 
     // Reset lifecycle tracker for new exploration
     this.lifecycleTracker.reset();
@@ -303,14 +309,22 @@ export class EngineDrivenExplorer {
     const candidates = await this.buildInitialCandidates(rootFen, playedMove, classification);
 
     // Run exploration
-    onProgress?.({
-      phase: 'exploring',
-      nodesExplored: 0,
-      maxNodes: this.config.maxNodes,
-      currentDepth: 0,
-      themesDetected: 0,
-      intentsGenerated: 0,
-    });
+    // Guarded like the per-node progress callbacks (inside PriorityQueueExplorer):
+    // a throwing progress consumer must never abort the exploration itself
+    try {
+      onProgress?.({
+        phase: 'exploring',
+        nodesExplored: 0,
+        maxNodes: this.config.maxNodes,
+        currentDepth: 0,
+        themesDetected: 0,
+        intentsGenerated: 0,
+      });
+    } catch (callbackError) {
+      console.error(
+        `[EngineDrivenExplorer] Progress callback error: ${callbackError instanceof Error ? callbackError.message : String(callbackError)}`,
+      );
+    }
 
     const explorationResult = await explorer.explore(rootFen, candidates);
 
@@ -399,7 +413,16 @@ export class EngineDrivenExplorer {
 
       // Capture the best move and evaluation from the first (best) line
       if (evals.length > 0 && evals[0]?.pv && evals[0].pv.length > 0) {
-        this.currentBestMove = evals[0].pv[0]!;
+        const bestCandidate = evals[0].pv[0]!;
+        // Only accept the engine's best move if it is legal in this position;
+        // garbage PV data must never flow into intent content (bestAlternative)
+        if (this.getResultingFen(position, bestCandidate) !== undefined) {
+          this.currentBestMove = bestCandidate;
+        } else {
+          console.warn(
+            `[EngineDrivenExplorer] Ignoring illegal engine best move "${bestCandidate}" for ${fen}`,
+          );
+        }
         this.currentEvalBefore = evals[0].cp;
       }
 
@@ -449,7 +472,9 @@ export class EngineDrivenExplorer {
         );
       }
     } catch (e) {
-      console.warn(`[EngineDrivenExplorer] Engine evaluation failed: ${e}`);
+      const message = `Engine evaluation failed for ${fen}: ${e instanceof Error ? e.message : String(e)}`;
+      console.warn(`[EngineDrivenExplorer] ${message}`);
+      this.config.onWarning?.(message);
     }
 
     // Final check - should never happen if playedMove is valid
@@ -591,15 +616,20 @@ export class EngineDrivenExplorer {
     // Generate intent for positions with interesting characteristics
     if (hasThemeContent || hasHighCriticality || hasSignificantPriority) {
       // Use the game ply (the actual move in the game) for intent placement,
-      // not the exploration depth. All intents from this exploration should
-      // attach to the critical moment's ply.
-      const targetPly = this.currentGamePly;
+      // not the exploration depth. All intents from this exploration attach
+      // to the critical moment's move.
+      //
+      // Comments are looked up by the RESULTING position's ply (toNode.ply in
+      // dag-transformer), so the intent's plyIndex is gamePly + 1 - the same
+      // after-move convention as createPlayedMoveIntent. The move descriptors
+      // (moveNumber / isWhiteMove) still describe the move itself at gamePly.
+      const movePly = this.currentGamePly;
       const input: IntentInput = {
         move: node.parentMove ?? '',
         fen: node.fen,
-        moveNumber: Math.floor(targetPly / 2) + 1,
-        isWhiteMove: targetPly % 2 === 0, // 0-based: even = white, odd = black
-        plyIndex: targetPly,
+        moveNumber: Math.floor(movePly / 2) + 1,
+        isWhiteMove: movePly % 2 === 0, // 0-based: even = white, odd = black
+        plyIndex: movePly + 1,
         criticalityScore,
         themeDeltas: deltas,
         activeThemes: themes,
@@ -842,7 +872,7 @@ export class EngineDrivenExplorer {
    */
   private sanToUci(position: ChessPosition, san: string): string | undefined {
     // Validate input is not already UCI format - catch upstream bugs
-    if (isUciFormat(san)) {
+    if (isUciMove(san)) {
       console.warn(
         `[EDE] sanToUci called with UCI-like input "${san}" at ${position.fen().split(' ')[0]} - possible upstream bug`,
       );

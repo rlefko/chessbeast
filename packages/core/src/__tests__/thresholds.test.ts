@@ -91,8 +91,8 @@ describe('Critical Moment Thresholds', () => {
     expect(CRITICAL_MOMENT_THRESHOLDS.maxCriticalRatio).toBe(0.25);
   });
 
-  it('should have minimum interestingness score for NAG-based detection', () => {
+  it('should have minimum criticality score for NAG-based detection', () => {
     // Any move with a NAG is critical (score > 0)
-    expect(CRITICAL_MOMENT_THRESHOLDS.minInterestingnessScore).toBe(1);
+    expect(CRITICAL_MOMENT_THRESHOLDS.minCriticalityScore).toBe(1);
   });
 });

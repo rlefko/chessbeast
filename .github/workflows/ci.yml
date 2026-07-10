@@ -78,7 +78,7 @@ jobs:
           version: "0.5.x"
 
       - run: uv sync --all-packages
-      - run: uv run pytest
+      - run: uv run pytest --cov --cov-report=term
 
   build:
     name: Build

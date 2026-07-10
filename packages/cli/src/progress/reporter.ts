@@ -6,9 +6,6 @@
 import chalk from 'chalk';
 import ora, { type Ora, type Color } from 'ora';
 
-import { DebugOutput, type MoveContext } from './debug-output.js';
-import { formatTokenCount, formatCost } from './eval-formatter.js';
-import { ExplorationDisplay, type ExplorationContext } from './exploration-display.js';
 import { formatEta } from './formatters.js';
 import { TimeEstimator } from './time-estimator.js';
 import {
@@ -68,10 +65,6 @@ export class ProgressReporter {
   // Color functions
   private c: ColorFunctions;
 
-  // Extracted components (lazy initialized)
-  private _debugOutput: DebugOutput | null = null;
-  private _explorationDisplay: ExplorationDisplay | null = null;
-
   constructor(options: ProgressReporterOptions | boolean = {}) {
     // Handle legacy boolean argument for backwards compatibility
     if (typeof options === 'boolean') {
@@ -91,22 +84,6 @@ export class ProgressReporter {
 
     // Create color functions based on color setting
     this.c = createColorFns(this.useColor);
-  }
-
-  // Lazy getter for debug output handler
-  private get debugOutput(): DebugOutput {
-    if (!this._debugOutput) {
-      this._debugOutput = new DebugOutput(this.c, () => this.spinner);
-    }
-    return this._debugOutput;
-  }
-
-  // Lazy getter for exploration display handler
-  private get explorationDisplay(): ExplorationDisplay {
-    if (!this._explorationDisplay) {
-      this._explorationDisplay = new ExplorationDisplay(this.c, () => this.spinner);
-    }
-    return this._explorationDisplay;
   }
 
   /**
@@ -325,112 +302,6 @@ export class ProgressReporter {
   }
 
   /**
-   * Display move context before annotation (debug mode only)
-   * Delegates to DebugOutput
-   */
-  displayMoveContext(context: MoveContext): void {
-    if (this.silent || !this.debug) return;
-    this.debugOutput.displayMoveContext(context);
-  }
-
-  /**
-   * Display full LLM reasoning content (debug mode only)
-   * Delegates to DebugOutput
-   */
-  displayDebugThinking(thought: string, done: boolean = false): void {
-    if (this.silent || !this.debug) return;
-    this.debugOutput.displayThinking(thought, done);
-  }
-
-  /**
-   * Display tool call details (debug mode only)
-   * Delegates to DebugOutput
-   */
-  displayDebugToolCall(
-    toolName: string,
-    toolArgs: Record<string, unknown>,
-    iteration: number,
-    maxIterations: number,
-  ): void {
-    if (this.silent || !this.debug) return;
-    this.debugOutput.displayToolCall(toolName, toolArgs, iteration, maxIterations);
-  }
-
-  /**
-   * Display tool result details (debug mode only)
-   * Delegates to DebugOutput
-   */
-  displayDebugToolResult(
-    toolName: string,
-    result: unknown,
-    error: string | undefined,
-    durationMs: number,
-  ): void {
-    if (this.silent || !this.debug) return;
-    this.debugOutput.displayToolResult(toolName, result, error, durationMs);
-  }
-
-  /**
-   * Display exploration tool call in chess-friendly format (debug mode only)
-   * Delegates to ExplorationDisplay
-   */
-  displayExplorationToolCall(
-    moveNotation: string,
-    toolName: string,
-    toolArgs: Record<string, unknown>,
-    iteration: number,
-    maxIterations: number,
-    context: ExplorationContext,
-  ): void {
-    if (this.silent || !this.debug) return;
-    this.explorationDisplay.displayToolCall(
-      moveNotation,
-      toolName,
-      toolArgs,
-      iteration,
-      maxIterations,
-      context,
-    );
-  }
-
-  /**
-   * Display exploration tool result in chess-friendly format (debug mode only)
-   * Delegates to ExplorationDisplay
-   */
-  displayExplorationToolResult(
-    toolName: string,
-    result: unknown,
-    error: string | undefined,
-    durationMs: number,
-  ): void {
-    if (this.silent || !this.debug) return;
-    this.explorationDisplay.displayToolResult(toolName, result, error, durationMs);
-  }
-
-  /**
-   * Display exploration completion summary (debug mode only)
-   * Delegates to ExplorationDisplay
-   */
-  displayExplorationComplete(stats: {
-    toolCalls: number;
-    maxToolCalls: number;
-    branchCount: number;
-    totalAnnotations?: number;
-  }): void {
-    if (this.silent || !this.debug) return;
-    this.explorationDisplay.displayComplete(stats);
-  }
-
-  /**
-   * Display a position card in concise format (debug mode only)
-   * Delegates to DebugOutput
-   */
-  displayPositionCard(cardText: string): void {
-    if (this.silent || !this.debug) return;
-    this.debugOutput.displayPositionCard(cardText);
-  }
-
-  /**
    * Complete a phase successfully
    */
   completePhase(phase: AnalysisPhase, detail?: string): void {
@@ -509,52 +380,6 @@ export class ProgressReporter {
     console.log(`  Total time: ${timeStr}`);
     console.log(`  Critical moments: ${stats.criticalMoments}`);
     console.log(`  Annotations: ${stats.annotationsGenerated}`);
-  }
-
-  /**
-   * Print LLM cost summary
-   */
-  printCostSummary(costs: {
-    model: string;
-    inputTokens: number;
-    outputTokens: number;
-    reasoningTokens?: number;
-    totalCost: number;
-    toolCalls?: number;
-    apiCalls?: number;
-  }): void {
-    if (this.silent) return;
-
-    console.log('');
-    console.log(this.c.bold('LLM Cost Summary:'));
-    console.log(`  Model: ${costs.model}`);
-    console.log(`  Input tokens: ${formatTokenCount(costs.inputTokens)}`);
-    console.log(`  Output tokens: ${formatTokenCount(costs.outputTokens)}`);
-    if (costs.reasoningTokens && costs.reasoningTokens > 0) {
-      console.log(`  Reasoning tokens: ${formatTokenCount(costs.reasoningTokens)}`);
-    }
-    if (costs.apiCalls !== undefined) {
-      console.log(`  API calls: ${costs.apiCalls}`);
-    }
-    if (costs.toolCalls !== undefined && costs.toolCalls > 0) {
-      console.log(`  Tool calls: ${costs.toolCalls}`);
-    }
-    console.log(`  ${this.c.bold('Estimated cost:')} ${formatCost(costs.totalCost)}`);
-  }
-
-  /**
-   * Display LLM tool call progress
-   */
-  displayToolCall(
-    moveNotation: string,
-    toolName: string,
-    iteration: number,
-    maxIterations: number,
-  ): void {
-    if (this.silent || !this.spinner) return;
-
-    const iterStr = `[${iteration}/${maxIterations}]`;
-    this.spinner.text = `${this.c.cyan(moveNotation)} ${iterStr} calling ${this.c.yellow(toolName)}...`;
   }
 
   /**

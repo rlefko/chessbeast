@@ -31,10 +31,8 @@ describe('parseCliOptions', () => {
       expect(parseCliOptions({ profile: 'deep' }).profile).toBe('deep');
     });
 
-    it('should parse verbosity option', () => {
-      expect(parseCliOptions({ verbosity: 'summary' }).verbosity).toBe('summary');
-      expect(parseCliOptions({ verbosity: 'normal' }).verbosity).toBe('normal');
-      expect(parseCliOptions({ verbosity: 'rich' }).verbosity).toBe('rich');
+    it('should ignore the removed verbosity option', () => {
+      expect('verbosity' in parseCliOptions({ verbosity: 'rich' })).toBe(false);
     });
   });
 
@@ -114,7 +112,6 @@ describe('parseCliOptions', () => {
       expect(result.input).toBe('game.pgn');
       expect(result.output).toBe('annotated.pgn');
       expect(result.profile).toBe('deep');
-      expect(result.verbosity).toBe('rich');
       expect(result.targetElo).toBe(2000);
       expect(result.skipMaia).toBe(true);
       expect(result.noColor).toBe(true);

@@ -4,6 +4,13 @@
  * Note: Types are inlined to avoid circular dependency with @chessbeast/cli
  */
 
+import type { AudienceLevel } from '@chessbeast/llm';
+
+/**
+ * Target audience level for annotations (canonical definition in @chessbeast/llm)
+ */
+export type { AudienceLevel };
+
 /**
  * Analysis profile presets
  */
@@ -114,11 +121,6 @@ export type VariationDepth = 'low' | 'medium' | 'high';
  * Comment density control
  */
 export type CommentDensity = 'sparse' | 'normal' | 'verbose';
-
-/**
- * Target audience level for annotations
- */
-export type AudienceLevel = 'beginner' | 'club' | 'expert';
 
 /**
  * Ultra-Fast Coach configuration

@@ -4,7 +4,6 @@
  */
 
 import { createAnalysisPipeline, type GameAnalysis } from '@chessbeast/core';
-import { type VerbosityLevel, type AnnotationProgress } from '@chessbeast/llm';
 import {
   parsePgn,
   renderPgn,
@@ -13,7 +12,7 @@ import {
   type ParsedGame,
 } from '@chessbeast/pgn';
 
-import type { ChessBeastConfig, AnnotationPerspective } from '../config/schema.js';
+import type { ChessBeastConfig } from '../config/schema.js';
 import { PgnError, AnalysisError } from '../errors/index.js';
 import type { ProgressReporter } from '../progress/reporter.js';
 import { createPipelineProgressCallback } from '../progress/reporter.js';
@@ -136,73 +135,23 @@ export async function orchestrateAnalysis(
 
     totalCriticalMoments += analysis.criticalMoments.length;
 
-    // Annotate with LLM if enabled
+    // Annotate with the Ultra-Fast Coach pipeline if LLM annotation is enabled
     if (!config.analysis.skipLlm && config.llm.apiKey) {
-      if (config.ultraFastCoach.enabled) {
-        // Ultra-Fast Coach annotation with engine-driven exploration
-        reporter.startPhase('llm_annotation');
-        try {
-          const annotationCount = await runUltraFastCoachAnnotation(
-            analysis,
-            config,
-            services,
-            reporter,
-          );
-          totalAnnotations += annotationCount;
-          reporter.completePhase('llm_annotation', `${annotationCount} annotations`);
-        } catch (error) {
-          reporter.failPhase(
-            'llm_annotation',
-            error instanceof Error ? error.message : 'unknown error',
-          );
-        }
-      } else if (services.annotator) {
-        // Regular LLM annotation
-        reporter.startPhase('llm_annotation');
-        try {
-          const preferredVerbosity: VerbosityLevel = 'normal';
-
-          const onProgress = (progress: AnnotationProgress): void => {
-            if (progress.phase === 'exploring' && progress.currentMove) {
-              reporter.updateMoveProgress(
-                progress.currentIndex + 1,
-                progress.totalPositions,
-                `Exploring ${progress.currentMove}`,
-              );
-            } else if (progress.phase === 'annotating' && progress.currentMove) {
-              reporter.updateMoveProgress(
-                progress.currentIndex + 1,
-                progress.totalPositions,
-                progress.currentMove,
-              );
-
-              if (progress.thinking) {
-                reporter.displayThinking(progress.currentMove, progress.thinking);
-              }
-            }
-          };
-
-          const onWarning = (message: string): void => {
-            reporter.warnSafe(message);
-          };
-
-          const result = await services.annotator.annotate(analysis, {
-            preferredVerbosity,
-            generateSummary: config.output.includeSummary,
-            perspective: config.output.perspective as AnnotationPerspective,
-            includeNags: config.output.includeNags,
-            onProgress,
-            onWarning,
-          });
-          analysis = result.analysis;
-          totalAnnotations += result.positionsAnnotated;
-          reporter.completePhase('llm_annotation', `${result.positionsAnnotated} annotations`);
-        } catch (error) {
-          reporter.failPhase(
-            'llm_annotation',
-            error instanceof Error ? error.message : 'unknown error',
-          );
-        }
+      reporter.startPhase('llm_annotation');
+      try {
+        const annotationCount = await runUltraFastCoachAnnotation(
+          analysis,
+          config,
+          services,
+          reporter,
+        );
+        totalAnnotations += annotationCount;
+        reporter.completePhase('llm_annotation', `${annotationCount} annotations`);
+      } catch (error) {
+        reporter.failPhase(
+          'llm_annotation',
+          error instanceof Error ? error.message : 'unknown error',
+        );
       }
     }
 

@@ -23,11 +23,11 @@ import {
   createLLMConfig,
   createEngineDrivenExplorer,
   createPostWritePipeline,
+  generateGameSummary,
   type EngineDrivenExplorerProgress,
   type PostWritePipelineProgress,
   type ThemeVerbosity,
   type AudienceLevel,
-  type DensityLevel,
   type CommentIntent,
   type ThemeInstance,
 } from '@chessbeast/llm';
@@ -123,6 +123,7 @@ export async function runUltraFastCoachFull(
   reporter: ProgressReporter,
 ): Promise<UltraFastCoachRunnerResult> {
   const warnings: string[] = [];
+  const runStartTime = Date.now();
 
   // Build LLM config (conditionally add reasoningEffort)
   const llmConfigInput: Parameters<typeof createLLMConfig>[0] = {
@@ -134,27 +135,26 @@ export async function runUltraFastCoachFull(
   if (config.llm.reasoningEffort !== undefined) {
     llmConfigInput.reasoningEffort = config.llm.reasoningEffort;
   }
+  if (config.llm.tokenBudget !== undefined) {
+    llmConfigInput.budget = { maxTokensPerGame: config.llm.tokenBudget };
+  }
   const llmConfig = createLLMConfig(llmConfigInput);
 
-  const client = new OpenAIClient(llmConfig);
+  // Use the injected client when present (tests inject a mock here)
+  const client = services.llmClient ?? new OpenAIClient(llmConfig);
 
-  // Get Ultra-Fast Coach config
+  // Get Ultra-Fast Coach config (the single layer deriving internal configs)
   const coachConfig = createUltraFastCoachConfig(config.ultraFastCoach);
 
-  // Create artifact cache with tier-based sizing
-  const cache = createArtifactCache({
-    maxEngineEvals: coachConfig.defaultTier === 'full' ? 5000 : 2000,
-    maxThemes: coachConfig.defaultTier === 'full' ? 3000 : 1000,
-    maxCandidates: coachConfig.defaultTier === 'full' ? 2000 : 500,
-    ttlMs: 3600000, // 1 hour
-  });
+  // Create artifact cache with tier-based sizing from the coach config
+  const cache = createArtifactCache(coachConfig.artifactCache);
 
   // Create engine adapter for the explorer
   const engineAdapter = createEngineAdapter(services.stockfish);
 
   // Determine theme verbosity and audience from config
   const themeVerbosity: ThemeVerbosity = coachConfig.themes.verbosity;
-  const audience = (coachConfig.narration.audience ?? 'club') as AudienceLevel;
+  const audience: AudienceLevel = coachConfig.narration.audience ?? 'club';
   const targetRating = config.ratings.targetAudienceRating ?? config.ratings.defaultRating;
 
   // Create the SHARED DAG upfront with mainline moves
@@ -176,12 +176,16 @@ export async function runUltraFastCoachFull(
   const explorer = createEngineDrivenExplorer(engineAdapter, cache, {
     maxNodes: coachConfig.variations.maxNodes,
     maxDepth: coachConfig.variations.maxDepth,
-    budgetMs: coachConfig.defaultTier === 'full' ? 120000 : 60000,
+    budgetMs: coachConfig.variations.budgetMs,
     detectThemes: coachConfig.themes.enabled,
     themeVerbosity,
     audience,
     targetRating,
     sharedDag, // Pass the shared DAG so explored variations are integrated
+    // Surface engine-evaluation failures (isolated inside exploration) as warnings
+    onWarning: (warning: string) => {
+      warnings.push(warning);
+    },
   });
 
   // Emit session start event
@@ -197,6 +201,7 @@ export async function runUltraFastCoachFull(
   // Phase 1: Engine-driven exploration (using deep_analysis phase)
   reporter.startPhase('deep_analysis');
   debugGuiEmitter.phaseStart('deep_analysis', 'Engine Exploration');
+  const explorationPhaseStart = Date.now();
 
   let totalNodesExplored = 0;
   const allIntents: CommentIntent[] = [];
@@ -277,6 +282,18 @@ export async function runUltraFastCoachFull(
           allThemes.set(key, themes);
         }
       }
+
+      // Emit detected themes to the Debug GUI
+      for (const [positionKey, themes] of explorationResult.themes) {
+        for (const theme of themes) {
+          debugGuiEmitter.themeDetected({
+            themeName: theme.type,
+            lifecycle: theme.status === 'transformed' ? 'escalated' : theme.status,
+            fen: positionKey,
+            description: theme.explanation,
+          });
+        }
+      }
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       warnings.push(`Exploration failed for ${moveNotation}: ${errMsg}`);
@@ -284,22 +301,44 @@ export async function runUltraFastCoachFull(
   }
 
   reporter.completePhase('deep_analysis', `${totalNodesExplored} nodes explored`);
-  debugGuiEmitter.phaseComplete('deep_analysis', 0, `${totalNodesExplored} nodes explored`);
+  debugGuiEmitter.phaseComplete(
+    'deep_analysis',
+    Date.now() - explorationPhaseStart,
+    `${totalNodesExplored} nodes explored`,
+  );
+
+  // Publish the intent queue to the Debug GUI annotation panel.
+  // Intents use the after-move ply convention (comments attach to the
+  // RESULTING position's ply), so the move described is moves[plyIndex - 1].
+  for (const intent of allIntents) {
+    const intentMove = analysis.moves[intent.plyIndex - 1];
+    debugGuiEmitter.annotationIntent({
+      plyIndex: intent.plyIndex,
+      moveNotation: intentMove
+        ? `${intentMove.moveNumber}${intentMove.isWhiteMove ? '.' : '...'} ${intentMove.san}`
+        : `ply ${intent.plyIndex}`,
+      intentType: intent.type,
+      priority: intent.priority,
+      mandatory: intent.mandatory,
+    });
+  }
 
   // Phase 2: Post-write annotation (using llm_annotation phase)
   reporter.startPhase('llm_annotation');
   debugGuiEmitter.phaseStart('llm_annotation', 'LLM Annotation', allIntents.length);
+  const annotationPhaseStart = Date.now();
 
   const pipeline = createPostWritePipeline(client, {
     narrator: {
-      audience,
-      maxWordsPerComment: 50,
-      includeVariations: coachConfig.variations.depth !== 'low',
+      // Narration settings (audience, word cap, variation inclusion) come
+      // from the coach config; only run-specific overrides are applied here
+      ...coachConfig.narration,
+      perspective: config.output.perspective,
       showEvaluations: false,
     },
-    density: coachConfig.density as DensityLevel,
+    density: coachConfig.density,
     lineMemory: coachConfig.lineMemory,
-    maxCommentsPerGame: 30,
+    maxCommentsPerGame: coachConfig.maxCommentsPerGame,
     useLlm: true,
   });
 
@@ -324,6 +363,21 @@ export async function runUltraFastCoachFull(
           progress.currentComment,
         );
       }
+
+      // Per-ply outcome: emit an annotation:comment event (generated or filtered)
+      if (progress.plyIndex !== undefined) {
+        const progressMove = analysis.moves[progress.plyIndex - 1];
+        debugGuiEmitter.annotationComment({
+          plyIndex: progress.plyIndex,
+          moveNotation:
+            progress.moveNotation ??
+            (progressMove
+              ? `${progressMove.moveNumber}${progressMove.isWhiteMove ? '.' : '...'} ${progressMove.san}`
+              : undefined),
+          comment: progress.currentComment ?? '',
+          filtered: progress.filtered,
+        });
+      }
     },
     (warning: string) => {
       warnings.push(warning);
@@ -333,9 +387,19 @@ export async function runUltraFastCoachFull(
   reporter.completePhase('llm_annotation', `${pipelineResult.stats.commentsGenerated} comments`);
   debugGuiEmitter.phaseComplete(
     'llm_annotation',
-    0,
+    Date.now() - annotationPhaseStart,
     `${pipelineResult.stats.commentsGenerated} comments`,
   );
+
+  // Phase 3: game summary (one LLM call, deterministic template fallback)
+  if (config.output.includeSummary) {
+    analysis.summary = await generateGameSummary(
+      client,
+      analysis,
+      { audience, targetRating },
+      (warning: string) => warnings.push(warning),
+    );
+  }
 
   // Transform the shared DAG (which now contains mainline + explored variations) to moves
   // Navigate to root first to ensure we start from the beginning
@@ -350,7 +414,8 @@ export async function runUltraFastCoachFull(
     gamesAnalyzed: 1,
     criticalMoments: criticalMoments.length,
     annotationsGenerated: pipelineResult.stats.commentsGenerated,
-    totalTimeMs: 0, // TODO: track actual time
+    totalTimeMs: Date.now() - runStartTime,
+    nodesExplored: totalNodesExplored,
   });
 
   return {

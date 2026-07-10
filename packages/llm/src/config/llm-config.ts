@@ -52,16 +52,6 @@ export interface CircuitBreakerConfig {
 }
 
 /**
- * Cache configuration
- */
-export interface CacheConfig {
-  /** Maximum number of entries in the response cache (default: 1000) */
-  maxSize: number;
-  /** Time-to-live for cache entries in milliseconds (default: 3600000 = 1 hour) */
-  ttlMs: number;
-}
-
-/**
  * Main LLM configuration
  */
 export interface LLMConfig {
@@ -83,8 +73,6 @@ export interface LLMConfig {
   retry: RetryConfig;
   /** Circuit breaker settings */
   circuitBreaker: CircuitBreakerConfig;
-  /** Cache settings */
-  cache: CacheConfig;
 }
 
 /**
@@ -120,14 +108,6 @@ export const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
 };
 
 /**
- * Default cache configuration
- */
-export const DEFAULT_CACHE_CONFIG: CacheConfig = {
-  maxSize: 1000,
-  ttlMs: 3600000, // 1 hour
-};
-
-/**
  * Default LLM configuration (requires apiKey to be provided)
  */
 export const DEFAULT_LLM_CONFIG: Omit<LLMConfig, 'apiKey'> = {
@@ -139,20 +119,29 @@ export const DEFAULT_LLM_CONFIG: Omit<LLMConfig, 'apiKey'> = {
   budget: DEFAULT_TOKEN_BUDGET,
   retry: DEFAULT_RETRY_CONFIG,
   circuitBreaker: DEFAULT_CIRCUIT_BREAKER_CONFIG,
-  cache: DEFAULT_CACHE_CONFIG,
+};
+
+/**
+ * Input for createLLMConfig: any subset of LLMConfig, with partial sub-configs
+ * merged over their defaults.
+ */
+export type LLMConfigInput = Omit<Partial<LLMConfig>, 'budget' | 'retry' | 'circuitBreaker'> & {
+  apiKey: string;
+  budget?: Partial<TokenBudget>;
+  retry?: Partial<RetryConfig>;
+  circuitBreaker?: Partial<CircuitBreakerConfig>;
 };
 
 /**
  * Create a full LLM config with defaults for unspecified values
  */
-export function createLLMConfig(partial: Partial<LLMConfig> & { apiKey: string }): LLMConfig {
+export function createLLMConfig(partial: LLMConfigInput): LLMConfig {
   return {
     ...DEFAULT_LLM_CONFIG,
     ...partial,
     budget: { ...DEFAULT_TOKEN_BUDGET, ...partial.budget },
     retry: { ...DEFAULT_RETRY_CONFIG, ...partial.retry },
     circuitBreaker: { ...DEFAULT_CIRCUIT_BREAKER_CONFIG, ...partial.circuitBreaker },
-    cache: { ...DEFAULT_CACHE_CONFIG, ...partial.cache },
   };
 }
 

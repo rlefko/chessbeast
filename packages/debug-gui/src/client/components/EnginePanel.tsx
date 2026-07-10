@@ -7,39 +7,59 @@
 import { Box, Text } from 'ink';
 
 import { useDebugStore } from '../state/store.js';
+import { getEvalColor, getLifecycleColor, getLifecycleIcon, palette } from '../theme.js';
 
-import { formatEval, getEvalColor } from './EvalBar.js';
+import { formatEval } from './EvalBar.js';
 import { Panel } from './Panel.js';
 
 export interface EnginePanelProps {
   focused?: boolean | undefined;
-  width?: string | number | undefined;
-  height?: string | number | undefined;
+  width?: number | undefined;
+  height?: number | undefined;
 }
 
 export function EnginePanel({ focused = false, width, height }: EnginePanelProps): JSX.Element {
-  const { engine, exploration, themes, criticalMoments } = useDebugStore();
+  const engine = useDebugStore((state) => state.engine);
+  const exploration = useDebugStore((state) => state.exploration);
+  const themes = useDebugStore((state) => state.themes);
+  const criticalMoments = useDebugStore((state) => state.criticalMoments);
+
+  const hasAnyData =
+    engine.hasData || exploration !== null || themes.length > 0 || criticalMoments.length > 0;
 
   return (
-    <Panel title="Engine Analysis" focused={focused} width={width} height={height}>
+    <Panel title="Engine" focused={focused} width={width} height={height}>
       <Box flexDirection="column">
+        {!hasAnyData && (
+          <Box flexDirection="column">
+            <Text dimColor>Waiting for engine data —</Text>
+            <Text dimColor>exploration starts at the first critical moment.</Text>
+          </Box>
+        )}
+
         {/* Analysis stats */}
-        <Box marginBottom={1}>
-          <Text dimColor>Depth: </Text>
-          <Text bold>{engine.depth}</Text>
-          <Text dimColor> | Nodes: </Text>
-          <Text>{formatNodes(engine.nodes)}</Text>
-          {engine.nps > 0 && (
-            <>
-              <Text dimColor> | </Text>
-              <Text>{formatNodes(engine.nps)}/s</Text>
-            </>
-          )}
-        </Box>
+        {engine.hasData && (
+          <Box>
+            <Text dimColor>Depth: </Text>
+            <Text bold>{engine.depth}</Text>
+            {engine.nodes > 0 && (
+              <>
+                <Text dimColor> | Nodes: </Text>
+                <Text>{formatNodes(engine.nodes)}</Text>
+              </>
+            )}
+            {engine.nps > 0 && (
+              <>
+                <Text dimColor> | </Text>
+                <Text>{formatNodes(engine.nps)}/s</Text>
+              </>
+            )}
+          </Box>
+        )}
 
         {/* Main PV line */}
         {engine.pv.length > 0 && (
-          <Box marginBottom={1}>
+          <Box>
             <Text color={getEvalColor(engine.evaluation)} bold>
               {formatEval(engine.evaluation)}
             </Text>
@@ -50,11 +70,15 @@ export function EnginePanel({ focused = false, width, height }: EnginePanelProps
 
         {/* MultiPV alternatives */}
         {engine.multipv.length > 1 && (
-          <Box flexDirection="column" marginBottom={1}>
+          <Box flexDirection="column">
             <Text dimColor>Alternatives:</Text>
             {engine.multipv.slice(1, 4).map((line, idx) => (
               <Box key={idx} marginLeft={1}>
-                <Text color="gray">{idx + 2}. </Text>
+                <Text
+                  color={engine.highlightedLine === idx + 1 ? palette.accentBright : palette.muted}
+                >
+                  {idx + 2}.{' '}
+                </Text>
                 <Text color={getEvalColor(line.evaluation)}>{formatEval(line.evaluation)}</Text>
                 <Text> {line.move}</Text>
                 {line.pv.length > 1 && <Text dimColor> {line.pv.slice(1, 4).join(' ')}</Text>}
@@ -65,13 +89,13 @@ export function EnginePanel({ focused = false, width, height }: EnginePanelProps
 
         {/* Exploration progress */}
         {exploration && (
-          <Box flexDirection="column" marginBottom={1}>
-            <Text dimColor>Exploration:</Text>
-            <Box marginLeft={1}>
+          <Box flexDirection="column" marginTop={engine.hasData ? 1 : 0}>
+            <Box>
+              <Text dimColor>Exploration: </Text>
               <Text>
-                Nodes: {exploration.nodesExplored}/{exploration.maxNodes}
+                {exploration.nodesExplored}/{exploration.maxNodes}
               </Text>
-              <Text dimColor> | Depth: </Text>
+              <Text dimColor> nodes | depth </Text>
               <Text>{exploration.currentDepth}</Text>
             </Box>
             <Box marginLeft={1}>
@@ -95,7 +119,7 @@ export function EnginePanel({ focused = false, width, height }: EnginePanelProps
 
         {/* Recent themes */}
         {themes.length > 0 && (
-          <Box flexDirection="column" marginBottom={1}>
+          <Box flexDirection="column" marginTop={1}>
             <Text dimColor>Themes:</Text>
             {themes.slice(-4).map((theme, idx) => (
               <Box key={idx} marginLeft={1}>
@@ -110,9 +134,9 @@ export function EnginePanel({ focused = false, width, height }: EnginePanelProps
 
         {/* Critical moments count */}
         {criticalMoments.length > 0 && (
-          <Box>
+          <Box marginTop={1}>
             <Text dimColor>Critical Moments: </Text>
-            <Text color="yellow" bold>
+            <Text color={palette.warning} bold>
               {criticalMoments.length}
             </Text>
           </Box>
@@ -129,14 +153,14 @@ interface ProgressBarProps {
 }
 
 function ProgressBar({ current, total, width = 20 }: ProgressBarProps): JSX.Element {
-  const percentage = total > 0 ? current / total : 0;
+  const percentage = total > 0 ? Math.min(1, current / total) : 0;
   const filled = Math.round(percentage * width);
   const empty = width - filled;
 
   return (
     <Text>
-      <Text color="green">{'\u2588'.repeat(filled)}</Text>
-      <Text color="gray">{'\u2591'.repeat(empty)}</Text>
+      <Text color={palette.success}>{'█'.repeat(filled)}</Text>
+      <Text color={palette.muted}>{'░'.repeat(empty)}</Text>
     </Text>
   );
 }
@@ -152,34 +176,4 @@ function formatNodes(nodes: number): string {
     return `${(nodes / 1000).toFixed(1)}K`;
   }
   return nodes.toString();
-}
-
-function getLifecycleColor(lifecycle: string): string {
-  switch (lifecycle) {
-    case 'emerged':
-      return 'greenBright';
-    case 'persisting':
-      return 'cyan';
-    case 'escalated':
-      return 'yellowBright';
-    case 'resolved':
-      return 'gray';
-    default:
-      return 'white';
-  }
-}
-
-function getLifecycleIcon(lifecycle: string): string {
-  switch (lifecycle) {
-    case 'emerged':
-      return '[NEW]';
-    case 'persisting':
-      return '[+]';
-    case 'escalated':
-      return '[!]';
-    case 'resolved':
-      return '[-]';
-    default:
-      return '[?]';
-  }
 }
