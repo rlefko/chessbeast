@@ -7,11 +7,13 @@ ChessBeast supports flexible configuration through files, environment variables,
 3. **Configuration file**
 4. **Default values** (lowest priority)
 
+The schema lives in `packages/cli/src/config/schema.ts`, defaults in `packages/cli/src/config/defaults.ts`, and the merge logic in `packages/cli/src/config/loader.ts`. This document tracks those files.
+
 ## Configuration File
 
-ChessBeast uses [cosmiconfig](https://github.com/davidtheclark/cosmiconfig) for configuration file discovery. The following file names are searched (in order):
+ChessBeast uses [cosmiconfig](https://github.com/davidtheclark/cosmiconfig) for configuration file discovery. The following file names are searched, in order:
 
-- `package.json` (under `"chessbeast"` key)
+- `package.json` (under a `"chessbeast"` key)
 - `.chessbeastrc`
 - `.chessbeastrc.json`
 - `.chessbeastrc.yaml`
@@ -26,6 +28,7 @@ You can also specify a config file explicitly with the `--config` flag.
 ### Example Configuration Files
 
 **JSON (`.chessbeastrc.json`)**:
+
 ```json
 {
   "analysis": {
@@ -42,32 +45,15 @@ You can also specify a config file explicitly with the `--config` flag.
     "targetAudienceRating": 1600
   },
   "llm": {
-    "model": "gpt-5-codex",
+    "model": "gpt-5-mini",
     "temperature": 0.7,
     "timeout": 30000,
     "reasoningEffort": "medium",
     "streaming": true
   },
-  "agentic": {
-    "enabled": false,
-    "annotateAll": false,
-    "maxToolCalls": 5,
-    "showCosts": true,
-    "agenticExploration": false,
-    "explorationMaxToolCalls": 40,
-    "explorationMaxDepth": 50
-  },
   "services": {
-    "stockfish": {
-      "host": "localhost",
-      "port": 50051,
-      "timeoutMs": 60000
-    },
-    "maia": {
-      "host": "localhost",
-      "port": 50052,
-      "timeoutMs": 30000
-    }
+    "stockfish": { "host": "localhost", "port": 50051, "timeoutMs": 300000 },
+    "maia": { "host": "localhost", "port": 50052, "timeoutMs": 30000 }
   },
   "databases": {
     "ecoPath": "data/eco.db",
@@ -76,12 +62,21 @@ You can also specify a config file explicitly with the `--config` flag.
   "output": {
     "includeVariations": true,
     "includeNags": true,
-    "includeSummary": true
+    "includeSummary": true,
+    "perspective": "neutral"
+  },
+  "ultraFastCoach": {
+    "speed": "normal",
+    "themes": "important",
+    "variations": "medium",
+    "commentDensity": "normal",
+    "audience": "club"
   }
 }
 ```
 
 **YAML (`.chessbeastrc.yaml`)**:
+
 ```yaml
 analysis:
   profile: standard
@@ -97,26 +92,17 @@ ratings:
   targetAudienceRating: 1600
 
 llm:
-  model: gpt-5-codex
+  model: gpt-5-mini
   temperature: 0.7
   timeout: 30000
   reasoningEffort: medium
   streaming: true
 
-agentic:
-  enabled: false
-  annotateAll: false
-  maxToolCalls: 5
-  showCosts: true
-  agenticExploration: false
-  explorationMaxToolCalls: 40
-  explorationMaxDepth: 50
-
 services:
   stockfish:
     host: localhost
     port: 50051
-    timeoutMs: 60000
+    timeoutMs: 300000
   maia:
     host: localhost
     port: 50052
@@ -130,6 +116,14 @@ output:
   includeVariations: true
   includeNags: true
   includeSummary: true
+  perspective: neutral
+
+ultraFastCoach:
+  speed: normal
+  themes: important
+  variations: medium
+  commentDensity: normal
+  audience: club
 ```
 
 ## Configuration Schema
@@ -139,129 +133,36 @@ output:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `analysis.profile` | `"quick"` \| `"standard"` \| `"deep"` | `"standard"` | Analysis profile preset |
-| `analysis.shallowDepth` | number | 14 | Engine depth for first pass (all positions) |
-| `analysis.deepDepth` | number | 22 | Engine depth for second pass (critical moments) |
-| `analysis.multiPvCount` | number | 3 | Number of principal variations to analyze |
-| `analysis.maxCriticalRatio` | number | 0.25 | Maximum ratio of moves to mark as critical (0.0-1.0) |
+| `analysis.shallowDepth` | number (1-99) | 14 | Engine depth for the shallow pass (all positions) |
+| `analysis.shallowTimeLimitMs` | number | 3000 | Time limit per position for the shallow pass |
+| `analysis.deepDepth` | number (1-99) | 22 | Engine depth for the deep pass (critical moments) |
+| `analysis.deepTimeLimitMs` | number | 10000 | Time limit per position for the deep pass |
+| `analysis.multiPvCount` | number (1-10) | 3 | Number of principal variations for critical moments |
+| `analysis.maxCriticalRatio` | number (0.0-1.0) | 0.25 | Maximum ratio of moves marked critical |
+| `analysis.mateMinTimeMs` | number (optional) | 5000 | Minimum search time for mate or winning positions |
 | `analysis.skipMaia` | boolean | false | Skip Maia human-likeness analysis |
-| `analysis.skipLlm` | boolean | false | Skip LLM annotation generation |
+| `analysis.skipLlm` | boolean | false | Skip LLM annotation generation (template only) |
+
+`deepDepth` must be greater than or equal to `shallowDepth`.
 
 ### Rating Settings
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `ratings.defaultRating` | number | 1500 | Default rating when player rating is unknown |
-| `ratings.targetAudienceRating` | number | — | Target audience rating for explanations |
+| `ratings.defaultRating` | number (100-4000) | 1500 | Default rating when a player rating is unknown |
+| `ratings.targetAudienceRating` | number (100-4000, optional) | (none) | Target audience rating for explanations |
 
 ### LLM Settings
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `llm.apiKey` | string | — | OpenAI API key (prefer `OPENAI_API_KEY` env var) |
-| `llm.model` | string | `"gpt-5-codex"` | OpenAI model to use (see available models below) |
-| `llm.temperature` | number | 0.7 | Model temperature (0.0-2.0) |
-| `llm.timeout` | number | 30000 | Request timeout in milliseconds |
-| `llm.reasoningEffort` | `"none"` \| `"low"` \| `"medium"` \| `"high"` | `"medium"` | Reasoning effort for codex models |
-| `llm.streaming` | boolean | true | Enable streaming for real-time progress |
-
-**Available Models:**
-| Model | Input Cost | Output Cost | Best For |
-|-------|------------|-------------|----------|
-| `gpt-5-codex` | $1.25/1M | $10.00/1M | Deep analysis with reasoning (default) |
-| `gpt-5` | $1.25/1M | $10.00/1M | Full GPT-5 capabilities |
-| `gpt-5-mini` | $0.25/1M | $2.00/1M | Cost-effective quality analysis |
-| `gpt-5-nano` | $0.05/1M | $0.40/1M | Fast, budget-friendly annotations |
-
-**Reasoning Effort Levels:**
-- `none`: Disable reasoning (standard completion, fastest)
-- `low`: Minimal reasoning for faster responses
-- `medium`: Balanced reasoning for quality analysis (default)
-- `high`: Maximum reasoning for complex positions (slower, most thorough)
-
-When using reasoning models (gpt-5-codex, o1, o3), the model's thinking process can be displayed in verbose mode (`--verbose` flag). This shows real-time reasoning as each move is analyzed.
-
-### Debug Mode
-
-Use `--debug` for detailed LLM observability beyond `--verbose`. Debug mode provides:
-
-- **Move Context**: FEN, evaluation, best move, and classification for each analyzed position
-- **Full LLM Reasoning**: Complete untruncated thinking (verbose shows truncated spinner text)
-- **Tool Call Details**: Full request (name + JSON arguments) and response for agentic mode
-
-Debug output goes to stderr for clean piping:
-
-```bash
-# Pipe PGN to stdout while capturing debug logs
-chessbeast analyze --input game.pgn --agentic --debug > annotated.pgn 2> debug.log
-
-# Or view debug output live while saving PGN
-chessbeast analyze --input game.pgn --debug 2>&1 | tee analysis.log
-```
-
-**Example Debug Output:**
-
-```
-=== DEBUG: 14... Be6 ===
-FEN: r2q1rk1/pp2bppp/2n1bn2/3pp3/2PP4/2N1PN2/PP2BPPP/R1BQ1RK1 b - - 0 14
-Eval: +0.45 | Best: Nxd4
-Classification: inaccuracy (35cp loss)
-
---- LLM Reasoning ---
-Let me analyze this position. Black played Be6 developing the bishop...
---- End Reasoning ---
-
-[Tool Call 1/5] evaluate_position
-Arguments:
-{
-  "fen": "r2q1rk1/pp2bppp/2n1bn2/3pp3/...",
-  "depth": 20
-}
-
-[Tool Result] evaluate_position (156ms)
-{
-  "evaluation": 45,
-  "bestMove": "Nxd4"
-}
-```
-
-Note: `--debug` implies `--verbose` (debug is a superset of verbose mode).
-
-### Agentic Settings
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `agentic.enabled` | boolean | false | Enable agentic mode with tool calling |
-| `agentic.annotateAll` | boolean | false | Annotate all moves (not just critical moments) |
-| `agentic.maxToolCalls` | number | 5 | Maximum tool calls per position |
-| `agentic.showCosts` | boolean | true | Display LLM cost summary after analysis |
-| `agentic.agenticExploration` | boolean | false | Enable agentic variation exploration |
-| `agentic.explorationMaxToolCalls` | number | 40 | Maximum tool calls per variation exploration |
-| `agentic.explorationMaxDepth` | number | 50 | Maximum depth (half-moves) for variation exploration |
-
-**Agentic Mode:**
-When enabled, the LLM can query external services using OpenAI function calling:
-- `evaluate_position`: Get Stockfish evaluation
-- `predict_human_moves`: Get Maia predictions for human-likely moves
-- `lookup_opening`: Query ECO database
-- `find_reference_games`: Search Lichess Elite games
-- `make_move`: Apply a move and get resulting position
-
-**Agentic Exploration Mode:**
-When `agenticExploration` is enabled, variation exploration becomes fully agentic. The LLM has complete control over which lines to explore and can leave comments throughout variations (not just at the start/end). Available exploration tools:
-
-- `get_board`: Visual ASCII board representation for the current position
-- `push_move`: Play a move and advance the position
-- `pop_move`: Take back a move
-- `start_branch`: Begin a new variation branch
-- `end_branch`: Close the current variation
-- `add_comment`: Add a comment at the current position
-- `add_nag`: Add a NAG (Numeric Annotation Glyph) to the current move
-- `suggest_nag`: Get engine-based NAG suggestion for a move (compares to best move)
-- `get_eval_nag`: Get position evaluation NAG (+=, -+, etc.)
-- `assess_continuation`: Check if exploration should continue (tactical tension, eval swings)
-- `finish_exploration`: Complete exploration and return results
-
-The explorer uses intelligent caching for expensive Stockfish evaluations (depth ≥ 14) to avoid redundant analysis. Stopping heuristics combine tactical tension detection, evaluation swings, and budget awareness to balance thoroughness with efficiency.
+| `llm.apiKey` | string (optional) | (none) | OpenAI API key (prefer the `OPENAI_API_KEY` env var) |
+| `llm.model` | string | `"gpt-5-mini"` | OpenAI model (see [Models](#models)) |
+| `llm.temperature` | number (0.0-2.0) | 0.7 | Sampling temperature |
+| `llm.timeout` | number (1000-300000) | 30000 | Request timeout in milliseconds |
+| `llm.tokenBudget` | number (optional) | 50000 | Maximum tokens per game |
+| `llm.reasoningEffort` | `"none"` \| `"low"` \| `"medium"` \| `"high"` | `"medium"` | Reasoning effort for reasoning models |
+| `llm.streaming` | boolean | true | Stream reasoning for real-time display |
 
 ### Service Settings
 
@@ -269,36 +170,54 @@ The explorer uses intelligent caching for expensive Stockfish evaluations (depth
 |--------|------|---------|-------------|
 | `services.stockfish.host` | string | `"localhost"` | Stockfish service host |
 | `services.stockfish.port` | number | 50051 | Stockfish service port |
-| `services.stockfish.timeoutMs` | number | 60000 | Stockfish request timeout |
+| `services.stockfish.timeoutMs` | number | 300000 | Stockfish request timeout |
 | `services.maia.host` | string | `"localhost"` | Maia service host |
 | `services.maia.port` | number | 50052 | Maia service port |
 | `services.maia.timeoutMs` | number | 30000 | Maia request timeout |
+| `services.stockfish16` | object (optional) | (none) | Optional Stockfish 16 classical-eval endpoint |
+
+`services.stockfish16` is optional. When present, it takes `host`, `port` (the service listens on 50053), `timeoutMs`, and an `enabled` flag.
 
 ### Database Settings
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `databases.ecoPath` | string | `"data/eco.db"` | Path to ECO opening database |
-| `databases.lichessPath` | string | `"data/lichess_elite.db"` | Path to Lichess Elite games database |
+| `databases.ecoPath` | string | `"data/eco.db"` | Path to the ECO opening database |
+| `databases.lichessPath` | string | `"data/lichess_elite.db"` | Path to the Lichess Elite games database |
 
 ### Output Settings
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `output.includeVariations` | boolean | true | Include alternative variations in output |
-| `output.includeNags` | boolean | true | Include NAG symbols ($1, $2, etc.) |
-| `output.includeSummary` | boolean | true | Include game summary comment |
+| `output.includeVariations` | boolean | true | Include alternative variations in the output PGN |
+| `output.includeNags` | boolean | true | Include NAG symbols (`$1`, `$2`, and so on) |
+| `output.includeSummary` | boolean | true | Include the game summary comment |
+| `output.perspective` | `"neutral"` \| `"white"` \| `"black"` | `"neutral"` | Annotation perspective |
+
+### Ultra-Fast Coach Settings
+
+Ultra-Fast Coach is the only annotation pipeline; these keys tune it.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `ultraFastCoach.speed` | `"fast"` \| `"normal"` \| `"deep"` | `"normal"` | Analysis speed tier (see [Speed Tiers](#speed-tiers)) |
+| `ultraFastCoach.themes` | `"none"` \| `"important"` \| `"all"` | `"important"` | Theme output verbosity |
+| `ultraFastCoach.variations` | `"low"` \| `"medium"` \| `"high"` | `"medium"` | Variation exploration depth |
+| `ultraFastCoach.commentDensity` | `"sparse"` \| `"normal"` \| `"verbose"` | `"normal"` | Comment density |
+| `ultraFastCoach.audience` | `"beginner"` \| `"club"` \| `"expert"` | `"club"` | Target audience level |
 
 ## Environment Variables
 
-All configuration options can be set via environment variables:
+Set any of these to override the corresponding config key.
 
 ### API Keys
+
 | Variable | Config Path |
 |----------|-------------|
 | `OPENAI_API_KEY` | `llm.apiKey` |
 
 ### Analysis
+
 | Variable | Config Path |
 |----------|-------------|
 | `CHESSBEAST_PROFILE` | `analysis.profile` |
@@ -306,12 +225,14 @@ All configuration options can be set via environment variables:
 | `CHESSBEAST_SKIP_LLM` | `analysis.skipLlm` |
 
 ### Ratings
+
 | Variable | Config Path |
 |----------|-------------|
 | `CHESSBEAST_DEFAULT_RATING` | `ratings.defaultRating` |
 | `CHESSBEAST_TARGET_RATING` | `ratings.targetAudienceRating` |
 
 ### LLM
+
 | Variable | Config Path |
 |----------|-------------|
 | `CHESSBEAST_LLM_MODEL` | `llm.model` |
@@ -320,15 +241,8 @@ All configuration options can be set via environment variables:
 | `LLM_REASONING_EFFORT` | `llm.reasoningEffort` |
 | `LLM_STREAMING` | `llm.streaming` |
 
-### Agentic
-| Variable | Config Path |
-|----------|-------------|
-| `CHESSBEAST_AGENTIC` | `agentic.enabled` |
-| `CHESSBEAST_AGENTIC_ALL` | `agentic.annotateAll` |
-| `CHESSBEAST_MAX_TOOL_CALLS` | `agentic.maxToolCalls` |
-| `CHESSBEAST_SHOW_COSTS` | `agentic.showCosts` |
-
 ### Services
+
 | Variable | Config Path |
 |----------|-------------|
 | `CHESSBEAST_STOCKFISH_HOST` | `services.stockfish.host` |
@@ -337,51 +251,213 @@ All configuration options can be set via environment variables:
 | `CHESSBEAST_MAIA_PORT` | `services.maia.port` |
 
 ### Databases
+
 | Variable | Config Path |
 |----------|-------------|
 | `CHESSBEAST_ECO_DB` | `databases.ecoPath` |
 | `CHESSBEAST_LICHESS_DB` | `databases.lichessPath` |
 
+### Output and Ultra-Fast Coach
+
+| Variable | Config Path |
+|----------|-------------|
+| `CHESSBEAST_PERSPECTIVE` | `output.perspective` |
+| `CHESSBEAST_SPEED` | `ultraFastCoach.speed` |
+| `CHESSBEAST_THEMES` | `ultraFastCoach.themes` |
+| `CHESSBEAST_VARIATIONS` | `ultraFastCoach.variations` |
+| `CHESSBEAST_COMMENT_DENSITY` | `ultraFastCoach.commentDensity` |
+| `CHESSBEAST_AUDIENCE` | `ultraFastCoach.audience` |
+
 ## Profile Presets
 
-Profiles provide preset configurations for common use cases:
+Setting `analysis.profile` (or `--profile`) applies a preset over the analysis pass settings:
 
-### Quick Profile
+### Quick
+
 ```json
 {
   "shallowDepth": 12,
+  "shallowTimeLimitMs": 2000,
   "deepDepth": 16,
+  "deepTimeLimitMs": 5000,
   "multiPvCount": 1,
-  "maxCriticalRatio": 0.15
+  "maxCriticalRatio": 0.15,
+  "mateMinTimeMs": 2000
 }
 ```
 
-### Standard Profile (Default)
+### Standard (default)
+
 ```json
 {
   "shallowDepth": 14,
+  "shallowTimeLimitMs": 3000,
   "deepDepth": 22,
+  "deepTimeLimitMs": 10000,
   "multiPvCount": 3,
-  "maxCriticalRatio": 0.25
+  "maxCriticalRatio": 0.25,
+  "mateMinTimeMs": 5000
 }
 ```
 
-### Deep Profile
+### Deep
+
 ```json
 {
   "shallowDepth": 18,
+  "shallowTimeLimitMs": 5000,
   "deepDepth": 28,
+  "deepTimeLimitMs": 20000,
   "multiPvCount": 5,
-  "maxCriticalRatio": 0.35
+  "maxCriticalRatio": 0.35,
+  "mateMinTimeMs": 10000
 }
 ```
 
+## CLI Reference
+
+All flags below belong to the `chessbeast analyze` command.
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-i, --input <file>` | Input PGN file | stdin |
+| `-o, --output <file>` | Output file | stdout |
+| `-c, --config <file>` | Path to a config file | auto-discovered |
+| `-p, --profile <profile>` | Analysis profile: `quick`, `standard`, `deep` | `standard` |
+| `--perspective <side>` | Annotation perspective: `neutral`, `white`, `black` | `neutral` |
+| `--target-elo <rating>` | Target audience rating for annotations | player rating, else 1500 |
+| `--model <model>` | OpenAI model to use | `gpt-5-mini` |
+| `--token-budget <tokens>` | Maximum tokens per game for the LLM | 50000 |
+| `--skip-maia` | Skip Maia human-likeness analysis | off |
+| `--skip-llm` | Skip LLM annotations (template only) | off |
+| `--reasoning-effort <level>` | Reasoning effort: `none`, `low`, `medium`, `high` | `medium` |
+| `--verbose` | Show real-time LLM reasoning | off |
+| `--debug` | Detailed debug output to stderr (implies `--verbose`) | off |
+| `--speed <level>` | Analysis speed tier: `fast`, `normal`, `deep` | `normal` |
+| `--themes <level>` | Theme verbosity: `none`, `important`, `all` | `important` |
+| `--variations <level>` | Variation depth: `low`, `medium`, `high` | `medium` |
+| `--comment-density <level>` | Comment density: `sparse`, `normal`, `verbose` | `normal` |
+| `--audience <level>` | Audience level: `beginner`, `club`, `expert` | `club` |
+| `--debug-gui [port]` | Start the Debug GUI WebSocket server | port 9222 |
+| `--ultra-fast-coach` | Deprecated no-op; Ultra-Fast Coach is the default | (removed in a future release) |
+| `--show-config` | Print the resolved configuration and exit | |
+| `--no-color` | Disable colored output (useful for piping) | |
+| `--dry-run` | Validate setup and configuration without running | |
+| `--version` | Print the version | |
+| `--help` | Print help | |
+
+### Analysis Profiles
+
+`--profile` selects the depth and breadth of the two-pass analysis.
+
+| Profile | Shallow / deep depth | MultiPV | Critical moments | Best for |
+|---------|----------------------|---------|------------------|----------|
+| `quick` | 12 / 16 | 1 | ~15% of moves | Fast overview, blitz games |
+| `standard` | 14 / 22 | 3 | ~25% of moves | Balanced analysis (default) |
+| `deep` | 18 / 28 | 5 | ~35% of moves | Thorough study, tournament games |
+
+### Speed Tiers
+
+`--speed` (and `ultraFastCoach.speed`) selects the engine-exploration tier, which is separate from the analysis profile above.
+
+| `--speed` | Tier | Depth | Time limit | MultiPV |
+|-----------|------|-------|------------|---------|
+| `fast` | shallow | 12 | 1.5s | 1 |
+| `normal` | standard | 18 | 5s | 3 |
+| `deep` | full | 22 | 15s | 5 |
+
+### Models
+
+Prices are per 1M tokens, from `packages/llm/src/cost/pricing.ts`.
+
+| Model | Input | Output | Notes |
+|-------|-------|--------|-------|
+| `gpt-5-mini` | $0.25 | $2.00 | Cost-effective quality analysis (default) |
+| `gpt-5-nano` | $0.05 | $0.40 | Fast, budget-friendly annotations |
+| `gpt-5` | $1.25 | $10.00 | Full GPT-5 capabilities |
+| `gpt-5-codex` | $1.25 | $10.00 | Deep analysis with reasoning |
+
+Reasoning models (`gpt-5`, `gpt-5-codex`, `o1`, `o3-mini`) also bill reasoning tokens; unknown models fall back to a conservative default estimate.
+
+```bash
+# Budget-friendly annotations
+chessbeast analyze --input game.pgn --model gpt-5-nano
+
+# Deep reasoning
+chessbeast analyze --input game.pgn --model gpt-5-codex --reasoning-effort high
+```
+
+### Reasoning Effort
+
+`--reasoning-effort` applies to reasoning models (`gpt-5`, `gpt-5-codex`, `o1`, `o3`).
+
+| Level | Behavior |
+|-------|----------|
+| `none` | Disable reasoning (standard completion, fastest) |
+| `low` | Minimal reasoning for faster responses |
+| `medium` | Balanced reasoning for quality analysis (default) |
+| `high` | Maximum reasoning for complex positions (slowest, most thorough) |
+
+### Perspective
+
+| Value | Point of view | Example |
+|-------|---------------|---------|
+| `neutral` | Objective third person (default) | "White gains a tempo" |
+| `white` | From White's side | "We gain a tempo" |
+| `black` | From Black's side | "They gain a tempo" |
+
+Set `--perspective white` when reviewing your own game as White to get personalized "we/they" commentary.
+
+### Audience
+
+| Value | Explanations |
+|-------|--------------|
+| `beginner` | Simple explanations, basic terms, evaluations hidden |
+| `club` | Club-player level (default) |
+| `expert` | Advanced terminology, less hand-holding |
+
+### Comment Density
+
+| Value | Behavior |
+|-------|----------|
+| `sparse` | Fewer comments, key moments only |
+| `normal` | Standard density (default) |
+| `verbose` | More frequent comments |
+
+### Themes
+
+| Value | Behavior |
+|-------|----------|
+| `none` | No theme detection |
+| `important` | Only significant themes (default) |
+| `all` | All detected themes |
+
+### Variations
+
+| Value | Behavior |
+|-------|----------|
+| `low` | Minimal variations |
+| `medium` | Standard exploration (default) |
+| `high` | Deep variation trees |
+
+## Debug Mode
+
+`--verbose` streams the LLM's reasoning as annotations are generated. `--debug` is a superset: it adds move context (FEN, evaluation, best move, and classification for each analyzed position) and full untruncated reasoning. Debug output goes to stderr, so the annotated PGN on stdout stays clean:
+
+```bash
+# Save the PGN while capturing debug logs
+chessbeast analyze --input game.pgn --debug > annotated.pgn 2> debug.log
+
+# View debug output live while saving the PGN
+chessbeast analyze --input game.pgn --debug 2>&1 | tee analysis.log
+```
+
+For a live visual view of exploration and narration, use `--debug-gui`; see [packages/debug-gui/README.md](../packages/debug-gui/README.md).
+
 ## Viewing Resolved Configuration
 
-Use `--show-config` to see the final merged configuration:
+Use `--show-config` to print the final merged configuration (defaults, config file, environment variables, and CLI arguments) and exit:
 
 ```bash
 chessbeast analyze --show-config
 ```
-
-This displays the configuration after merging all sources (defaults, file, env vars, CLI args).

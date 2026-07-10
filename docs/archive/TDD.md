@@ -1,3 +1,5 @@
+> Archived design document from the original build-out; superseded by docs/concepts.md and docs/architecture.md; kept for provenance.
+
 TDD: AI Chess Annotator
 
 1. High-Level Architecture
